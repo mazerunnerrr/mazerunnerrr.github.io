@@ -20,5 +20,7 @@ next-env.d.ts
 /AGENTS.md
 /session-context.md
 /docs/
+# обломок разбора activetheory из прошлой сессии: на диске остаётся, в сайт не входит
+/_probe2.mjs
 
 .DS_Store
