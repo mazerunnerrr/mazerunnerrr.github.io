@@ -1,0 +1,24 @@
+# зависимости и сборка
+/node_modules
+/.next
+/out
+*.tsbuildinfo
+next-env.d.ts
+
+# секреты
+.env*
+
+# готовые ролики — пересобираются `npm run tour` / `npm run demo`
+/shots
+
+# бэкапы времён без git — лежат на диске, в историю не идут
+*.backup-*
+
+# внутренние заметки: репозиторий публичный, рабочие записи в нём не нужны.
+# Файлы остаются на диске и работают как раньше.
+/CLAUDE.md
+/AGENTS.md
+/session-context.md
+/docs/
+
+.DS_Store

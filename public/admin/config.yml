@@ -1,0 +1,152 @@
+# Админка сайта: правит те же JSON в content/, которые читает вёрстка.
+#
+# На localhost вход не нужен — CMS предлагает открыть папку проекта прямо
+# с диска. На боевом адресе вход по токену GitHub, и «Сохранить» становится
+# коммитом: после него сборка едет на Pages сама.
+#
+# Имя файла проекта = адрес его страницы, поэтому поле «Адрес» только
+# латиницей. Обязательность полей держит эта форма, а не код сайта.
+
+backend:
+  name: github
+  repo: mazerunnerrr/mazerunnerrr.github.io
+  branch: main
+
+media_folder: public/media
+public_folder: /media
+
+collections:
+  - name: projects
+    label: Проекты
+    label_singular: проект
+    folder: content/projects
+    extension: json
+    format: json
+    create: true
+    slug: "{{fields.slug}}"
+    summary: "{{title}}"
+    sortable_fields: [year, title]
+    fields:
+      - name: title
+        label: Название
+        widget: string
+      - name: slug
+        label: Адрес страницы
+        widget: string
+        pattern: ["^[a-z0-9-]+$", "Только латиница в нижнем регистре, цифры и дефис"]
+        hint: "Станет адресом вида /work/адрес/ и именем файла. Потом не меняется."
+      - name: year
+        label: Год
+        widget: string
+        hint: "Год или диапазон: 2026 или 2025–2026"
+      - name: role
+        label: Роль
+        widget: string
+      - name: status
+        label: Статус
+        widget: select
+        options: ["в работе", "личный проект", "разбор и архитектура", "запущен"]
+      - name: summary
+        label: Суть одной строкой
+        widget: string
+        required: false
+        hint: "Показывается на плитке под названием"
+      - name: lead
+        label: Задача и решение
+        widget: text
+        hint: "Абзац: что за задача и почему решена так"
+      - name: did
+        label: Что сделал
+        widget: list
+        hint: "3–6 пунктов строго о сделанном. Без «участвовал» и «помогал»"
+      - name: stack
+        label: Технологии
+        widget: list
+        hint: "По одной на строку: Python, FastAPI, SQLite"
+      - name: facts
+        label: Цифры
+        widget: list
+        required: false
+        fields:
+          - { name: value, label: Число, widget: string }
+          - { name: label, label: Подпись, widget: string }
+      - name: video
+        label: Видео на обложку
+        widget: file
+        required: false
+        hint: "Есть видео — оно идёт обложкой вместо скриншотов"
+      - name: shots
+        label: Скриншоты
+        widget: list
+        required: false
+        field: { name: image, label: Экран, widget: image }
+      - name: links
+        label: Ссылки
+        widget: list
+        required: false
+        fields:
+          - { name: label, label: Подпись, widget: string }
+          - { name: url, label: Адрес, widget: string }
+      - name: accent
+        label: Акцентный цвет
+        widget: select
+        required: false
+        options:
+          - { label: "Песочный", value: amber }
+          - { label: "Терракота", value: clay }
+          - { label: "Пыльно-голубой", value: azure }
+          - { label: "Шалфей", value: sage }
+        hint: "Пусто — будет пыльно-голубой"
+
+  - name: settings
+    label: Тексты сайта
+    files:
+      - name: site
+        label: Первый экран
+        file: content/site.json
+        format: json
+        fields:
+          - name: alias
+            label: Псевдоним
+            widget: string
+            hint: "Из него собирается слово из частиц и заголовок вкладки"
+          - name: thesis
+            label: Тезис
+            widget: string
+          - name: intro
+            label: Абзац под тезисом
+            widget: text
+          - name: status
+            label: Строка статуса
+            widget: string
+            hint: "Угол первого экрана: формат работы, часовой пояс, занятость"
+
+      - name: skills
+        label: Что делаю
+        file: content/skills.json
+        format: json
+        fields:
+          - name: items
+            label: Направления
+            widget: list
+            fields:
+              - { name: title, label: Название, widget: string }
+              - { name: lead, label: Одна строка о пользе, widget: text }
+
+      - name: contacts
+        label: Контакты
+        file: content/contacts.json
+        format: json
+        fields:
+          - { name: name, label: Имя, widget: string }
+          - name: note
+            label: Строка над ссылками
+            widget: text
+            required: false
+            hint: "Необязательно: что писать и когда ответишь"
+          - name: links
+            label: Ссылки
+            widget: list
+            fields:
+              - { name: label, label: Подпись, widget: string }
+              - { name: url, label: Адрес, widget: string }
