@@ -515,11 +515,25 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
        единицы, и множитель 0.6 уместен. В пикселях та же формула даёт
        полторы сотни пикселей за кадр — слово улетает за край экрана
        с первого же взмаха. */
-    const HIT = 210;        // радиус, в котором рука вообще что-то задевает
-    const SWEEP = 0.0018;   // увлечение по ходу руки — основная сила
-    const PUSH = 0.0006;    // отталкивание от точки касания
-    const CURL = 0.0009;    // закрутка вбок, чтобы не расходились строем
-    const DEPTH = 0.0035;   // разброс по глубине: одни ближе, другие дальше
+    /* Замерная точка для доводки удара: сколько скорости руки доходит до точек
+       и насколько их уносит. Живёт только в дев-режиме — в сборку не попадает,
+       там `probe` равен null и лишний проход по облаку не делается. */
+    type Probe = { rawSpeed: number; speed: number; maxDisp: number; moved: number };
+    const probe: Probe | null =
+      process.env.NODE_ENV === "production"
+        ? null
+        : ((window as unknown as { __probe: Probe }).__probe = {
+            rawSpeed: 0,
+            speed: 0,
+            maxDisp: 0,
+            moved: 0,
+          });
+
+    const HIT = 105;        // радиус, в котором рука вообще что-то задевает
+    const SWEEP = 0.0030;   // увлечение по ходу руки — основная сила
+    const PUSH = 0.0010;    // отталкивание от точки касания
+    const CURL = 0.0015;    // закрутка вбок, чтобы не расходились строем
+    const DEPTH = 0.0059;   // разброс по глубине: одни ближе, другие дальше
 
     const stepPhysics = (dt: number) => {
       if (!vel || !disp || !dispAttr || !base2 || !give || !spray) return;
@@ -531,9 +545,20 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
         ? { x: rawMouse.x - ptrPrev.x, y: rawMouse.y - ptrPrev.y }
         : { x: 0, y: 0 };
       ptrPrev.copy(rawMouse);
-      handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.3);
-      const speed = Math.min(handVel.length(), 55);
+      /* Сглаживание и потолок решают, сколько удара доходит до точек.
+
+         Было 0.3 и 55: рука на 120 пикселях за кадр отдавала облаку 55 —
+         меньше половины, и сильный мах ощущался как слабый. Сглаживание
+         держим слабым, чтобы рывок не размазывался по кадрам, а потолок
+         поднимаем — он остаётся только страховкой от броска мышью через
+         весь экран. */
+      handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.55);
+      const speed = Math.min(handVel.length(), 120);
       const moving = speed > 0.35 && hover > 0.01;
+      if (probe) {
+        probe.rawSpeed = Math.max(probe.rawSpeed, Math.hypot(raw.x, raw.y));
+        probe.speed = Math.max(probe.speed, speed);
+      }
       const hx = rawMouse.x;
       const hy = rawMouse.y;
       const vhx = handVel.x;
@@ -673,6 +698,19 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
         disp[i3 + 1] = dy2;
         disp[i3 + 2] = dz2;
       }
+      if (probe) {
+        let max = 0;
+        let moved = 0;
+        for (let i = 0; i < n; i++) {
+          const i3 = i * 3;
+          const d = Math.hypot(disp[i3], disp[i3 + 1], disp[i3 + 2]);
+          if (d > max) max = d;
+          if (d > 2) moved++;
+        }
+        probe.maxDisp = Math.max(probe.maxDisp, max);
+        probe.moved = Math.max(probe.moved, moved);
+      }
+
       dispAttr.needsUpdate = true;
       if (velAttr) velAttr.needsUpdate = true;
     };
