@@ -16,6 +16,10 @@ import { join } from "node:path";
 
 const ROOT = join(process.cwd(), "content");
 
+/** Боевой адрес сайта. Нужен мета-данным, карте сайта и robots: там
+    относительные пути не годятся. */
+export const SITE_URL = "https://mazerunnerrr.github.io";
+
 export type ProjectStatus = "в работе" | "личный проект" | "разбор и архитектура" | "запущен";
 
 /** Акцент карточки — только из палитры сайта, иначе карточки разъедутся по стилю. */

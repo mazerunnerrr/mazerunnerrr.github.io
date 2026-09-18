@@ -29,9 +29,22 @@ export async function generateMetadata({
   const project = find((await params).slug);
   const site = getSite();
   if (!project) return { title: site.alias };
+  const description = project.summary ?? project.lead.slice(0, 160);
+  const url = `/work/${project.slug}/`;
+  /* Канонический адрес и превью задаём здесь же: из корневого layout сюда
+     протекали адрес главной и её картинка, и ссылка на проект в мессенджере
+     показывала первый экран сайта вместо самого проекта. */
   return {
     title: `${project.title} — ${site.alias}`,
-    description: project.summary ?? project.lead.slice(0, 160),
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      url,
+      title: `${project.title} — ${site.alias}`,
+      description,
+      ...(project.shots[0] ? { images: [project.shots[0]] } : {}),
+    },
   };
 }
 

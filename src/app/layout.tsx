@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant, Manrope } from "next/font/google";
-import { getSite } from "@/content";
+import { SITE_URL, getSite } from "@/content";
 import "./globals.css";
 
 /* Дисплейный сериф + чистый гротеск, оба с кириллицей — это не опция.
@@ -20,10 +20,30 @@ const manrope = Manrope({
   display: "swap",
 });
 
-// Функцией, а не константой: в дев-режиме правка site.json видна по перезагрузке.
+/* Функцией, а не константой: в дев-режиме правка site.json видна по перезагрузке.
+
+   Картинку превью и значки Next подхватывает сам — по именам файлов рядом:
+   `opengraph-image.png`, `icon.svg`, `apple-icon.png`. Абсолютные адреса для них
+   собираются из `metadataBase`, без него в разметку попадут относительные пути,
+   и Telegram с поиском картинку не увидят. */
 export function generateMetadata(): Metadata {
   const site = getSite();
-  return { title: site.alias, description: `${site.thesis}.` };
+  const description = `${site.thesis}.`;
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: site.alias,
+    description,
+    alternates: { canonical: "/" },
+    openGraph: {
+      type: "website",
+      locale: "ru_RU",
+      url: "/",
+      siteName: site.alias,
+      title: site.alias,
+      description,
+    },
+    twitter: { card: "summary_large_image", title: site.alias, description },
+  };
 }
 
 export const viewport: Viewport = {
