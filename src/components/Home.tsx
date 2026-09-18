@@ -10,10 +10,15 @@ import { ContactForm } from "@/components/ContactForm";
 const STOPS = 4;
 
 /* Прозрачность слоя плюс метка «погас» для CSS: кнопки погасшего слоя
-   перестают ловить клики. Метка пишется только при смене, не каждый кадр. */
-const fade = (el: HTMLElement, opacity: number) => {
+   перестают ловить клики. Метка пишется только при смене, не каждый кадр.
+
+   Метка зависит не только от прозрачности, но и от того, чья сейчас точка.
+   Камера, застывшая между точками, оставляла соседний слой почти невидимым,
+   но кликабельным: на 2,4 невидимые контакты перехватывали нажатие на плитку
+   проекта. Теперь нажатия принимает только ближайшая к камере точка. */
+const fade = (el: HTMLElement, opacity: number, own: boolean) => {
   el.style.opacity = String(opacity);
-  const off = opacity < 0.05;
+  const off = !own || opacity < 0.05;
   if (el.hasAttribute("data-faded") !== off) el.toggleAttribute("data-faded", off);
 };
 
@@ -82,9 +87,11 @@ export function Home({
      и ссылки классом `pointer-events-auto`. */
   const onFrame = ({ progress, velocity }: FrameInfo) => {
     const p = Math.min(1, progress);
+    /** Чья сейчас точка: к ней камера ближе всего, ей и принимать нажатия. */
+    const near = Math.round(progress);
 
     if (heroRef.current) {
-      fade(heroRef.current, Math.max(0, 1 - p * 1.7));
+      fade(heroRef.current, Math.max(0, 1 - p * 1.7), near === 0);
       // Слой уезжает на зрителя вместе с камерой, иначе вёрстка
       // стоит на месте, пока частицы улетают, и связь распадается.
       heroRef.current.style.transform = `translate3d(0,0,0) scale(${1 + p * 0.5})`;
@@ -96,7 +103,7 @@ export function Home({
       // Появляется на подлёте к своей точке и уходит на вылете с неё.
       const appear = Math.max(0, Math.min(1, (progress - 0.45) / 0.55));
       const leave = Math.max(0, Math.min(1, (progress - 1.1) / 0.6));
-      fade(skillsRef.current, appear * (1 - leave));
+      fade(skillsRef.current, appear * (1 - leave), near === 1);
       skillsRef.current.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
     }
 
@@ -105,13 +112,13 @@ export function Home({
       // Уход появился вместе с четвёртой точкой: иначе карточки стояли
       // поверх контактов и перекрывали их.
       const leave = Math.max(0, Math.min(1, (progress - 2.1) / 0.6));
-      fade(projectsRef.current, appear * (1 - leave));
+      fade(projectsRef.current, appear * (1 - leave), near === 2);
       projectsRef.current.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
     }
 
     if (contactsRef.current) {
       const appear = Math.max(0, Math.min(1, (progress - 2.45) / 0.55));
-      fade(contactsRef.current, appear);
+      fade(contactsRef.current, appear, near === 3);
       contactsRef.current.style.transform = `scale(${0.94 + appear * 0.06})`;
     }
 
