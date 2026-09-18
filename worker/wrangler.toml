@@ -1,0 +1,6 @@
+name = "helias-contact"
+main = "index.js"
+compatibility_date = "2026-09-01"
+
+# Секретов здесь нет и быть не должно: TG_BOT_TOKEN и TG_CHAT_ID кладутся
+# командой `wrangler secret put` и живут на стороне Cloudflare.

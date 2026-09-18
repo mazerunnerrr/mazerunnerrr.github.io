@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef } from "react";
 import { Scene, type FrameInfo } from "@/components/Scene";
 import type { Contacts, Project, Site, Skill } from "@/content";
 import { ProjectCard } from "@/components/ProjectCard";
+import { ContactForm } from "@/components/ContactForm";
 
 /** Точки маршрута. Секции — не блоки друг под другом, а места на пути. */
 const STOPS = 4;
@@ -261,7 +262,11 @@ export function Home({
           </p>
         ) : null}
 
-        <ul className="mt-[clamp(20px,4vh,44px)] w-full max-w-[640px]">
+        {/* Ссылки и форма — в две колонки на широком экране. В столбик экран
+            контактов перестал помещаться по высоте: заголовок срезало сверху,
+            кнопку — снизу, а прокрутки на маршруте нет. */}
+        <div className="mt-[clamp(18px,3vh,36px)] grid w-full max-w-[1060px] gap-x-[clamp(24px,5vw,72px)] gap-y-[clamp(16px,3vh,28px)] lg:grid-cols-2 lg:items-start">
+        <ul className="w-full max-w-[640px]">
           {contacts.links.map((l) => (
             <li key={l.url} className="border-t border-[var(--line)]">
               {/* pointer-events включает сама ссылка: слой сквозной всегда. */}
@@ -282,6 +287,11 @@ export function Home({
             </li>
           ))}
         </ul>
+
+        {/* Форма появляется, только когда в админке указан адрес приёмника.
+            Нет адреса — остаются ссылки, и экран не врёт пустой формой. */}
+        {contacts.formUrl ? <ContactForm url={contacts.formUrl} /> : null}
+        </div>
       </div>
     </main>
   );

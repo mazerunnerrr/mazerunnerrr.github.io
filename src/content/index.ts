@@ -43,6 +43,8 @@ export type Contacts = {
   /** Необязательная строка над ссылками: что писать и чего ждать в ответ. */
   note?: string;
   links: Link[];
+  /** Адрес воркера-приёмника формы. Пусто — формы на сайте нет, только ссылки. */
+  formUrl?: string;
 };
 
 export type Skill = {
@@ -97,7 +99,7 @@ export const getSite = () => read<Site>("site.json");
 
 export const getContacts = (): Contacts => {
   const c = read<Contacts>("contacts.json");
-  return { ...c, note: opt(c.note) };
+  return { ...c, note: opt(c.note), formUrl: opt(c.formUrl) };
 };
 
 export const getSkills = () => read<{ items: Skill[] }>("skills.json").items;

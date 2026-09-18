@@ -150,3 +150,8 @@ collections:
             fields:
               - { name: label, label: Подпись, widget: string }
               - { name: url, label: Адрес, widget: string }
+          - name: formUrl
+            label: Адрес приёмника формы
+            widget: string
+            required: false
+            hint: "Адрес воркера вида https://helias-contact.<аккаунт>.workers.dev. Пусто — формы на сайте нет, только ссылки"
