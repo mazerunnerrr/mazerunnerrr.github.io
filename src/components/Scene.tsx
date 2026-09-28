@@ -529,7 +529,7 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
             moved: 0,
           });
 
-    const HIT = 105;        // радиус, в котором рука вообще что-то задевает
+    const HIT = 52;         // радиус, в котором рука вообще что-то задевает
     const SWEEP = 0.0030;   // увлечение по ходу руки — основная сила
     const PUSH = 0.0010;    // отталкивание от точки касания
     const CURL = 0.0015;    // закрутка вбок, чтобы не расходились строем
