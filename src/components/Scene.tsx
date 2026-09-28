@@ -25,6 +25,8 @@ export type FrameInfo = {
     points: number;
     /** Сколько из них сейчас сдвинуты рукой дальше пары пикселей. */
     moving: number;
+    /** Скорость руки над объектом, от 0 до 1 — для звука. */
+    hand: number;
   };
 };
 
@@ -107,7 +109,7 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
         onFrameRef.current?.({
           progress,
           velocity: journey.velocity,
-          stats: { fps: 0, points: 0, moving: 0 },
+          stats: { fps: 0, points: 0, moving: 0, hand: 0 },
         });
       };
       tick();
@@ -205,6 +207,8 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
     let settled = true;
     /** Сколько точек сейчас сдвинуто рукой — для прибора «в движении». */
     let movingNow = 0;
+    /** Скорость руки над объектом, от 0 до 1 — для звука. */
+    let handNow = 0;
     const ptrPrev = new THREE.Vector2(-9999, -9999);
 
     const particleUniforms = {
@@ -609,6 +613,7 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
       handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.55);
       const speed = Math.min(handVel.length(), 120);
       const moving = speed > 0.35 && hover > 0.01 && settled;
+      handNow = Math.min(1, speed / 60) * hover;
       if (probe) {
         probe.rawSpeed = Math.max(probe.rawSpeed, Math.hypot(raw.x, raw.y));
         probe.speed = Math.max(probe.speed, speed);
@@ -843,7 +848,7 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
       onFrameRef.current?.({
         progress,
         velocity: journey.velocity,
-        stats: { fps: 1000 / frameMs, points: disp ? disp.length / 3 : 0, moving: movingNow },
+        stats: { fps: 1000 / frameMs, points: disp ? disp.length / 3 : 0, moving: movingNow, hand: handNow },
       });
 
       fieldUniforms.uTime.value = t;
@@ -911,7 +916,7 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
         onFrameRef.current?.({
           progress,
           velocity: 0,
-          stats: { fps: 0, points: disp ? disp.length / 3 : 0, moving: 0 },
+          stats: { fps: 0, points: disp ? disp.length / 3 : 0, moving: 0, hand: 0 },
         });
         renderer.render(scene, camera);
       };

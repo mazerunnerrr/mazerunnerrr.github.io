@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scene, type FrameInfo } from "@/components/Scene";
 import type { Contacts, Project, Site, Skill } from "@/content";
 import { ContactForm } from "@/components/ContactForm";
+import { Ambience } from "@/lib/ambience";
 import { Cover } from "@/components/Cover";
 import type { ShapeSpec } from "@/lib/shapes";
 import { STATUS } from "@/lib/status";
@@ -92,6 +93,19 @@ export function Home({
   // Монитор с обложкой проекта листает кадры только под рукой или в фокусе.
   const [monitor, setMonitor] = useState(false);
 
+  // Звук выключен по умолчанию и собирается только по первому нажатию:
+  // браузер не даёт аудио начаться без жеста посетителя.
+  const [sound, setSound] = useState(false);
+  const ambienceRef = useRef<Ambience | null>(null);
+  const lastSound = useRef(0);
+  useEffect(() => () => ambienceRef.current?.close(), []);
+  const toggleSound = () => {
+    const next = !sound;
+    if (next && !ambienceRef.current) ambienceRef.current = new Ambience();
+    ambienceRef.current?.set(next);
+    setSound(next);
+  };
+
   // useCallback обязателен: onReady попал бы в зависимости эффекта сцены,
   // и та пересобиралась бы на каждый рендер, теряя инерцию маршрута.
   const onReady = useCallback((api: { goTo: (stop: number) => void; jumpTo: (stop: number) => void }) => {
@@ -177,6 +191,12 @@ export function Home({
       if (fpsRef.current) fpsRef.current.textContent = stats.fps ? String(Math.round(stats.fps)) : "—";
       if (pointsRef.current) pointsRef.current.textContent = stats.points ? fmt(stats.points) : "—";
       if (movingRef.current) movingRef.current.textContent = stats.points ? fmt(stats.moving) : "—";
+    }
+
+    // Звук слушает руку и пролёт несколько раз в секунду — чаще не нужно.
+    if (ambienceRef.current && now - lastSound.current > 80) {
+      lastSound.current = now;
+      ambienceRef.current.drive(stats.hand, Math.min(1, Math.abs(velocity) * 0.9));
     }
 
     // Расслоение текста на скорости: тот же приём, что держит характер
@@ -343,7 +363,7 @@ export function Home({
                 aria-hidden
                 onPointerEnter={() => setMonitor(true)}
                 onPointerLeave={() => setMonitor(false)}
-                className="pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+84px)] block w-[min(280px,22vw)]"
+                className="pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+104px)] block w-[min(280px,22vw)]"
               >
                 <Cover video={project.video} shots={project.shots} alt="" active={monitor} />
                 <span className="instrument mt-2 block text-right text-[var(--sand-dim)]">экран проекта · наведи</span>
@@ -426,6 +446,15 @@ export function Home({
             —
           </dd>
         </dl>
+
+        <button
+          type="button"
+          onClick={toggleSound}
+          aria-pressed={sound}
+          className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+62px)] text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
+        >
+          звук · {sound ? "вкл" : "выкл"}
+        </button>
       </div>
     </main>
   );
