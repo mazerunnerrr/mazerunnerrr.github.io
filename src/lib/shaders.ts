@@ -110,7 +110,10 @@ void main(){
 
 export const PARTICLE_VERT = `
 precision highp float;
-attribute vec2 aBase;
+/* Два дома точки: объект, с которого маршрут уходит, и объект, к которому
+   идёт. На точке маршрута они совпадают по смыслу — там uT = 0. */
+attribute vec2 aHomeA;
+attribute vec2 aHomeB;
 attribute vec2 aFrom;
 attribute float aSeed;
 uniform vec2  uRes;
@@ -127,8 +130,8 @@ uniform float uEnter;
 uniform float uPixelRatio;
 uniform float uDrag;
 uniform vec2  uDragVec;
-/** 0 — камера на точке заголовка, 1 — ушла на следующую. */
-uniform float uDepart;
+/** Переход между соседними точками маршрута: 0 — стоим на A, 1 — на B. */
+uniform float uT;
 /** Где камера сейчас и где стояла в начале: по ним точка переводится
     в экранные пиксели, чтобы рука работала на любом угле поворота. */
 uniform float uCamZ;
@@ -137,7 +140,8 @@ uniform float uBaseZ;
     в неподвижную мишень. */
 uniform float uWordSpin;
 /** Половина ширины облака в пикселях: по ней считается очередь на оборот. */
-uniform float uHalfW;
+uniform float uHalfWA;
+uniform float uHalfWB;
 varying float vFade;
 varying float vSpark;
 /** Направление движения и длина штриха — фрагменту, чтобы вытянуть точку. */
@@ -146,11 +150,28 @@ varying float vStretch;
 varying float vHeat;
 
 void main(){
+  /* Пересадка с объекта A на объект B — у каждой точки в свой миг.
+
+     До своего мига точка уходит с A той самой хореографией, что была
+     у имени: разворот, срыв, дождь в камеру. После — зеркально приходит
+     на B из глубины. Миги разбросаны, поэтому поток не рвётся: одни
+     точки ещё пролетают мимо камеры, а другие уже собираются впереди, —
+     камера проходит сквозь материю, и шва между объектами нет. */
+  float split = 0.40 + fract(aSeed * 13.13) * 0.20;
+  bool onB = uT > split;
+  vec2 home = onB ? aHomeB : aHomeA;
+  float halfW = onB ? uHalfWB : uHalfWA;
+  // Насколько точка сейчас далеко от своего дома: 0 — на месте, 1 — дальше некуда.
+  float depart = onB ? 1.0 - clamp((uT - split) / (1.0 - split), 0.0, 1.0)
+                     : clamp(uT / split, 0.0, 1.0);
+  // Уход — к камере и сквозь неё, приход — из глубины.
+  float toward = onB ? -1.0 : 1.0;
+
   // Появление: частица прилетает из своей случайной точки на место.
   // Разброс по aSeed, чтобы облако собиралось не одним фронтом.
   float d = clamp((uEnter - aSeed * 0.35) / 0.65, 0.0, 1.0);
   float e = 1.0 - pow(1.0 - d, 3.0);
-  vec2 sheet = mix(aFrom, aBase, e);
+  vec2 sheet = mix(aFrom, home, e);
 
   // Собственное дыхание — мелкое, иначе текст «плывёт» и читается хуже.
   // Частоты у каждой точки свои, иначе всё облако качается в такт.
@@ -170,14 +191,16 @@ void main(){
      оборот в свой черёд: очередь идёт слева направо, буква за буквой,
      плюс личный разброс — без него фронт виден ровной вертикальной
      границей. */
-  float xs = clamp(aBase.x / max(uHalfW, 1.0) * 0.5 + 0.5, 0.0, 1.0);
+  float xs = clamp(home.x / max(halfW, 1.0) * 0.5 + 0.5, 0.0, 1.0);
   float rotWait = xs * 0.34 + fract(aSeed * 7.77) * 0.16;
-  float rt = clamp((uDepart - rotWait) / max(1.0 - rotWait, 0.08), 0.0, 1.0);
+  float rt = clamp((depart - rotWait) / max(1.0 - rotWait, 0.08), 0.0, 1.0);
   // Разгон по экспоненте: трогается еле-еле и к концу летит.
   // К обороту по маршруту добавляется раскрутка рукой: зажатой мышью
   // слово можно провернуть на сколько угодно, и оно докрутится по
   // инерции само.
-  float a = 3.14159 * pow(rt, 2.1);
+  // На приходе оборот зеркальный: объект доворачивается туда же, куда
+  // уходил прежний, и полтора оборота читаются одним движением.
+  float a = toward * 3.14159 * pow(rt, 2.1);
   float ca = cos(a), sa = sin(a);
 
   // Точка не сидит на жёсткой окружности, а поджимается к оси на
@@ -210,7 +233,7 @@ void main(){
 
   // Срыв по касательной к вращению: точку тянет само движение.
   vec2 tang = normalize(vec2(P.z, -P.x) + vec2(0.0001));
-  float spill = smoothstep(0.34, 1.0, uDepart) * (55.0 + aSeed * 300.0);
+  float spill = smoothstep(0.34, 1.0, depart) * (55.0 + aSeed * 300.0);
   P.x += tang.x * spill;
   P.z += tang.y * spill;
   // Чуть-чуть по высоте, иначе россыпь идёт ровным поясом.
@@ -223,14 +246,14 @@ void main(){
   // Слово целиком идёт на камеру, пока вертится. Без этого оно крутится
   // на месте, и до зрителя доезжают одни сорвавшиеся точки, а сама
   // надпись так и остаётся вдали.
-  P.z += pow(uDepart, 2.0) * 900.0;
+  P.z += toward * pow(depart, 2.0) * 900.0;
 
   // Дождь: сперва срывается одна точка, за ней вторая, потом гуще
   // и гуще. Степень ниже единицы скашивает раздачу к концу — при
   // равной раздаче ливень шёл с первой секунды и весь разом.
   float delay = pow(fract(aSeed * 17.317), 0.38) * 0.72;
-  float fly = smoothstep(delay, delay + 0.3, uDepart);
-  P.z += fly * (950.0 + aSeed * 1500.0);
+  float fly = smoothstep(delay, delay + 0.3, depart);
+  P.z += toward * fly * (950.0 + aSeed * 1500.0);
 
   /* Рука работает по экрану, а не по исходной раскладке слова.
 
@@ -269,7 +292,7 @@ void main(){
   // На лету точка ещё и разогревается: песок на скорости светлее.
   vHeat = min(spd * 0.05, 0.65);
 
-  vFade = e * (1.0 - smoothstep(0.82, 1.0, uDepart));
+  vFade = e * (1.0 - smoothstep(0.82, 1.0, depart));
   vec4 mv = modelViewMatrix * vec4(P, 1.0);
   gl_Position = projectionMatrix * mv;
   // Точка растёт по мере приближения к камере. Без этого летящая в лицо

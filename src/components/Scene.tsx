@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { sampleText } from "@/lib/textParticles";
+import { buildShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
 import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG } from "@/lib/shaders";
 import { Journey } from "@/lib/journey";
 
@@ -20,21 +20,21 @@ export type FrameInfo = {
 };
 
 type Props = {
-  lines: string[];
-  /** Своя разбивка для узкого экрана: та же фраза, но короткими строками. */
-  linesNarrow?: string[];
-  /** Сколько точек на маршруте. */
-  stops: number;
+  /** Объект-герой каждой точки маршрута, по порядку. Первый — имя: он задаёт
+      число частиц, остальные пересобираются из той же материи. Число точек
+      маршрута равно числу объектов. Массив должен быть стабильным: новый
+      на каждый рендер пересобирал бы сцену. */
+  shapes: ShapeSpec[];
   /**
    * Вызывается каждый кадр. Писать отсюда только в style напрямую:
    * состояние React на шестидесяти кадрах в секунду недопустимо.
    */
   onFrame?: (f: FrameInfo) => void;
   /** Отдаёт наружу управление маршрутом — для кнопок и якорей. */
-  onReady?: (api: { goTo: (stop: number) => void }) => void;
+  onReady?: (api: { goTo: (stop: number) => void; jumpTo: (stop: number) => void }) => void;
 };
 
-export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
+export function Scene({ shapes, onFrame, onReady }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
   // Колбэк держим в рефе: попади он в зависимости эффекта, сцена
@@ -57,24 +57,22 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
        а при «уменьшить движение» кадр рисовался однажды и больше никогда.
        В обоих случаях слои не проявлялись, и сайт сворачивался в первый
        экран: до «Что делаю» и «Проектов» было не добраться ничем. */
-    const journey = new Journey({ stops });
+    const journey = new Journey({ stops: shapes.length });
     // Корень — вся страница сайта, а не только канвас: курсор часто
     // стоит над текстовым слоем, и оттуда колесо тоже должно вести камеру.
     const detachJourney = journey.attach(host.closest("main") ?? host);
     // Якоря вида href="#projects" при перехваченном скролле не работают:
     // прокручивать нечего. Кнопки должны двигать камеру.
-    onReady?.({ goTo: (stop: number) => journey.goTo(stop) });
+    onReady?.({
+      goTo: (stop: number) => journey.goTo(stop),
+      jumpTo: (stop: number) => journey.jumpTo(stop),
+    });
     let raf = 0;
 
     /* При «уменьшить движение» камера не едет, а переставляется: положение
        на маршруте сразу равно цели, как у обычной прокрутки, и скорость
        нулевая — расслоения текста тоже нет. */
-    const advance = (dt: number) => {
-      if (!reduced) return journey.update(dt);
-      journey.current = journey.target;
-      journey.velocity = 0;
-      return journey.current;
-    };
+    const advance = (dt: number) => (reduced ? journey.snap() : journey.update(dt));
 
     const renderer = (() => {
       try {
@@ -122,9 +120,6 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
     const FOV = 50;
     const camera = new THREE.PerspectiveCamera(FOV, 1, 10, 12000);
     const fitZ = (height: number) => height / (2 * Math.tan((FOV * Math.PI) / 360));
-
-    /** Насколько далеко камера уезжает за одну точку маршрута. */
-    const SPAN = 1500;
 
     /* ── фон ───────────────────────────────────────────────────── */
 
@@ -191,6 +186,10 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
 
     /** Сглаженная скорость руки в пикселях за кадр. */
     const handVel = new THREE.Vector2();
+    /** Маршрут стоит на точке, а не в пролёте. Рука задевает объект только
+        тогда: посреди пролёта точки летят по хореографии, и попадание по
+        их «домашним» координатам не совпадало бы с тем, что на экране. */
+    let settled = true;
     const ptrPrev = new THREE.Vector2(-9999, -9999);
 
     const particleUniforms = {
@@ -201,10 +200,11 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
       uSand: { value: SAND },
       uDrag: { value: 0 },
       uDragVec: { value: new THREE.Vector2() },
-      uDepart: { value: 0 },
+      uT: { value: 0 },
       uCamZ: { value: 1000 },
       uBaseZ: { value: 1000 },
-      uHalfW: { value: 400 },
+      uHalfWA: { value: 400 },
+      uHalfWB: { value: 400 },
       uWordSpin: { value: 0 },
     };
 
@@ -224,31 +224,27 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
         без движения, где сцена перерисовывается только по делу. */
     let dirty = true;
 
+    /* Мир из одной материи: объекты всех точек маршрута собираются из одних
+       и тех же частиц. Имя строится сразу и задаёт их число, остальные
+       досчитываются следом, пока посетитель смотрит на первый экран. Пока
+       объект не готов, его место временно занимает имя. */
+    let world: (Shape | null)[] = [];
+    let homeAAttr: THREE.BufferAttribute | null = null;
+    let homeBAttr: THREE.BufferAttribute | null = null;
+    /** Какая пара объектов сейчас залита в атрибуты. Перезаливка — только при
+        смене пары, а не каждый кадр: это 2 × 50 тысяч чисел. */
+    let pair = "";
+    /** Номер сборки: ресайз посреди досчёта не должен смешать старые формы с новыми. */
+    let build = 0;
+
     const buildParticles = async (w: number, h: number) => {
-      const narrow = w < 720;
-      // На узком экране фраза идёт короткими строками, поэтому кегль можно
-      // взять крупнее: на общей разбивке он падал до 28px и буквы крошились.
-      const src = narrow ? linesNarrow ?? lines : lines;
-      // Одно слово, поэтому кегль берём заметно крупнее, чем под фразу.
-      const fontSize = narrow
-        ? Math.max(56, Math.min(110, w * 0.24))
-        : Math.max(90, Math.min(230, w * 0.14));
-      // Шаг сетки: Cormorant даёт тонкие штрихи, и на шаге 4px буквы
-      // рвутся в пунктир. На 1px это порядка 50 тысяч точек — облако
-      // читается сплошной надписью, но зерно в нём видно.
-      const step = 1;
-      const sampled = await sampleText({
-        lines: src,
-        fontSize,
-        fontFamily: "var(--font-cormorant), Georgia, serif",
-        lineHeight: 1.12,
-        fontWeight: "400",
-        step,
-      });
-      if (!alive || !sampled.count) return;
-      // Очередь на оборот отсчитывается от места точки в слове, поэтому
-      // шейдеру нужна фактическая полуширина облака, а не ширина экрана.
-      particleUniforms.uHalfW.value = sampled.width / 2;
+      const gen = ++build;
+      const spec0 = shapes[0];
+      // Шаг сетки 1px: Cormorant даёт тонкие штрихи, и на шаге 4px буквы
+      // рвутся в пунктир. Это порядка 50 тысяч точек — облако читается
+      // сплошной надписью, но зерно в нём видно.
+      const sampled = await textShape(spec0?.kind === "text" ? spec0.text : "", w, h, true);
+      if (!alive || gen !== build || !sampled.count) return;
 
       if (points) {
         scene.remove(points);
@@ -256,15 +252,16 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
       }
 
       const n = sampled.count;
-      const base = new Float32Array(n * 2);
+      const first: Shape = { points: sampled.points, halfW: sampled.width / 2 };
+      world = shapes.map((_, i) => (i === 0 ? first : null));
+      pair = "";
+
       const from = new Float32Array(n * 2);
       const seed = new Float32Array(n);
       const dummy = new Float32Array(n * 3);
       const spread = Math.max(w, h) * 0.75;
 
       for (let i = 0; i < n; i++) {
-        base[i * 2] = sampled.points[i * 2];
-        base[i * 2 + 1] = sampled.points[i * 2 + 1];
         // Стартовая точка — по кольцу вокруг центра: облако собирается
         // внутрь, а не выпадает сверху.
         const a = Math.random() * Math.PI * 2;
@@ -290,19 +287,26 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
         spray[i * 3 + 1] = Math.sin(ph) * Math.sin(th) * far;
         spray[i * 3 + 2] = Math.cos(ph) * far;
       }
-      base2 = base;
+      base2 = first.points;
       dispAttr = new THREE.BufferAttribute(disp, 3);
       dispAttr.setUsage(THREE.DynamicDrawUsage);
       // Тот же буфер скоростей уходит в шейдер как атрибут: лишней памяти
       // не нужно, физика и смаз смотрят на одни и те же числа.
       velAttr = new THREE.BufferAttribute(vel, 3);
       velAttr.setUsage(THREE.DynamicDrawUsage);
+      homeAAttr = new THREE.BufferAttribute(new Float32Array(first.points), 2);
+      homeBAttr = new THREE.BufferAttribute(new Float32Array(first.points), 2);
+      homeAAttr.setUsage(THREE.DynamicDrawUsage);
+      homeBAttr.setUsage(THREE.DynamicDrawUsage);
+      particleUniforms.uHalfWA.value = first.halfW;
+      particleUniforms.uHalfWB.value = first.halfW;
 
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(dummy, 3));
       geo.setAttribute("aDisp", dispAttr);
       geo.setAttribute("aVel", velAttr);
-      geo.setAttribute("aBase", new THREE.BufferAttribute(base, 2));
+      geo.setAttribute("aHomeA", homeAAttr);
+      geo.setAttribute("aHomeB", homeBAttr);
       geo.setAttribute("aFrom", new THREE.BufferAttribute(from, 2));
       geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
       geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), spread * 2);
@@ -311,6 +315,40 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
       points.frustumCulled = false;
       scene.add(points);
       dirty = true;
+
+      // Остальные объекты — следом, по одному, из той же материи.
+      for (let i = 1; i < shapes.length; i++) {
+        const shape = await buildShape(shapes[i], w, h, n);
+        if (!alive || gen !== build) return;
+        world[i] = shape;
+        // Пара могла ждать именно эту форму — перезальём при следующем кадре.
+        pair = "";
+        dirty = true;
+      }
+    };
+
+    /** Заливает в атрибуты пару объектов для отрезка маршрута [k, k+1]
+        и отдаёт положение внутри отрезка — оно и есть uT. */
+    const syncPair = (progress: number) => {
+      const n = world.length;
+      if (!n || !homeAAttr || !homeBAttr) return 0;
+      const k = Math.floor(progress) % n;
+      const next = (k + 1) % n;
+      const a = world[k] ?? world[0]!;
+      const b = world[next] ?? world[0]!;
+      const key = `${k}:${world[k] ? 1 : 0}${world[next] ? 1 : 0}`;
+      if (key !== pair) {
+        pair = key;
+        (homeAAttr.array as Float32Array).set(a.points);
+        (homeBAttr.array as Float32Array).set(b.points);
+        homeAAttr.needsUpdate = true;
+        homeBAttr.needsUpdate = true;
+        particleUniforms.uHalfWA.value = a.halfW;
+        particleUniforms.uHalfWB.value = b.halfW;
+      }
+      // Рука работает по тому объекту, к которому камера сейчас ближе.
+      base2 = (world[Math.round(progress) % n] ?? world[0]!).points;
+      return progress - Math.floor(progress);
     };
 
     /* ── размеры ───────────────────────────────────────────────── */
@@ -554,7 +592,7 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
          весь экран. */
       handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.55);
       const speed = Math.min(handVel.length(), 120);
-      const moving = speed > 0.35 && hover > 0.01;
+      const moving = speed > 0.35 && hover > 0.01 && settled;
       if (probe) {
         probe.rawSpeed = Math.max(probe.rawSpeed, Math.hypot(raw.x, raw.y));
         probe.speed = Math.max(probe.speed, speed);
@@ -722,10 +760,13 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
     let enter = 0;
     let trailTick = 0;
 
-    // На первом переходе камера почти стоит: движение делают частицы,
-    // летящие в неё. Дальше, где частиц уже нет, камера идёт как шла.
-    const camZ = (progress: number) =>
-      baseZ - (progress <= 1 ? progress * 320 : 320 + (progress - 1) * SPAN);
+    /* Камера стоит на месте, полёт делает материя.
+
+       Раньше камера уезжала вперёд на полторы тысячи единиц за точку —
+       над пустым фоном, где этого не было видно. Теперь на каждой точке
+       есть объект, и маршрут замкнут в кольцо: неподвижная камера
+       избавляет от прыжка при переходе с последней точки на первую,
+       а ощущение пролёта дают точки, летящие сквозь неё. */
 
     const frame = () => {
       raf = requestAnimationFrame(frame);
@@ -763,12 +804,14 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
       drag += ((dragging ? 1 : 0) - drag) * Math.min(1, k * 0.9);
       if (!dragging) dragVec.multiplyScalar(Math.pow(0.86, dt * 60));
 
-      // Маршрут ведёт камеру. Прогресс 0 — заголовок, 1 — «что делаю».
+      // Маршрут ведёт материю. Прогресс — положение на кольце точек.
       const progress = journey.update(dt);
       const speed = Math.min(1, Math.abs(journey.velocity) * 1.4);
-      camera.position.z = camZ(progress);
+      camera.position.z = baseZ;
 
-      particleUniforms.uDepart.value = Math.min(1, progress);
+      const seg = syncPair(progress);
+      settled = Math.abs(seg - Math.round(seg)) < 0.12;
+      particleUniforms.uT.value = seg;
       // Поле светлеет на разгоне: движение чувствуется всем экраном,
       // а не только тем, что уезжает.
       fieldUniforms.uSpeed.value = speed;
@@ -836,8 +879,8 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
         if (progress === shown && !dirty) return;
         shown = progress;
         dirty = false;
-        camera.position.z = camZ(progress);
-        particleUniforms.uDepart.value = Math.min(1, progress);
+        camera.position.z = baseZ;
+        particleUniforms.uT.value = syncPair(progress);
         particleUniforms.uCamZ.value = camera.position.z;
         particleUniforms.uBaseZ.value = baseZ;
         onFrameRef.current?.({ progress, velocity: 0 });
@@ -864,7 +907,7 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
       renderer.dispose();
       if (renderer.domElement.parentNode === host) host.removeChild(renderer.domElement);
     };
-  }, [lines, linesNarrow, stops, onReady]);
+  }, [shapes, onReady]);
 
   return (
     // Скринридеру здесь читать нечего: заголовок страницы — скрытый h1
@@ -875,7 +918,7 @@ export function Scene({ lines, linesNarrow, stops, onFrame, onReady }: Props) {
         ref={fallbackRef}
         className="font-display absolute inset-0 flex items-center justify-center px-6 text-center text-[clamp(30px,7vw,86px)] leading-[1.04]"
       >
-        {lines.join(" ")}
+        {shapes[0]?.kind === "text" ? shapes[0].text : null}
       </div>
     </div>
   );

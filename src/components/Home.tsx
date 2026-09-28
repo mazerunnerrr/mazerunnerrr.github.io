@@ -5,9 +5,25 @@ import { Scene, type FrameInfo } from "@/components/Scene";
 import type { Contacts, Project, Site, Skill } from "@/content";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ContactForm } from "@/components/ContactForm";
+import type { ShapeSpec } from "@/lib/shapes";
 
-/** Точки маршрута. Секции — не блоки друг под другом, а места на пути. */
+/** Точки маршрута. Секции — не блоки друг под другом, а места на пути.
+    Маршрут — кольцо: за последней точкой снова первая. */
 const STOPS = 4;
+
+/** Якоря, с которых можно встать на точку сразу, без пролёта: так страница
+    проекта возвращает на «Проекты», а не заново на имя. */
+const HASH_STOPS: Record<string, number> = { "#skills": 1, "#projects": 2, "#contacts": 3 };
+
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+/** Где точка k относительно камеры на кольце: минус — ещё впереди,
+    плюс — уже позади. У последней точки соседом слева идёт первая. */
+const offset = (p: number, k: number) => {
+  let d = (((p - k) % STOPS) + STOPS) % STOPS;
+  if (d > STOPS / 2) d -= STOPS;
+  return d;
+};
 
 /* Прозрачность слоя плюс метка «погас» для CSS: кнопки погасшего слоя
    перестают ловить клики. Метка пишется только при смене, не каждый кадр.
@@ -39,7 +55,18 @@ export function Home({
   /* Из частиц собирается псевдоним — одно слово держит удар лучше длинной
      фразы: его видно целиком и оно не рвётся при разлёте. Массив мемоизирован:
      новый на каждый рендер пересобирал бы сцену. */
-  const lines = useMemo(() => [site.alias], [site.alias]);
+  /* Объект-герой каждой точки — из той же материи, что и имя. Массив
+     мемоизирован по значениям, а не по ссылкам на пропсы. */
+  const projectTitle = projects[0]?.title ?? site.alias;
+  const shapes = useMemo<ShapeSpec[]>(
+    () => [
+      { kind: "text", text: site.alias },
+      { kind: "rings", count: skills.length },
+      { kind: "text", text: projectTitle },
+      { kind: "text", text: "@" },
+    ],
+    [site.alias, skills.length, projectTitle]
+  );
   const heroRef = useRef<HTMLDivElement>(null);
   const skillsRef = useRef<HTMLDivElement>(null);
   const glitchRef = useRef<HTMLHeadingElement>(null);
@@ -52,8 +79,10 @@ export function Home({
 
   // useCallback обязателен: onReady попал бы в зависимости эффекта сцены,
   // и та пересобиралась бы на каждый рендер, теряя инерцию маршрута.
-  const onReady = useCallback((api: { goTo: (stop: number) => void }) => {
+  const onReady = useCallback((api: { goTo: (stop: number) => void; jumpTo: (stop: number) => void }) => {
     goToRef.current = api.goTo;
+    const stop = HASH_STOPS[window.location.hash];
+    if (stop !== undefined) api.jumpTo(stop);
   }, []);
 
   /* Обработчики не каррированы нарочно: вызов вида jump(2) в разметке
@@ -86,40 +115,37 @@ export function Home({
      мёртв. Слои сквозные всегда, а кликабельность включают сами кнопки
      и ссылки классом `pointer-events-auto`. */
   const onFrame = ({ progress, velocity }: FrameInfo) => {
-    const p = Math.min(1, progress);
     /** Чья сейчас точка: к ней камера ближе всего, ей и принимать нажатия. */
-    const near = Math.round(progress);
+    const near = Math.round(progress) % STOPS;
 
     if (heroRef.current) {
-      fade(heroRef.current, Math.max(0, 1 - p * 1.7), near === 0);
-      // Слой уезжает на зрителя вместе с камерой, иначе вёрстка
-      // стоит на месте, пока частицы улетают, и связь распадается.
-      heroRef.current.style.transform = `translate3d(0,0,0) scale(${1 + p * 0.5})`;
+      const d = offset(progress, 0);
+      // Первый экран уходит быстрее остальных: освобождает место под пролёт.
+      const vis = d > 0 ? Math.max(0, 1 - d * 1.7) : clamp01((d + 0.55) / 0.55);
+      fade(heroRef.current, vis, near === 0);
+      // Слой уезжает на зрителя вместе с материей, иначе вёрстка стоит
+      // на месте, пока частицы улетают, и связь распадается.
+      heroRef.current.style.transform = `translate3d(0,0,0) scale(${1 + Math.max(0, d) * 0.5})`;
     }
 
-    if (hintRef.current) hintRef.current.style.opacity = String(Math.max(0, 1 - p * 4));
-
-    if (skillsRef.current) {
-      // Появляется на подлёте к своей точке и уходит на вылете с неё.
-      const appear = Math.max(0, Math.min(1, (progress - 0.45) / 0.55));
-      const leave = Math.max(0, Math.min(1, (progress - 1.1) / 0.6));
-      fade(skillsRef.current, appear * (1 - leave), near === 1);
-      skillsRef.current.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
+    if (hintRef.current) {
+      hintRef.current.style.opacity = String(Math.max(0, 1 - Math.abs(offset(progress, 0)) * 4));
     }
 
-    if (projectsRef.current) {
-      const appear = Math.max(0, Math.min(1, (progress - 1.45) / 0.55));
-      // Уход появился вместе с четвёртой точкой: иначе карточки стояли
-      // поверх контактов и перекрывали их.
-      const leave = Math.max(0, Math.min(1, (progress - 2.1) / 0.6));
-      fade(projectsRef.current, appear * (1 - leave), near === 2);
-      projectsRef.current.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
-    }
-
-    if (contactsRef.current) {
-      const appear = Math.max(0, Math.min(1, (progress - 2.45) / 0.55));
-      fade(contactsRef.current, appear, near === 3);
-      contactsRef.current.style.transform = `scale(${0.94 + appear * 0.06})`;
+    // Остальные точки устроены одинаково: появляются на подлёте, уходят
+    // на вылете. На кольце «подлёт» к первой точке идёт от последней.
+    const layers = [
+      [skillsRef.current, 1],
+      [projectsRef.current, 2],
+      [contactsRef.current, 3],
+    ] as const;
+    for (const [el, k] of layers) {
+      if (!el) continue;
+      const d = offset(progress, k);
+      const appear = d <= 0 ? clamp01((d + 0.55) / 0.55) : 1;
+      const leave = d > 0 ? clamp01((d - 0.1) / 0.6) : 0;
+      fade(el, appear * (1 - leave), near === k);
+      el.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
     }
 
     // Расслоение текста на скорости: тот же приём, что держит характер
@@ -137,7 +163,7 @@ export function Home({
 
   return (
     <main className="relative h-screen w-full overflow-hidden">
-      <Scene lines={lines} stops={STOPS} onFrame={onFrame} onReady={onReady} />
+      <Scene shapes={shapes} onFrame={onFrame} onReady={onReady} />
 
       {/* Заголовок для поиска и скринридеров: частицы их не заменяют. */}
       <h1 className="sr-only">

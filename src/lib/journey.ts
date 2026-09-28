@@ -9,6 +9,11 @@
  * стоит на первой точке», 2.4 — «прошла две с половиной». Так любую
  * анимацию можно писать от расстояния до своей точки, не пересчитывая
  * пиксели.
+ *
+ * Маршрут — кольцо, как у igloo.inc: после последней точки колесо ведёт
+ * дальше, к первой, а вверх с первой — к последней. Концов нет, поэтому
+ * `current` всегда нормализован в [0, stops), а `target` может убегать
+ * за края — разница между ними и есть оставшийся путь.
  */
 
 export type JourneyOptions = {
@@ -44,8 +49,6 @@ export class Journey {
    *   содержимое панели стоит на месте.
    */
   attach(root: HTMLElement | null) {
-    const max = this.stops - 1;
-
     /** Событие адресовано сайту, а не панели поверх него? */
     const mine = (e: Event) => {
       const el = e.target as Element | null;
@@ -59,7 +62,7 @@ export class Journey {
     };
 
     const push = (dy: number) => {
-      this.target = Math.max(0, Math.min(max, this.target + dy / this.pxPerStop));
+      this.target += dy / this.pxPerStop;
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -92,7 +95,7 @@ export class Journey {
       const t = e.target as Element | null;
       if (t?.closest?.("input, textarea, select, [contenteditable], nextjs-portal")) return;
       e.preventDefault();
-      this.target = Math.max(0, Math.min(max, Math.round(this.target) + step));
+      this.target = Math.round(this.target) + step;
     };
 
     // Слушаем на window, но фильтруем по источнику: так курсор может
@@ -116,9 +119,35 @@ export class Journey {
     this.detach = [];
   }
 
-  /** Прямой переход — для кнопок и якорей. */
+  /** Прямой переход — для кнопок и якорей. На кольце у точки бесконечно
+      много копий; едем к ближайшей, а не отматываем круг назад. */
   goTo(stop: number) {
-    this.target = Math.max(0, Math.min(this.stops - 1, stop));
+    const n = this.stops;
+    this.target = stop + n * Math.round((this.target - stop) / n);
+  }
+
+  /** Встать на точку сразу, без пролёта: возврат со страницы проекта. */
+  jumpTo(stop: number) {
+    this.target = this.current = stop;
+    this.velocity = 0;
+  }
+
+  /** Режим без движения: камера сразу на цели. */
+  snap() {
+    this.current = this.target;
+    this.velocity = 0;
+    this.wrap();
+    return this.current;
+  }
+
+  /** Держит `current` в [0, stops), сдвигая `target` на те же целые круги —
+      путь между ними не меняется, поэтому скачка не видно. */
+  private wrap() {
+    const n = this.stops;
+    if (this.current >= 0 && this.current < n) return;
+    const shift = Math.floor(this.current / n) * n;
+    this.current -= shift;
+    this.target -= shift;
   }
 
   update(dt: number) {
@@ -128,11 +157,15 @@ export class Journey {
     const k = 1 - Math.pow(0.0022, dt);
     this.current += (this.target - this.current) * Math.min(1, k * 0.42);
     this.velocity = dt > 0 ? (this.current - prev) / dt : 0;
+    this.wrap();
     return this.current;
   }
 
-  /** Насколько камера близка к точке: 1 — стоит на ней, 0 — дальше секции. */
+  /** Насколько камера близка к точке: 1 — стоит на ней, 0 — дальше секции.
+      Расстояние по кольцу: последняя точка соседствует с первой. */
   proximity(stop: number) {
-    return Math.max(0, 1 - Math.abs(this.current - stop));
+    const n = this.stops;
+    const d = Math.abs((((this.current - stop) % n) + n) % n);
+    return Math.max(0, 1 - Math.min(d, n - d));
   }
 }

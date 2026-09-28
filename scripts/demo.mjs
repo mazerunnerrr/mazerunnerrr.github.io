@@ -117,14 +117,25 @@ await glide([W * 0.3, H * 0.48], [W * 0.88, H * 0.48], 20, 7);
 await page.mouse.up();
 await page.waitForTimeout(4200);
 
-// 7. Маршрут: две точки вперёд и возврат к заголовку.
-await page.mouse.move(W * 0.55, H * 0.5);
-for (let i = 0; i < 16; i++) { await page.mouse.wheel(0, 80); await page.waitForTimeout(50); }
-await page.waitForTimeout(2200);
-for (let i = 0; i < 16; i++) { await page.mouse.wheel(0, 80); await page.waitForTimeout(50); }
-await page.waitForTimeout(2000);
-for (let i = 0; i < 32; i++) { await page.mouse.wheel(0, -80); await page.waitForTimeout(40); }
-await page.waitForTimeout(2600);
+/* 7. Маршрут — полный круг: имя → кольца → проект → «@» → снова имя.
+
+   Одна точка — ровно 900 пикселей колеса (`pxPerStop` в journey.ts), то есть
+   десять щелчков по 90. Прежние щелчки по 80 с перелётом оставляли камеру
+   между объектами, а на кольце это видно сразу. */
+const nextStop = async () => {
+  await page.mouse.move(W * 0.5, H * 0.5);
+  for (let i = 0; i < 10; i++) { await page.mouse.wheel(0, 90); await page.waitForTimeout(50); }
+  await page.waitForTimeout(3200);
+};
+
+await nextStop(); // кольца-узлы
+// Рука по кольцам: физика работает на любом объекте, не только на имени.
+await glide([W * 0.25, H * 0.42], [W * 0.75, H * 0.58], 26, 12);
+await page.waitForTimeout(1800);
+await nextStop(); // название проекта
+await nextStop(); // «@»
+await nextStop(); // снова имя — кольцо замкнулось
+await page.waitForTimeout(1200);
 
 const b64 = await page.evaluate(async () => {
   await new Promise((ok) => {
