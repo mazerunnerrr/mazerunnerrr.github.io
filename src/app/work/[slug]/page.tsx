@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProjects, getSite, type Project } from "@/content";
+import { getProjects, getSite } from "@/content";
+import { STATUS } from "@/lib/status";
 
 /* Адреса страниц известны на сборке — их ровно столько, сколько файлов
    в content/projects. Ничего динамического на Pages появиться не может. */
@@ -14,12 +15,6 @@ export function generateStaticParams() {
 
 const find = (slug: string) => getProjects().find((p) => p.slug === slug);
 
-const STATUS: Record<Project["status"], { dot: string; text: string }> = {
-  "в работе": { dot: "bg-[var(--st-work)]", text: "text-[var(--st-work)]" },
-  "личный проект": { dot: "bg-[var(--st-personal)]", text: "text-[var(--st-personal)]" },
-  "разбор и архитектура": { dot: "bg-[var(--st-research)]", text: "text-[var(--st-research)]" },
-  запущен: { dot: "bg-[var(--st-live)]", text: "text-[var(--st-live)]" },
-};
 
 export async function generateMetadata({
   params,

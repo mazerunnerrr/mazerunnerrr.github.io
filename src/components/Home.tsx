@@ -1,15 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Scene, type FrameInfo } from "@/components/Scene";
 import type { Contacts, Project, Site, Skill } from "@/content";
-import { ProjectCard } from "@/components/ProjectCard";
 import { ContactForm } from "@/components/ContactForm";
+import { Cover } from "@/components/Cover";
 import type { ShapeSpec } from "@/lib/shapes";
+import { STATUS } from "@/lib/status";
 
 /** Точки маршрута. Секции — не блоки друг под другом, а места на пути.
     Маршрут — кольцо: за последней точкой снова первая. */
 const STOPS = 4;
+
+/** Номер точки на круге для прибора слева сверху. Нумерация здесь честная:
+    это последовательность маршрута, а не украшение. */
+const ROUTE = ["01 / 04 · имя", "02 / 04 · что делаю", "03 / 04 · проекты", "04 / 04 · контакты"];
 
 /** Якоря, с которых можно встать на точку сразу, без пролёта: так страница
     проекта возвращает на «Проекты», а не заново на имя. */
@@ -41,6 +47,8 @@ const fade = (el: HTMLElement, opacity: number, own: boolean) => {
 /** Адрес без служебной части: в строке рядом со ссылкой она лишняя. */
 const plain = (url: string) => url.replace(/^mailto:/, "").replace(/^https?:\/\//, "");
 
+/* Объект из частиц — герой, текст — приборы. Всё, что написано, стоит
+   по углам мелким моноширинным шрифтом, центр экрана отдан объекту. */
 export function Home({
   site,
   skills,
@@ -52,12 +60,11 @@ export function Home({
   projects: Project[];
   contacts: Contacts;
 }) {
-  /* Из частиц собирается псевдоним — одно слово держит удар лучше длинной
-     фразы: его видно целиком и оно не рвётся при разлёте. Массив мемоизирован:
-     новый на каждый рендер пересобирал бы сцену. */
+  const project = projects[0];
   /* Объект-герой каждой точки — из той же материи, что и имя. Массив
-     мемоизирован по значениям, а не по ссылкам на пропсы. */
-  const projectTitle = projects[0]?.title ?? site.alias;
+     мемоизирован по значениям, а не по ссылкам на пропсы: новый на каждый
+     рендер пересобирал бы сцену. */
+  const projectTitle = project?.title ?? site.alias;
   const shapes = useMemo<ShapeSpec[]>(
     () => [
       { kind: "text", text: site.alias },
@@ -75,7 +82,15 @@ export function Home({
   const projectsTitleRef = useRef<HTMLHeadingElement>(null);
   const contactsRef = useRef<HTMLDivElement>(null);
   const contactsTitleRef = useRef<HTMLHeadingElement>(null);
+  const routeRef = useRef<HTMLSpanElement>(null);
+  const fpsRef = useRef<HTMLElement>(null);
+  const pointsRef = useRef<HTMLElement>(null);
+  const movingRef = useRef<HTMLElement>(null);
+  const lastNear = useRef(-1);
+  const lastStats = useRef(0);
   const goToRef = useRef<((stop: number) => void) | null>(null);
+  // Монитор с обложкой проекта листает кадры только под рукой или в фокусе.
+  const [monitor, setMonitor] = useState(false);
 
   // useCallback обязателен: onReady попал бы в зависимости эффекта сцены,
   // и та пересобиралась бы на каждый рендер, теряя инерцию маршрута.
@@ -106,15 +121,15 @@ export function Home({
      к его точке. Раньше он молча вставал на невидимую ссылку. */
   const follow = (stop: number) => goToRef.current?.(stop);
 
-  /* Всё, что меняется каждый кадр, пишется прямо в style. Через
-     состояние React это был бы ре-рендер шестьдесят раз в секунду.
+  /* Всё, что меняется каждый кадр, пишется прямо в style и textContent.
+     Через состояние React это был бы ре-рендер шестьдесят раз в секунду.
 
      pointer-events здесь НЕ трогаем. Слои лежат поверх канваса на весь
      экран, и стоит выставить им `auto` — они перехватывают всю мышь,
      до сцены не доходит ни одного события, и кажется, что интерактив
      мёртв. Слои сквозные всегда, а кликабельность включают сами кнопки
      и ссылки классом `pointer-events-auto`. */
-  const onFrame = ({ progress, velocity }: FrameInfo) => {
+  const onFrame = ({ progress, velocity, stats }: FrameInfo) => {
     /** Чья сейчас точка: к ней камера ближе всего, ей и принимать нажатия. */
     const near = Math.round(progress) % STOPS;
 
@@ -148,6 +163,22 @@ export function Home({
       el.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
     }
 
+    // Номер точки на круге — только при смене, а не каждый кадр.
+    if (near !== lastNear.current) {
+      lastNear.current = near;
+      if (routeRef.current) routeRef.current.textContent = ROUTE[near];
+    }
+
+    // Живые показания — четыре раза в секунду: чаще число не успевают прочитать.
+    const now = performance.now();
+    if (now - lastStats.current > 250) {
+      lastStats.current = now;
+      const fmt = (x: number) => x.toLocaleString("ru-RU");
+      if (fpsRef.current) fpsRef.current.textContent = stats.fps ? String(Math.round(stats.fps)) : "—";
+      if (pointsRef.current) pointsRef.current.textContent = stats.points ? fmt(stats.points) : "—";
+      if (movingRef.current) movingRef.current.textContent = stats.points ? fmt(stats.moving) : "—";
+    }
+
     // Расслоение текста на скорости: тот же приём, что держит характер
     // у Dreamzone, и то, из-за чего у Active Theory буквы «плывут»
     // при пролёте. Порог нужен, иначе в покое видна цветная кайма.
@@ -161,6 +192,8 @@ export function Home({
     if (contactsTitleRef.current) contactsTitleRef.current.style.textShadow = shadow;
   };
 
+  const status = project ? STATUS[project.status] : null;
+
   return (
     <main className="relative h-screen w-full overflow-hidden">
       <Scene shapes={shapes} onFrame={onFrame} onReady={onReady} />
@@ -170,22 +203,17 @@ export function Home({
         {site.alias} — {site.thesis}
       </h1>
 
-      {/* ── точка 0: кто я ─────────────────────────────────────── */}
+      {/* ── точка 0: имя ───────────────────────────────────────── */}
       <div
         ref={heroRef}
         onFocus={() => follow(0)}
-        className="pointer-events-none absolute inset-0 flex flex-col justify-between p-[clamp(18px,3vw,40px)]"
+        className="pointer-events-none absolute inset-0 flex flex-col justify-end p-[var(--gutter)]"
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          {/* Имени здесь нет: живое имя стоит только рядом с контактами. */}
-          <span className="eyebrow text-[var(--sand-faint)]">{site.status}</span>
-        </div>
-
-        <div className="flex flex-col items-start gap-7 pb-[clamp(20px,6vh,64px)]">
-          <p className="font-display max-w-[22ch] text-[clamp(21px,2.6vw,36px)] font-light leading-[1.15] tracking-[-0.01em] sm:max-w-[30ch]">
+        <div className="flex max-w-[460px] flex-col items-start gap-5">
+          <p className="font-display text-[clamp(22px,2.2vw,30px)] font-light leading-[1.15] tracking-[-0.01em]">
             {site.thesis}
           </p>
-          <p className="max-w-[46ch] text-[clamp(14px,1.5vw,17px)] font-extralight leading-[1.75] text-[var(--sand-dim)]">
+          <p className="max-w-[44ch] text-[14px] font-extralight leading-[1.7] text-[var(--sand-dim)]">
             {site.intro}
           </p>
 
@@ -204,69 +232,125 @@ export function Home({
             >
               Написать
             </a>
-            <span ref={hintRef} className="eyebrow ml-2 text-[var(--sand-faint)]">
-              крути дальше
-            </span>
           </div>
+          <span ref={hintRef} className="instrument text-[var(--sand-dim)]">
+            колесо или ↑ ↓ — по кругу
+          </span>
         </div>
       </div>
 
-      {/* ── точка 1: что делаю ─────────────────────────────────── */}
+      {/* ── точка 1: что делаю — подписи у колец-узлов ──────────── */}
       <div
         ref={skillsRef}
         data-faded
         onFocus={() => follow(1)}
-        className="pointer-events-none absolute inset-0 flex flex-col justify-center px-[clamp(18px,6vw,90px)] opacity-0"
+        className="rings pointer-events-none absolute inset-0 opacity-0"
       >
         <h2
           ref={glitchRef}
           id="skills"
           tabIndex={-1}
-          className="font-display mb-[clamp(24px,4vh,52px)] text-[clamp(30px,5vw,64px)] font-light leading-[1.04] tracking-[-0.02em]"
+          className="instrument absolute bottom-[var(--gutter)] left-[var(--gutter)] text-[var(--sand-dim)]"
         >
           Что делаю
         </h2>
 
-        <ul className="grid gap-x-[clamp(20px,4vw,64px)] gap-y-[clamp(20px,3vh,38px)] sm:grid-cols-2">
-          {skills.map((s) => (
-            <li key={s.title} className="border-t border-[var(--line)] pt-4">
-              <h3 className="font-display text-[clamp(19px,2vw,27px)] font-normal leading-tight">
-                {s.title}
-              </h3>
-              <p className="mt-2 max-w-[38ch] text-[13.5px] font-extralight leading-[1.7] text-[var(--sand-dim)]">
-                {s.lead}
-              </p>
-            </li>
-          ))}
-        </ul>
+        {skills.length === 4 ? (
+          <ul>
+            {skills.map((s, i) => (
+              <li
+                key={s.title}
+                className="ring-label"
+                data-side={i % 2 === 0 ? "left" : "right"}
+                data-row={i < 2 ? "top" : "bottom"}
+              >
+                <h3 className="instrument text-[var(--color-sand)]">{s.title}</h3>
+                <p className="mt-1.5 text-[13px] font-extralight leading-[1.6] text-[var(--sand-dim)]">{s.lead}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          /* Не четыре направления — кольца стоят рядом, и подписи уходят
+             списком в угол: выноски рассчитаны на сетку 2×2. */
+          <ul className="absolute bottom-[calc(var(--gutter)+28px)] left-[var(--gutter)] grid max-w-[420px] gap-3">
+            {skills.map((s) => (
+              <li key={s.title}>
+                <h3 className="instrument text-[var(--color-sand)]">{s.title}</h3>
+                <p className="mt-1 text-[13px] font-extralight leading-[1.6] text-[var(--sand-dim)]">{s.lead}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* ── точка 2: проекты ───────────────────────────────────── */}
       <div
         ref={projectsRef}
         data-faded
+        data-accent={project?.accent}
         onFocus={() => follow(2)}
-        className="pointer-events-none absolute inset-0 flex flex-col justify-center overflow-y-auto px-[clamp(18px,6vw,90px)] py-[clamp(40px,8vh,90px)] opacity-0"
+        className="pointer-events-none absolute inset-0 opacity-0"
       >
-        <h2
-          ref={projectsTitleRef}
-          id="projects"
-          tabIndex={-1}
-          className="font-display mb-[clamp(20px,3vh,40px)] text-[clamp(30px,5vw,64px)] font-light leading-[1.04] tracking-[-0.02em]"
-        >
-          Проекты
-        </h2>
-        {/* В две колонки — только когда проектов больше одного: единственная
-            плитка в сетке оставляла пустой половину экрана. */}
-        <div
-          className={`grid gap-[clamp(24px,4vw,56px)] ${
-            projects.length > 1 ? "lg:grid-cols-2" : "max-w-[860px]"
-          }`}
-        >
-          {projects.map((p) => (
-            <ProjectCard key={p.slug} project={p} />
-          ))}
-        </div>
+        {project && status ? (
+          <>
+            {/* Внизу слева: что это и куда нажать. */}
+            <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] flex max-w-[440px] flex-col items-start gap-3">
+              <h2 ref={projectsTitleRef} id="projects" tabIndex={-1} className="instrument text-[var(--sand-dim)]">
+                Проекты · {project.year}
+              </h2>
+              <div className="flex items-center gap-2.5">
+                <span className={`h-[5px] w-[5px] shrink-0 rounded-full ${status.dot}`} aria-hidden />
+                <span className={`instrument ${status.text}`}>{project.status}</span>
+              </div>
+              <h3 className="font-display text-[clamp(22px,2.2vw,30px)] font-light leading-tight">{project.title}</h3>
+              {project.summary ? (
+                <p className="text-[15px] font-light leading-[1.5] text-[var(--color-sand)]">{project.summary}</p>
+              ) : null}
+              <p className="instrument text-[var(--sand-dim)]">
+                {project.role} · {project.stack.slice(0, 4).join(" · ")}
+              </p>
+              <Link
+                href={`/work/${project.slug}/`}
+                className="pointer-events-auto mt-1 rounded-[3px] bg-[var(--color-sand)] px-6 py-3 text-[13px] font-medium text-[var(--color-void)] transition-opacity duration-500 hover:opacity-80"
+              >
+                Смотреть проект
+              </Link>
+            </div>
+
+            {/* Внизу справа: цифры проекта — его показания. */}
+            {project.facts.length > 0 ? (
+              <dl className="absolute bottom-[var(--gutter)] right-[var(--gutter)] grid gap-y-4 text-right">
+                {project.facts.map((f) => (
+                  // Подпись идёт первой, как требует HTML, а число встаёт над ней
+                  // обратным порядком колонки.
+                  <div key={f.label} className="flex flex-col-reverse">
+                    <dt className="instrument mt-1 text-[var(--sand-dim)]">{f.label}</dt>
+                    <dd className="font-display text-[clamp(22px,2.2vw,30px)] font-light leading-none text-[var(--accent)]">
+                      {f.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+
+            {/* Справа сверху, под показаниями сцены: монитор с обложкой.
+                Дубль ссылки «Смотреть проект» для мыши, поэтому вне обхода Tab
+                и скрыт от скринридера — второй раз ту же ссылку ему не читать. */}
+            {project.video || project.shots.length ? (
+              <Link
+                href={`/work/${project.slug}/`}
+                tabIndex={-1}
+                aria-hidden
+                onPointerEnter={() => setMonitor(true)}
+                onPointerLeave={() => setMonitor(false)}
+                className="pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+84px)] block w-[min(280px,22vw)]"
+              >
+                <Cover video={project.video} shots={project.shots} alt="" active={monitor} />
+                <span className="instrument mt-2 block text-right text-[var(--sand-dim)]">экран проекта · наведи</span>
+              </Link>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
       {/* ── точка 3: контакты ──────────────────────────────────── */}
@@ -274,57 +358,74 @@ export function Home({
         ref={contactsRef}
         data-faded
         onFocus={() => follow(3)}
-        className="pointer-events-none absolute inset-0 flex flex-col justify-center px-[clamp(18px,6vw,90px)] opacity-0"
+        className="pointer-events-none absolute inset-0 opacity-0"
       >
-        <h2
-          ref={contactsTitleRef}
-          id="contacts"
-          tabIndex={-1}
-          className="font-display text-[clamp(30px,5vw,64px)] font-light leading-[1.04] tracking-[-0.02em]"
-        >
-          Контакты
-        </h2>
-
-        <p className="eyebrow mt-4 text-[var(--sand-faint)]">
-          {contacts.name} · {site.status}
-        </p>
-
-        {contacts.note ? (
-          <p className="mt-5 max-w-[46ch] text-[clamp(14px,1.5vw,17px)] font-extralight leading-[1.75] text-[var(--sand-dim)]">
-            {contacts.note}
-          </p>
-        ) : null}
-
-        {/* Ссылки и форма — в две колонки на широком экране. В столбик экран
-            контактов перестал помещаться по высоте: заголовок срезало сверху,
-            кнопку — снизу, а прокрутки на маршруте нет. */}
-        <div className="mt-[clamp(18px,3vh,36px)] grid w-full max-w-[1060px] gap-x-[clamp(24px,5vw,72px)] gap-y-[clamp(16px,3vh,28px)] lg:grid-cols-2 lg:items-start">
-        <ul className="w-full max-w-[640px]">
-          {contacts.links.map((l) => (
-            <li key={l.url} className="border-t border-[var(--line)]">
-              {/* pointer-events включает сама ссылка: слой сквозной всегда. */}
-              <a
-                href={l.url}
-                {...(l.url.startsWith("mailto:")
-                  ? {}
-                  : { target: "_blank", rel: "noreferrer noopener" })}
-                className="group pointer-events-auto flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-[clamp(12px,2vh,20px)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-azure)]"
-              >
-                <span className="font-display text-[clamp(22px,3vw,38px)] font-light leading-none">
-                  {l.label}
-                </span>
-                <span className="eyebrow text-[var(--sand-faint)] transition-colors duration-500 ease-[var(--ease-out-deep)] group-hover:text-[var(--color-azure)]">
-                  {plain(l.url)}
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] flex w-[min(460px,40vw)] flex-col items-start gap-3">
+          <h2 ref={contactsTitleRef} id="contacts" tabIndex={-1} className="instrument text-[var(--sand-dim)]">
+            Контакты · {contacts.name}
+          </h2>
+          {contacts.note ? (
+            <p className="max-w-[40ch] text-[14px] font-extralight leading-[1.7] text-[var(--sand-dim)]">
+              {contacts.note}
+            </p>
+          ) : null}
+          <ul className="mt-1 w-full">
+            {contacts.links.map((l) => (
+              <li key={l.url} className="border-t border-[var(--line)]">
+                {/* pointer-events включает сама ссылка: слой сквозной всегда. */}
+                <a
+                  href={l.url}
+                  {...(l.url.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer noopener" })}
+                  className="group pointer-events-auto flex items-baseline justify-between gap-6 py-3 transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-azure)]"
+                >
+                  <span className="font-display text-[26px] font-light leading-none">{l.label}</span>
+                  <span className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] group-hover:text-[var(--color-azure)]">
+                    {plain(l.url)}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {/* Форма появляется, только когда в админке указан адрес приёмника.
             Нет адреса — остаются ссылки, и экран не врёт пустой формой. */}
-        {contacts.formUrl ? <ContactForm url={contacts.formUrl} /> : null}
+        {contacts.formUrl ? (
+          <div className="absolute bottom-[var(--gutter)] right-[var(--gutter)] w-[min(420px,36vw)]">
+            <ContactForm url={contacts.formUrl} />
+          </div>
+        ) : null}
+      </div>
+
+      {/* ── приборы: на всём круге ─────────────────────────────── */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-[var(--gutter)] top-[var(--gutter)] flex flex-col gap-0.5">
+          <span className="instrument text-[var(--color-sand)]">{site.alias}</span>
+          <span className="instrument text-[var(--sand-dim)]">{site.status}</span>
+          <span ref={routeRef} className="instrument text-[var(--sand-dim)]">
+            {ROUTE[0]}
+          </span>
         </div>
+
+        {/* Живые показания сцены — настоящие числа, не декор. Для скринридера
+            это шум: числа меняются четыре раза в секунду. */}
+        <dl
+          aria-hidden
+          className="absolute right-[var(--gutter)] top-[var(--gutter)] grid grid-cols-[auto_auto] gap-x-5 gap-y-0.5 text-right"
+        >
+          <dt className="instrument text-[var(--sand-dim)]">к/с</dt>
+          <dd ref={fpsRef} className="instrument text-[var(--color-sand)]">
+            —
+          </dd>
+          <dt className="instrument text-[var(--sand-dim)]">точек</dt>
+          <dd ref={pointsRef} className="instrument text-[var(--color-sand)]">
+            —
+          </dd>
+          <dt className="instrument text-[var(--sand-dim)]">в движении</dt>
+          <dd ref={movingRef} className="instrument text-[var(--color-sand)]">
+            —
+          </dd>
+        </dl>
       </div>
     </main>
   );

@@ -19,6 +19,7 @@
 
   --font-display: var(--font-cormorant), Georgia, serif;
   --font-body: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
   /* Длинный хвост, ничего не отскакивает. Отскок — про игривость. */
   --ease-out-deep: cubic-bezier(0.16, 1, 0.3, 1);
@@ -85,6 +86,86 @@ body {
   background-image: var(--grain);
   opacity: 0.055;
   mix-blend-mode: overlay;
+}
+
+/* Приборы: мелкий моноширинный текст по углам экрана. Объект из частиц —
+   герой, текст — его показания и подписи. Смысловое идёт цветом --sand-dim
+   (контраст около 6,3:1 на угле); бледный --sand-faint (около 2,6:1) —
+   только для служебных пометок, которые можно не читать. */
+.instrument {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Поля экрана: все приборы стоят на одном расстоянии от краёв. */
+:root {
+  --gutter: clamp(18px, 3vw, 40px);
+}
+
+/* Подписи к кольцам-узлам точки «Что делаю».
+
+   Геометрия — та же формула, что в ringLayout (src/lib/shapes.ts), только
+   в CSS: подписи стоят у своих колец без единой строки JS, есть в серверной
+   разметке для поиска и сами следуют за размером окна. Меняешь формулу
+   там — меняй и здесь. */
+.rings {
+  --m: min(100vw, 100vh);
+  --r: calc(var(--m) * 0.075);
+  --gx: min(20vw, calc(var(--m) * 0.33));
+  --gy: min(22vh, calc(var(--m) * 0.285));
+}
+.ring-label {
+  position: absolute;
+  width: min(300px, 26vw);
+  transform: translateY(-50%);
+}
+.ring-label[data-row="top"] {
+  top: calc(50vh - var(--gy) / 2);
+}
+.ring-label[data-row="bottom"] {
+  top: calc(50vh + var(--gy) / 2);
+}
+.ring-label[data-side="left"] {
+  right: calc(50vw + var(--gx) / 2 + var(--r) + 44px);
+  text-align: right;
+}
+.ring-label[data-side="right"] {
+  left: calc(50vw + var(--gx) / 2 + var(--r) + 44px);
+}
+/* Выноска: волосяная линия от подписи к краю кольца и точка на самом краю. */
+.ring-label::before,
+.ring-label::after {
+  content: "";
+  position: absolute;
+  top: 0.7em;
+}
+.ring-label::before {
+  width: 30px;
+  height: 1px;
+  background: var(--sand-faint);
+}
+.ring-label::after {
+  width: 4px;
+  height: 4px;
+  margin-top: -1.5px;
+  border-radius: 50%;
+  background: var(--sand-dim);
+}
+.ring-label[data-side="left"]::before {
+  left: calc(100% + 8px);
+}
+.ring-label[data-side="left"]::after {
+  left: calc(100% + 42px);
+}
+.ring-label[data-side="right"]::before {
+  right: calc(100% + 8px);
+}
+.ring-label[data-side="right"]::after {
+  right: calc(100% + 42px);
 }
 
 .eyebrow {

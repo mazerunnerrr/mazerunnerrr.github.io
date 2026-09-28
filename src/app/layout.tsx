@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant, Manrope } from "next/font/google";
+import { Cormorant, IBM_Plex_Mono, Manrope } from "next/font/google";
 import { SITE_URL, getSite } from "@/content";
 import "./globals.css";
 
@@ -10,6 +10,15 @@ const cormorant = Cormorant({
   subsets: ["cyrillic", "latin"],
   weight: ["300", "400", "500"],
   style: ["normal", "italic"],
+  display: "swap",
+});
+
+/* Приборы — моноширинным: живые показания меняются каждый кадр, и в пропорциональном
+   шрифте цифры прыгали бы по ширине. Моноширинный держит их в колонке. */
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["cyrillic", "latin"],
+  weight: ["400", "500"],
   display: "swap",
 });
 
@@ -63,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        по-прежнему видно. */
     <html
       lang="ru"
-      className={`${cormorant.variable} ${manrope.variable}`}
+      className={`${cormorant.variable} ${manrope.variable} ${plexMono.variable}`}
       suppressHydrationWarning
     >
       <body>

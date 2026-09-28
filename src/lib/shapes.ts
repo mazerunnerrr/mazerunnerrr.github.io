@@ -50,23 +50,32 @@ export async function textShape(text: string, w: number, h: number, first: boole
 }
 
 /**
- * Кольца-узлы. Для четырёх — сетка 2×2, иначе ряд. Большая часть точек
- * лежит на окружности, остальные — редкой пылью внутри: пустое кольцо
- * читается чертежом, сплошной диск — пятном.
+ * Раскладка колец-узлов. Общая для частиц и для выносок на странице: подписи
+ * должны стоять ровно у своих колец, поэтому геометрия считается в одном месте.
+ * Для четырёх — сетка 2×2, иначе ряд. Координаты — от центра экрана, Y вверх.
  */
-export function ringsShape(count: number, w: number, h: number, n: number): Shape {
+export function ringLayout(count: number, w: number, h: number) {
   const c = Math.max(1, count);
   const cols = c === 4 ? 2 : c;
   const rows = Math.ceil(c / cols);
   const R = Math.min(w, h) * 0.075;
   const gx = Math.min(w * 0.2, R * 4.4);
   const gy = Math.min(h * 0.22, R * 3.8);
-  const centers: [number, number][] = [];
-  for (let i = 0; i < c; i++) {
+  const centers = Array.from({ length: c }, (_, i): [number, number] => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    centers.push([(col - (cols - 1) / 2) * gx, ((rows - 1) / 2 - row) * gy]);
-  }
+    return [(col - (cols - 1) / 2) * gx, ((rows - 1) / 2 - row) * gy];
+  });
+  return { R, gx, cols, centers };
+}
+
+/**
+ * Кольца-узлы. Большая часть точек лежит на окружности, остальные — редкой
+ * пылью внутри: пустое кольцо читается чертежом, сплошной диск — пятном.
+ */
+export function ringsShape(count: number, w: number, h: number, n: number): Shape {
+  const { R, gx, cols, centers } = ringLayout(count, w, h);
+  const c = centers.length;
   const out = new Float32Array(n * 2);
   for (let i = 0; i < n; i++) {
     const [cx, cy] = centers[i % c];

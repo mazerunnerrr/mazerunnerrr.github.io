@@ -17,6 +17,15 @@ export type FrameInfo = {
   progress: number;
   /** Скорость движения по маршруту, точек в секунду. */
   velocity: number;
+  /** Живые показания для приборов по углам: настоящие числа сцены. */
+  stats: {
+    /** Кадров в секунду, сглаженно — чтобы число читалось, а не мелькало. */
+    fps: number;
+    /** Сколько точек в мире. */
+    points: number;
+    /** Сколько из них сейчас сдвинуты рукой дальше пары пикселей. */
+    moving: number;
+  };
 };
 
 type Props = {
@@ -95,7 +104,11 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
         last = now;
         const fb = fallbackRef.current;
         if (fb) fb.style.opacity = String(Math.max(0, 1 - Math.min(1, progress) * 1.7));
-        onFrameRef.current?.({ progress, velocity: journey.velocity });
+        onFrameRef.current?.({
+          progress,
+          velocity: journey.velocity,
+          stats: { fps: 0, points: 0, moving: 0 },
+        });
       };
       tick();
       return () => {
@@ -190,6 +203,8 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
         тогда: посреди пролёта точки летят по хореографии, и попадание по
         их «домашним» координатам не совпадало бы с тем, что на экране. */
     let settled = true;
+    /** Сколько точек сейчас сдвинуто рукой — для прибора «в движении». */
+    let movingNow = 0;
     const ptrPrev = new THREE.Vector2(-9999, -9999);
 
     const particleUniforms = {
@@ -576,6 +591,7 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
     const stepPhysics = (dt: number) => {
       if (!vel || !disp || !dispAttr || !base2 || !give || !spray) return;
       const n = disp.length / 3;
+      let moved = 0;
 
       // Скорость руки сглаживаем и ограничиваем: рывок мышью через весь
       // экран иначе выстреливает облако одним кадром.
@@ -735,7 +751,9 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
         disp[i3] = dx2;
         disp[i3 + 1] = dy2;
         disp[i3 + 2] = dz2;
+        if (dx2 * dx2 + dy2 * dy2 > 4) moved++;
       }
+      movingNow = moved;
       if (probe) {
         let max = 0;
         let moved = 0;
@@ -759,6 +777,8 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
     const started = last;
     let enter = 0;
     let trailTick = 0;
+    /** Длительность кадра, сглаженная: прибор показывает её как кадры в секунду. */
+    let frameMs = 16.7;
 
     /* Камера стоит на месте, полёт делает материя.
 
@@ -774,6 +794,7 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       const t = (now - started) / 1000;
+      frameMs += (dt * 1000 - frameMs) * 0.08;
 
       // Кадронезависимое сглаживание: при просадке fps движение
       // замедляется по времени, а не по кадрам.
@@ -819,7 +840,11 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
       fieldUniforms.uDrag.value = drag;
       fieldUniforms.uHasPtr.value = rawMouse.x > -9000 ? hover : 0;
 
-      onFrameRef.current?.({ progress, velocity: journey.velocity });
+      onFrameRef.current?.({
+        progress,
+        velocity: journey.velocity,
+        stats: { fps: 1000 / frameMs, points: disp ? disp.length / 3 : 0, moving: movingNow },
+      });
 
       fieldUniforms.uTime.value = t;
       fieldUniforms.uEnter.value = eased;
@@ -883,7 +908,11 @@ export function Scene({ shapes, onFrame, onReady }: Props) {
         particleUniforms.uT.value = syncPair(progress);
         particleUniforms.uCamZ.value = camera.position.z;
         particleUniforms.uBaseZ.value = baseZ;
-        onFrameRef.current?.({ progress, velocity: 0 });
+        onFrameRef.current?.({
+          progress,
+          velocity: 0,
+          stats: { fps: 0, points: disp ? disp.length / 3 : 0, moving: 0 },
+        });
         renderer.render(scene, camera);
       };
       still();
