@@ -130,71 +130,72 @@ const run = async () => {
     await glide(page, [W * 0.09, H * 0.87], [W * 0.2, H * 0.87], 25, 20);
     await page.waitForTimeout(700);
 
-    /* 4. Маршрут: летим ко второй точке. Колесо здесь двигает камеру,
-          а не прокручивает документ.
+    const wheel = async (clicks) => {
+      for (let i = 0; i < Math.abs(clicks); i++) {
+        await page.mouse.wheel(0, Math.sign(clicks) * 90);
+        await page.waitForTimeout(55);
+      }
+    };
 
-          Ровно одна точка — это 900 пикселей колеса (`pxPerStop` в journey.ts),
-          то есть десять щелчков по 90. Прежние четырнадцать проскакивали
-          дальше: пока точек было три, лишнее съедал предел маршрута, а с
-          появлением контактов камера стала зависать между точками, и
-          невидимый слой контактов перехватывал нажатие на плитку. */
+    // 4. Нажатие на имя — комната «обо мне»: имя раскрывается облаком.
+    //    Выход — прокруткой вверх, как у igloo.
+    await glide(page, [W * 0.2, H * 0.87], [W * 0.5, H * 0.48], 35);
+    await page.waitForTimeout(400);
+    await page.mouse.click(W * 0.5, H * 0.48);
+    await page.waitForTimeout(3000);
+    await wheel(-3);
+    await page.waitForTimeout(2400);
+
+    // 5. Звук: линия в переключателе справа сверху оживает волной.
+    const toggle = page.getByRole("button", { name: /звук/i });
+    if (await toggle.count()) {
+      const tb = await toggle.boundingBox();
+      if (tb) {
+        await glide(page, [W * 0.5, H * 0.48], [tb.x + tb.width / 2, tb.y + tb.height / 2], 35);
+        await toggle.click();
+        await page.waitForTimeout(1800);
+      }
+    }
+
+    /* 6. Аллея. Одна точка — 900 пикселей колеса (`pxPerStop` в journey.ts),
+          десять щелчков по 90. Нарочно недокручиваем: шесть щелчков —
+          и рука замирает; через секунду доводка плавно довозит до точки. */
     await page.mouse.move(W * 0.55, H * 0.5);
-    for (let i = 0; i < 10; i++) {
-      await page.mouse.wheel(0, 90);
-      await page.waitForTimeout(55);
-    }
+    await wheel(6);
+    await page.waitForTimeout(3400);
+
+    // 7. Сфера проекта: зажал и повёл — вертится в любую сторону, как
+    //    планета, и докручивается по инерции. Нажатие — раскрывается
+    //    одним движением, и ты внутри сетки, в комнате проекта.
+    await page.mouse.move(W * 0.42, H * 0.42);
+    await page.mouse.down();
+    await glide(page, [W * 0.42, H * 0.42], [W * 0.62, H * 0.6], 30, 16);
+    await glide(page, [W * 0.62, H * 0.6], [W * 0.5, H * 0.35], 25, 16);
+    await page.mouse.up();
     await page.waitForTimeout(2200);
-    await glide(page, [W * 0.55, H * 0.5], [W * 0.3, H * 0.62], 35);
-    await page.waitForTimeout(900);
+    await page.mouse.click(W * 0.5, H * 0.5);
+    await page.waitForTimeout(3000);
+    await glide(page, [W * 0.5, H * 0.5], [W * 0.83, H * 0.36], 35);
+    await page.waitForTimeout(2200);
+    // Изнутри сетку тоже вертят рукой, а под рукой точки разлетаются.
+    await page.mouse.move(W * 0.62, H * 0.7);
+    await page.mouse.down();
+    await glide(page, [W * 0.62, H * 0.7], [W * 0.3, H * 0.55], 35, 16);
+    await page.mouse.up();
+    await page.waitForTimeout(1600);
+    await glide(page, [W * 0.3, H * 0.55], [W * 0.5, H * 0.5], 25);
+    await wheel(-3);
+    await page.waitForTimeout(2400);
 
-    // 5. Третья точка: проекты.
-    for (let i = 0; i < 10; i++) {
-      await page.mouse.wheel(0, 90);
-      await page.waitForTimeout(55);
-    }
-    await page.waitForTimeout(2600);
-    await glide(page, [W * 0.3, H * 0.62], [W * 0.6, H * 0.45], 40);
-    await page.waitForTimeout(1200);
+    // 8. Следующий проект: сфера не улетает, а пересобирается на месте.
+    await wheel(10);
+    await page.waitForTimeout(3400);
 
-    // 6. Плитка проекта: под рукой обложка оживает, по нажатию открывается
-    //    страница проекта. Кнопки в туре нажимаются с 2026-09-16 — без этого
-    //    мёртвую ссылку на ролике было не отличить от живой.
-    const tile = page.locator("main a[href^='/work/']").first();
-    const box = (await tile.count()) ? await tile.boundingBox() : null;
-    if (box) {
-      await glide(page, [W * 0.6, H * 0.45], [box.x + box.width / 2, box.y + box.height * 0.45], 35);
-      // Пауза длиннее смены кадра обложки: иначе слайд-шоу не видно.
-      await page.waitForTimeout(3000);
-      await tile.click();
-      await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(1400);
-
-      // На странице проекта прокрутка обычная: маршрут её не перехватывает.
-      for (let i = 0; i < 26; i++) {
-        await page.mouse.wheel(0, 150);
-        await page.waitForTimeout(60);
-      }
-      await page.waitForTimeout(1200);
-
-      // 7. Назад к маршруту — облако собирается заново, с нуля.
-      await page.goBack({ waitUntil: "networkidle" });
-      await page.waitForTimeout(3000);
-
-      // 8. Клавиатурой до контактов: маршрут слушает PageDown, и после
-      //    возврата это самый короткий путь к последней точке.
-      for (let i = 0; i < 3; i++) {
-        await page.keyboard.press("PageDown");
-        await page.waitForTimeout(2300);
-      }
-      await page.waitForTimeout(1600);
-    } else {
-      // Плитки нет — возвращаемся к заголовку колесом, как раньше.
-      for (let i = 0; i < 28; i++) {
-        await page.mouse.wheel(0, -90);
-        await page.waitForTimeout(45);
-      }
-      await page.waitForTimeout(2200);
-    }
+    // 9. Контакты и дальше по кольцу — снова имя.
+    await wheel(10);
+    await page.waitForTimeout(3000);
+    await wheel(10);
+    await page.waitForTimeout(3200);
   }
 
   await page.waitForTimeout(600);

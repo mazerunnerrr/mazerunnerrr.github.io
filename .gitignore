@@ -24,3 +24,6 @@ next-env.d.ts
 /_probe2.mjs
 
 .DS_Store
+
+# исходники треков от Ильи — на сайт идёт только файл из public/media
+/Music/

@@ -120,6 +120,19 @@ collections:
             label: Строка статуса
             widget: string
             hint: "Угол первого экрана: формат работы, часовой пояс, занятость"
+          - name: bridges
+            label: Строки-связки между точками
+            widget: object
+            hint: "Короткая фраза, которая появляется на переходе и ведёт сюжет. Пусто — на этом переходе фразы нет"
+            fields:
+              - { name: toProjects, label: "Имя → Проекты", widget: string, required: false }
+              - { name: toContacts, label: "Проекты → Контакты", widget: string, required: false }
+              - { name: toName, label: "Контакты → снова имя", widget: string, required: false }
+          - name: music
+            label: Музыка
+            widget: file
+            required: false
+            hint: "mp3, играет по кругу по переключателю звука. Пусто — звучит процедурный ветер мира. Ставить только трек, на который есть права"
 
       - name: skills
         label: Что делаю

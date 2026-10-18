@@ -35,6 +35,16 @@ export type Site = {
   intro: string;
   /** Строка в углу первого экрана: формат работы, часовой пояс, занятость. */
   status: string;
+  /** Строки-связки: фраза на переходе между точками, ведёт сюжет маршрута. */
+  bridges: Bridges;
+  /** Трек сайта, путь от корня. Пусто — играет процедурный звук мира. */
+  music?: string;
+};
+
+export type Bridges = {
+  toProjects?: string;
+  toContacts?: string;
+  toName?: string;
 };
 
 export type Contacts = {
@@ -92,10 +102,27 @@ const read = <T>(file: string): T => {
 /** Пустая строка из формы админки означает «не заполнено». */
 const opt = (v?: string) => (v?.trim() ? v : undefined);
 
+/** Порядок на аллее: готовые проекты первыми, «в работе» — в конце
+    (Илья, 2026-10-18). Внутри статуса — свежие первыми. */
+const STATUS_ORDER: Record<ProjectStatus, number> = {
+  запущен: 0,
+  "личный проект": 1,
+  "разбор и архитектура": 2,
+  "в работе": 3,
+};
+
 /** Последний год из «2025–2026»: по нему свежие проекты идут первыми. */
 const lastYear = (year: string) => Math.max(0, ...(year.match(/\d{4}/g) ?? []).map(Number));
 
-export const getSite = () => read<Site>("site.json");
+export const getSite = (): Site => {
+  const s = read<Site>("site.json");
+  const b = s.bridges ?? {};
+  return {
+    ...s,
+    bridges: { toProjects: opt(b.toProjects), toContacts: opt(b.toContacts), toName: opt(b.toName) },
+    music: opt(s.music),
+  };
+};
 
 export const getContacts = (): Contacts => {
   const c = read<Contacts>("contacts.json");
@@ -122,4 +149,9 @@ export const getProjects = (): Project[] =>
         links: p.links ?? [],
       };
     })
-    .sort((a, b) => lastYear(b.year) - lastYear(a.year) || a.title.localeCompare(b.title, "ru"));
+    .sort(
+      (a, b) =>
+        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+        lastYear(b.year) - lastYear(a.year) ||
+        a.title.localeCompare(b.title, "ru")
+    );

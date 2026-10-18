@@ -44,9 +44,12 @@ const state = () =>
       if (!el) return "нет";
       return `${(+getComputedStyle(el).opacity).toFixed(2)}${el.hasAttribute("data-faded") ? " погас" : ""}`;
     };
+    const about = [...document.querySelectorAll("main button")].find((b) => b.textContent.includes("обо мне"));
+    const aboutLayer = about?.closest("main > div");
     return {
-      имя: layer("a[href='#projects']"),
-      "что делаю": layer("#skills"),
+      имя: aboutLayer
+        ? `${(+getComputedStyle(aboutLayer).opacity).toFixed(2)}${aboutLayer.hasAttribute("data-faded") ? " погас" : ""}`
+        : "нет",
       проекты: layer("#projects"),
       контакты: layer("#contacts"),
       h1: document.querySelectorAll("h1").length,
@@ -85,32 +88,63 @@ await settle();
 console.log("колесо → 1       ", JSON.stringify(await state()));
 
 await fresh();
-await page.click("text=Смотреть проекты", { timeout: 3000 });
+await page.click("nav >> text=работы", { timeout: 3000 });
 await settle();
-console.log("клик «Смотреть»  ", JSON.stringify(await state()), "фокус:", await focused());
+console.log("клик «работы»    ", JSON.stringify(await state()), "фокус:", await focused());
 
 await fresh();
-await page.click("text=Написать", { timeout: 3000 });
+await page.click("nav >> text=контакт", { timeout: 3000 });
 await settle();
-console.log("клик «Написать»  ", JSON.stringify(await state()), "фокус:", await focused());
+console.log("клик «контакт»   ", JSON.stringify(await state()), "фокус:", await focused());
 
-/* Под погасшей «Смотреть проекты» на контактах не должна ловиться она сама.
-   Кликать туда вслепую нельзя: в том же углу стоит живая ссылка Telegram,
-   и клик честно открыл бы вкладку. Спрашиваем, кто под курсором. */
+/* Под погасшей «обо мне» на контактах не должна ловиться она сама.
+   Спрашиваем, кто под курсором, а не кликаем вслепую. */
 const hit = await page.evaluate(() => {
-  const ghost = [...document.querySelectorAll("main a")].find((x) => x.textContent.includes("Смотреть проекты"));
+  const ghost = [...document.querySelectorAll("main button")].find((x) => x.textContent.includes("обо мне"));
   const r = ghost.getBoundingClientRect();
   const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-  const a = el?.closest("a");
-  if (!a) return "пусто — нажатие уходит в сцену";
-  if (a === ghost) return "ПОГАСШАЯ «Смотреть проекты» — перехват!";
-  return `живая ссылка «${a.textContent.trim().slice(0, 24)}» своей точки`;
+  const b = el?.closest("a, button");
+  if (!b) return "пусто — нажатие уходит в сцену";
+  if (b === ghost) return "ПОГАСШАЯ «обо мне» — перехват!";
+  return `живая «${b.textContent.trim().slice(0, 24)}» своей точки`;
 });
-console.log("под погасшей «Смотреть» на 3:", hit);
+console.log("под погасшей «обо мне» на контактах:", hit);
 
 // Кольцо: с контактов вниз — снова имя.
 await page.keyboard.press("PageDown");
 await settle();
 console.log("PageDown с контактов", JSON.stringify(await state()));
+
+/* Комнаты. Вход с клавиатуры: фокус встаёт на «закрыть», аллея за спиной
+   инертна, колесо маршрут не двигает; Esc возвращает фокус ко входу. */
+const room = () =>
+  page.evaluate(() => {
+    const open = [...document.querySelectorAll("[role=dialog]")].find((d) => !d.inert);
+    const route = document.querySelector("main > div:last-child span:nth-child(3)")?.textContent;
+    return open ? `открыта «${open.getAttribute("aria-label")}» видно ${(+getComputedStyle(open).opacity).toFixed(2)} | ${route}` : `закрыто | ${route}`;
+  });
+await fresh();
+await page.keyboard.press("Tab");
+await settle();
+console.log("Tab → вход       ", await focused());
+await page.keyboard.press("Enter");
+await settle();
+console.log("Enter            ", await room(), "фокус:", await focused());
+await page.mouse.move(720, 450);
+await page.mouse.wheel(0, 900);
+await settle();
+console.log("колесо в комнате ", await room());
+await page.keyboard.press("Tab");
+console.log("Tab в комнате    ", await focused());
+await page.keyboard.press("Escape");
+await settle();
+console.log("Esc              ", await room(), "фокус:", await focused());
+
+// Вход кликом по самому объекту: имя стоит в центре.
+await page.mouse.click(720, 440);
+await settle();
+console.log("клик по объекту  ", await room());
+await page.keyboard.press("Escape");
+await settle();
 console.log("вкладок открылось:", popups, "| ошибки:", errors.length ? errors.join(" | ") : "нет");
 await browser.close();

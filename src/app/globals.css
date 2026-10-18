@@ -12,8 +12,8 @@
    ══════════════════════════════════════════════════════════════ */
 
 @theme {
-  --color-void: #0a0908;
-  --color-surface: #12100e;
+  --color-void: #0b1633;
+  --color-surface: #111f45;
   --color-sand: #e8dfcd;
   --color-azure: #8fb3cc;
 
@@ -106,68 +106,6 @@ body {
   --gutter: clamp(18px, 3vw, 40px);
 }
 
-/* Подписи к кольцам-узлам точки «Что делаю».
-
-   Геометрия — та же формула, что в ringLayout (src/lib/shapes.ts), только
-   в CSS: подписи стоят у своих колец без единой строки JS, есть в серверной
-   разметке для поиска и сами следуют за размером окна. Меняешь формулу
-   там — меняй и здесь. */
-.rings {
-  --m: min(100vw, 100vh);
-  --r: calc(var(--m) * 0.075);
-  --gx: min(20vw, calc(var(--m) * 0.33));
-  --gy: min(22vh, calc(var(--m) * 0.285));
-}
-.ring-label {
-  position: absolute;
-  width: min(300px, 26vw);
-  transform: translateY(-50%);
-}
-.ring-label[data-row="top"] {
-  top: calc(50vh - var(--gy) / 2);
-}
-.ring-label[data-row="bottom"] {
-  top: calc(50vh + var(--gy) / 2);
-}
-.ring-label[data-side="left"] {
-  right: calc(50vw + var(--gx) / 2 + var(--r) + 44px);
-  text-align: right;
-}
-.ring-label[data-side="right"] {
-  left: calc(50vw + var(--gx) / 2 + var(--r) + 44px);
-}
-/* Выноска: волосяная линия от подписи к краю кольца и точка на самом краю. */
-.ring-label::before,
-.ring-label::after {
-  content: "";
-  position: absolute;
-  top: 0.7em;
-}
-.ring-label::before {
-  width: 30px;
-  height: 1px;
-  background: var(--sand-faint);
-}
-.ring-label::after {
-  width: 4px;
-  height: 4px;
-  margin-top: -1.5px;
-  border-radius: 50%;
-  background: var(--sand-dim);
-}
-.ring-label[data-side="left"]::before {
-  left: calc(100% + 8px);
-}
-.ring-label[data-side="left"]::after {
-  left: calc(100% + 42px);
-}
-.ring-label[data-side="right"]::before {
-  right: calc(100% + 8px);
-}
-.ring-label[data-side="right"]::after {
-  right: calc(100% + 42px);
-}
-
 .eyebrow {
   font-size: 10.5px;
   letter-spacing: 0.17em;
@@ -196,4 +134,24 @@ body {
     animation: none !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Затемнение комнаты — ровное и лёгкое: сетка сферы вокруг должна быть
+   видна, иначе непонятно, что ты внутри неё; текст при этом читается. */
+.room-veil {
+  background: rgba(11, 22, 51, 0.34);
+}
+
+/* Прокрутка без видимой полосы — для комнаты, которой на низком окне
+   не хватает экрана. Полоса посреди сцены ломала картинку. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Свечение волны звука, пока играет: линии светятся своим же цветом. */
+.wave-glow {
+  filter: drop-shadow(0 0 2px currentColor);
 }

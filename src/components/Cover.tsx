@@ -1,7 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+/* Обычный <img>, а не next/image: тот вписывает в атрибут style
+   `color: transparent` (а с fill — ещё и позицию), Dark Reader переписывает
+   такой атрибут до гидратации, и React падает на несовпадении разметки
+   (2026-10-18). Оптимизации картинок при статической выкладке всё равно
+   нет — images.unoptimized. */
 
 const QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -72,13 +77,14 @@ export function Cover({
         />
       ) : (
         shots.map((src, n) => (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element -- см. комментарий в начале файла
+          <img
             key={src}
             src={src}
             alt={n === 0 ? alt : ""}
-            fill
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className={`object-cover transition-opacity duration-[1100ms] ease-[var(--ease-out-deep)] ${
+            loading="lazy"
+            decoding="async"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[1100ms] ease-[var(--ease-out-deep)] ${
               n === frame ? "opacity-100" : "opacity-0"
             }`}
           />
