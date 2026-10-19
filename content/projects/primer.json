@@ -15,5 +15,14 @@
     "/media/placeholder-primer.jpg"
   ],
   "links": [],
-  "accent": ""
+  "accent": "",
+  "en": {
+    "title": "PLACEHOLDER",
+    "role": "PLACEHOLDER",
+    "summary": "Sample project to show the transition between spheres. Delete it in the admin panel once a real second project exists",
+    "lead": "PLACEHOLDER: a paragraph about the task and why it was solved this way.",
+    "did": [
+      "PLACEHOLDER: what was done"
+    ]
+  }
 }

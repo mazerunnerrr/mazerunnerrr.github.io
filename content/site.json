@@ -3,5 +3,10 @@
   "thesis": "Беру задачу и довожу до работающего продукта",
   "intro": "Разбираюсь в бизнесе заказчика, проектирую систему и собираю её сам, с AI-инструментами. Поэтому быстрее и дешевле студии, а решения принимаю без цепочки менеджеров.",
   "status": "Удалённо · CET · открыт к проектам",
-  "music": "/media/fly-up-high.m4a"
+  "music": "/media/fly-up-high.m4a",
+  "en": {
+    "thesis": "I take a task and see it through to a working product",
+    "intro": "I get to know the client's business, design the system and build it myself, with AI tools. That makes me faster and cheaper than a studio, and decisions don't wait on a chain of managers.",
+    "status": "Remote · CET · open to projects"
+  }
 }

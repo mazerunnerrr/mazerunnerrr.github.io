@@ -22,5 +22,43 @@
   "video": "",
   "shots": ["/media/placeholder-1.jpg", "/media/placeholder-2.jpg", "/media/placeholder-3.jpg"],
   "links": [],
-  "accent": ""
+  "accent": "",
+  "en": {
+    "role": "Solo developer",
+    "summary": "Personal task and time manager",
+    "lead": "None of the existing task managers fit, so instead of trying yet again to get used to one, I wrote my own, one I'd use every day. A single backend serves two different surfaces: a desktop kanban for work at the computer and a mobile app that answers one question, what's overdue and what's on for today. Tasks go to Google Calendar, so the day shows up in the same place as meetings. I left out the ORM and the front-end build step on purpose, so I can open it in six months and fix it.",
+    "did": [
+      "One FastAPI backend for two interfaces: a drag-and-drop kanban on desktop and a mobile PWA with a daily summary on the phone, plus an open REST API",
+      "Added spaced repetition on the Ebbinghaus curve: material unfolds into ten tasks, from \"in an hour\" to \"every six months\", and the schedule keeps itself within active hours, 08:00–22:30",
+      "Synced tasks with Google Calendar: every hour the service looks for free slots in the working window, splits long tasks into parts, turns repeats into RRULE and colors events by priority",
+      "Built a native macOS app: pywebview on top of the system WebKit, launched from Spotlight, with the server starting on a random free port in the same process",
+      "Deployed to a VPS: Ubuntu 24.04 on 848 MB of memory, Caddy with automatic HTTPS, login via a signed cookie and a PBKDF2 password hash",
+      "Wrote an Android widget in Java without a single dependency: exact alarms, three notification channels, a screen that shows over the lock screen, and a list that survives going offline"
+    ],
+    "stack": [
+      "Python",
+      "FastAPI",
+      "SQLite",
+      "vanilla JS",
+      "pywebview",
+      "PWA",
+      "Web Push",
+      "Java",
+      "Caddy"
+    ],
+    "facts": [
+      {
+        "value": "2",
+        "label": "interfaces on one backend"
+      },
+      {
+        "value": "10",
+        "label": "repetitions on the Ebbinghaus curve"
+      },
+      {
+        "value": "848 MB",
+        "label": "of server memory"
+      }
+    ]
+  }
 }

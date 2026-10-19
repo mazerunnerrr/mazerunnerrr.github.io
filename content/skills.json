@@ -16,5 +16,25 @@
       "title": "Автоматизация процессов",
       "lead": "То, что делалось руками по шагам, происходит само: по времени, по событию или по одной кнопке — вместе с уведомлением о результате."
     }
-  ]
+  ],
+  "en": {
+    "items": [
+      {
+        "title": "Agents and bots",
+        "lead": "A Telegram bot handles the conversation instead of a person: it takes the request, does the math, sends reminders and answers the moment someone asks."
+      },
+      {
+        "title": "Web apps and admin panels",
+        "lead": "Interfaces people use every day, like task boards, cards and tables, with login, permissions and predictable behavior on a phone."
+      },
+      {
+        "title": "Integrations",
+        "lead": "Services start talking to each other. Tasks land in the calendar, events go to the messenger, and data moves by itself, on schedule."
+      },
+      {
+        "title": "Process automation",
+        "lead": "Work that used to be done by hand, step by step, happens on its own: on a timer, on an event or at the press of a button, and you get notified of the result."
+      }
+    ]
+  }
 }

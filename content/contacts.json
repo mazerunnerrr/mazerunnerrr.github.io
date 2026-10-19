@@ -11,5 +11,18 @@
       "url": "mailto:directed.by.our@gmail.com"
     }
   ],
-  "formUrl": ""
+  "formUrl": "",
+  "en": {
+    "name": "Ilya",
+    "links": [
+      {
+        "label": "Telegram",
+        "url": "https://t.me/Mazerrunnerr"
+      },
+      {
+        "label": "Email",
+        "url": "mailto:directed.by.our@gmail.com"
+      }
+    ]
+  }
 }
