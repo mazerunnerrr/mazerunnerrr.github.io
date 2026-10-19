@@ -9,10 +9,15 @@
  * Обязательность полей и допустимые значения держит форма админки. Здесь
  * только то, чего она не знает: пустая строка из формы значит «не заполнено»,
  * а кривой JSON роняет сборку с именем файла — прежняя версия сайта остаётся.
+ *
+ * Языка два (см. `src/lib/i18n.ts`). Русский лежит в корне файла, английский —
+ * в ключе `en`: так пишет админка (`single_file_default_root`). Каждое чтение
+ * берёт язык параметром; не переведённое поле отдаёт русское.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import type { Lang } from "@/lib/i18n";
 
 const ROOT = join(process.cwd(), "content");
 
@@ -35,16 +40,8 @@ export type Site = {
   intro: string;
   /** Строка в углу первого экрана: формат работы, часовой пояс, занятость. */
   status: string;
-  /** Строки-связки: фраза на переходе между точками, ведёт сюжет маршрута. */
-  bridges: Bridges;
   /** Трек сайта, путь от корня. Пусто — играет процедурный звук мира. */
   music?: string;
-};
-
-export type Bridges = {
-  toProjects?: string;
-  toContacts?: string;
-  toName?: string;
 };
 
 export type Contacts = {
@@ -102,6 +99,30 @@ const read = <T>(file: string): T => {
 /** Пустая строка из формы админки означает «не заполнено». */
 const opt = (v?: string) => (v?.trim() ? v : undefined);
 
+/** Английское поверх русского: пустая строка или пустой список в переводе
+    не затирают оригинал. Списки сводятся по порядку, пункт к пункту. */
+const fill = (ru: unknown, en: unknown): unknown => {
+  if (typeof ru === "string") return typeof en === "string" && en.trim() ? en : ru;
+  if (Array.isArray(ru)) {
+    if (!Array.isArray(en) || en.length === 0) return ru;
+    return en.map((x, i) => (i < ru.length ? fill(ru[i], x) : x));
+  }
+  if (ru && typeof ru === "object") {
+    const out: Record<string, unknown> = { ...ru };
+    if (en && typeof en === "object")
+      for (const [k, v] of Object.entries(en)) out[k] = fill((ru as Record<string, unknown>)[k], v);
+    return out;
+  }
+  return en ?? ru;
+};
+
+/** Файл на нужном языке. Служебное поле `lang` админка ведёт сама — оно не нужно. */
+const readIn = <T>(file: string, lang: Lang): T => {
+  const { en, ...ru } = read<Record<string, unknown>>(file);
+  delete ru.lang;
+  return (lang === "ru" ? ru : fill(ru, en)) as T;
+};
+
 /** Порядок на аллее: готовые проекты первыми, «в работе» — в конце
     (Илья, 2026-10-18). Внутри статуса — свежие первыми. */
 const STATUS_ORDER: Record<ProjectStatus, number> = {
@@ -114,29 +135,26 @@ const STATUS_ORDER: Record<ProjectStatus, number> = {
 /** Последний год из «2025–2026»: по нему свежие проекты идут первыми. */
 const lastYear = (year: string) => Math.max(0, ...(year.match(/\d{4}/g) ?? []).map(Number));
 
-export const getSite = (): Site => {
-  const s = read<Site>("site.json");
-  const b = s.bridges ?? {};
-  return {
-    ...s,
-    bridges: { toProjects: opt(b.toProjects), toContacts: opt(b.toContacts), toName: opt(b.toName) },
-    music: opt(s.music),
-  };
+export const getSite = (lang: Lang = "en"): Site => {
+  const s = readIn<Site>("site.json", lang);
+  return { ...s, music: opt(s.music) };
 };
 
-export const getContacts = (): Contacts => {
-  const c = read<Contacts>("contacts.json");
+export const getContacts = (lang: Lang = "en"): Contacts => {
+  const c = readIn<Contacts>("contacts.json", lang);
   return { ...c, note: opt(c.note), formUrl: opt(c.formUrl) };
 };
 
-export const getSkills = () => read<{ items: Skill[] }>("skills.json").items;
+export const getSkills = (lang: Lang = "en") => readIn<{ items: Skill[] }>("skills.json", lang).items;
 
-export const getProjects = (): Project[] =>
+/** Порядок проектов один на оба языка — по русскому тексту: иначе точки
+    маршрута менялись бы местами при смене языка. */
+export const getProjects = (lang: Lang = "en"): Project[] =>
   readdirSync(join(ROOT, "projects"))
     .filter((name) => name.endsWith(".json"))
     .map((name) => {
-      const p = read<Omit<Project, "slug"> & { accent?: string }>(`projects/${name}`);
-      return {
+      const p = readIn<Omit<Project, "slug"> & { accent?: string }>(`projects/${name}`, lang);
+      const project: Project = {
         ...p,
         slug: name.slice(0, -".json".length),
         summary: opt(p.summary),
@@ -148,10 +166,12 @@ export const getProjects = (): Project[] =>
         shots: p.shots ?? [],
         links: p.links ?? [],
       };
+      return { project, ru: readIn<Omit<Project, "slug">>(`projects/${name}`, "ru") };
     })
     .sort(
-      (a, b) =>
+      ({ ru: a }, { ru: b }) =>
         STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
         lastYear(b.year) - lastYear(a.year) ||
         a.title.localeCompare(b.title, "ru")
-    );
+    )
+    .map(({ project }) => project);

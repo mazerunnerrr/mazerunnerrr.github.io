@@ -147,7 +147,7 @@ const run = async () => {
     await page.waitForTimeout(2400);
 
     // 5. Звук: линия в переключателе справа сверху оживает волной.
-    const toggle = page.getByRole("button", { name: /звук/i });
+    const toggle = page.getByRole("button", { name: /sound|звук/i });
     if (await toggle.count()) {
       const tb = await toggle.boundingBox();
       if (tb) {

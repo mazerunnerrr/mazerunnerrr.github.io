@@ -45,7 +45,8 @@ export function generateMetadata(): Metadata {
     alternates: { canonical: "/" },
     openGraph: {
       type: "website",
-      locale: "ru_RU",
+      locale: "en_US",
+      alternateLocale: ["ru_RU"],
       url: "/",
       siteName: site.alias,
       title: site.alias,
@@ -71,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        Глушим расхождение ровно на корневом теге — глубже оно
        по-прежнему видно. */
     <html
-      lang="ru"
+      lang="en"
       className={`${cormorant.variable} ${manrope.variable} ${plexMono.variable}`}
       suppressHydrationWarning
     >

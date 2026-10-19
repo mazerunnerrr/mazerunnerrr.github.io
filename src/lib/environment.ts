@@ -40,10 +40,18 @@ type Shared = {
   uBaseZ: Uniform<number>;
   uSand: Uniform<THREE.Color>;
   uAzure: Uniform<THREE.Color>;
+  /** Вода, которую мешает рука: пыль в ней — взвесь (см. `Water`). */
+  uWaterTex: Uniform<THREE.Texture>;
+  uWaterMap: Uniform<THREE.Vector4>;
 };
 
 /** Сколько пылинок. Их видно краем глаза, гуще — и они спорят с объектом. */
 const DUST = 2600;
+/** Взвесь в толще вокруг объекта: её рука закручивает течением, и видно,
+    что мы в воде, а не перед картинкой (Илья, 2026-10-19). Слой неглубокий —
+    две глубины экрана, — чтобы частицы были рядом с рукой, а не в дали. */
+const SILT_DUST = 3600;
+const SILT_DEPTH = 2.2;
 /** Сколько глубины пыли проходит одна точка маршрута, в долях расстояния до экрана. */
 const DUST_STEP = 1.6;
 /** Глубина ориентира на расстоянии в одну точку маршрута, в тех же долях:
@@ -72,12 +80,12 @@ function ring(out: number[], R: number, count: number, from = 0, span = Math.PI 
   }
 }
 
-/** Ворота — два кольца с рисками, как шкала прибора. Арки — три дуги:
+/** Ворота — одно кольцо с рисками наружу, как шкала прибора: два кольца
+    рядом читались двойной линией (Илья, 2026-10-19). Арки — три дуги:
     видно, что это проход, но не путаешь с воротами раздела. */
 function markShape(kind: Landmark["kind"], h: number) {
   const out: number[] = [];
   if (kind === "gate") {
-    ring(out, h * 0.42, 1700);
     ring(out, h * 0.47, 1900);
     for (let t = 0; t < 48; t++) {
       const a = (t / 48) * Math.PI * 2;
@@ -99,6 +107,8 @@ export class Environment {
   readonly marksOnScreen: MarkFrame[];
   private dust: THREE.Points | null = null;
   private dustU: Record<string, Uniform<number>> | null = null;
+  private silt: THREE.Points | null = null;
+  private siltU: Record<string, Uniform<number>> | null = null;
   private marks: Mark[] = [];
 
   constructor(
@@ -161,6 +171,24 @@ export class Environment {
     };
     this.dust = this.add(pos, this.dustU);
 
+    const sLen = SILT_DEPTH * baseZ;
+    const sPos = new Float32Array(SILT_DUST * 3);
+    for (let i = 0; i < SILT_DUST; i++) {
+      sPos[i * 3] = (Math.random() - 0.5) * w * 2.2;
+      sPos[i * 3 + 1] = (Math.random() - 0.5) * h * 2.2;
+      sPos[i * 3 + 2] = Math.random() * sLen;
+    }
+    this.siltU = {
+      uShift: { value: 0 },
+      uLen: { value: sLen },
+      uWrap: { value: 1 },
+      uZ: { value: 0 },
+      uFar: { value: sLen },
+      uAlpha: { value: 0 },
+      uSpeed: { value: 0 },
+    };
+    this.silt = this.add(sPos, this.siltU);
+
     this.marks = this.landmarks.map((m) => {
       const u = {
         uShift: { value: 0 },
@@ -186,6 +214,11 @@ export class Environment {
       // разброс мешал увидеть ровную сетку.
       this.dustU.uAlpha.value = 0.55 * (1 - room * 0.95);
     }
+    if (this.siltU) {
+      this.siltU.uShift.value = progress * DUST_STEP * baseZ;
+      this.siltU.uSpeed.value = speed * 0.6;
+      this.siltU.uAlpha.value = 0.4 * (1 - room * 0.95);
+    }
     // Ориентиры видны только в движении: в покое на точке их нет.
     const frac = progress - Math.floor(progress);
     const motion = smooth(0.04, 0.18, Math.min(frac, 1 - frac)) * (1 - room);
@@ -202,13 +235,15 @@ export class Environment {
   }
 
   dispose() {
-    for (const p of [this.dust, ...this.marks.map((m) => m.points)]) {
+    for (const p of [this.dust, this.silt, ...this.marks.map((m) => m.points)]) {
       if (!p) continue;
       this.scene.remove(p);
       p.geometry.dispose();
       (p.material as THREE.Material).dispose();
     }
     this.dust = null;
+    this.silt = null;
+    this.siltU = null;
     this.dustU = null;
     this.marks = [];
   }

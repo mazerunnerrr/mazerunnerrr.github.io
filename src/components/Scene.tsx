@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { buildShape, burstShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
 import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG } from "@/lib/shaders";
 import { Journey } from "@/lib/journey";
+import { Water } from "@/lib/fluid";
 import {
   Environment,
   chapterLight,
@@ -19,7 +20,8 @@ const VOID = new THREE.Color("#0b1633");
 const AZURE = new THREE.Color("#8fb3cc");
 const SAND = new THREE.Color("#e8dfcd");
 
-const TRAIL = 8;
+/** Радиус мазка по воде — доля высоты экрана: воду рука мешает шире, чем точки. */
+const WATER_R = 0.2;
 
 /* Аллея-кольцо. Каждый объект собирается и рассыпается по центру экрана:
    подлетающий — из глубины, уходящий — сквозь камеру. Так было у одного
@@ -166,6 +168,10 @@ type Body = {
   disp: Float32Array;
   /** Податливость каждой точки: без разброса облако летит ровным строем. */
   give: Float32Array;
+  /** 1 — точку унесло распылением, и домой её ведёт прежний медленный возврат. */
+  sprayed: Uint8Array;
+  /** Насколько точку «разбудил» удар руки: пока не угасло, её крутит вихрь. */
+  stir: Float32Array;
   /** Куда и насколько далеко уходит точка при распылении рукой. */
   spray: Float32Array;
   dispAttr: THREE.BufferAttribute;
@@ -311,22 +317,22 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
     /* ── фон ───────────────────────────────────────────────────── */
 
-    const trailPos = Array.from({ length: TRAIL }, () => new THREE.Vector2(0.5, 0.5));
-    const trailW = new Float32Array(TRAIL);
-    // Пока руки на экране не было, следа нет вовсе. Иначе в центре
-    // с первого кадра горит круглое пятно — ровно то размытое радиальное
-    // свечение, по которому шаблонный лендинг видно за секунду.
-    let touched = false;
+    /* Вода, которую мешает рука: поле в JS (`Water`), в шейдеры — текстурой.
+       Её читают фон (муть, свет) и пыль (её уносит течением). */
+    const waterU = {
+      uWaterTex: { value: new THREE.DataTexture(new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType) },
+      /** Из UV экрана в UV сетки: масштаб и сдвиг на полклетки. */
+      uWaterMap: { value: new THREE.Vector4(1, 1, 0, 0) },
+    };
 
     const fieldUniforms = {
+      ...waterU,
       uRes: { value: new THREE.Vector2(1, 1) },
       uTime: { value: 0 },
       // На узком экране режем октавы шума: телефон этого не тянет,
       // а разницу на глаз там не видно.
       uOct: { value: 5 },
       uEnter: { value: 0 },
-      uTrail: { value: trailPos },
-      uTrailW: { value: trailW },
       /* Фон — в том виде, в каком его выбрал Илья. three хранит цвет
          в линейном пространстве, а наш шейдер пишет значение на экран
          как есть, без перевода обратно: «#0b1633» выходил почти чёрным.
@@ -334,9 +340,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       uVoid: { value: VOID.clone().convertLinearToSRGB() },
       uAzure: { value: AZURE },
       uSpeed: { value: 0 },
-      uLens: { value: new THREE.Vector2(0.5, 0.5) },
-      uDrag: { value: 0 },
-      uHasPtr: { value: 0 },
       uTint: { value: new THREE.Color() },
       uTintAmt: { value: 0 },
       uTintDir: { value: new THREE.Vector2(0, 1) },
@@ -439,7 +442,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     /* Среда маршрута: пыль, ориентиры, свет глав. */
     const env = new Environment(
       scene,
-      { ...shared, uAzure: fieldUniforms.uAzure },
+      { ...shared, ...waterU, uAzure: fieldUniforms.uAzure },
       landmarks,
       N
     );
@@ -495,6 +498,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const vel = new Float32Array(n * 3);
       const disp = new Float32Array(n * 3);
       const give = new Float32Array(n);
+      const sprayed = new Uint8Array(n);
+      const stir = new Float32Array(n);
       const spray = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
         give[i] = 0.35 + Math.random() * 1.5;
@@ -570,7 +575,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       points.visible = false;
       scene.add(points);
       const body: Body = {
-        points, geo, mat, u, a, b, n, vel, disp, give, spray, dispAttr, velAttr,
+        points, geo, mat, u, a, b, n, vel, disp, give, sprayed, stir, spray, dispAttr, velAttr,
         morph: 0, restless: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
       };
       if (spec.media) loadMedia(body, spec.media);
@@ -720,9 +725,22 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let w = 0;
     let h = 0;
     let baseZ = 1000;
+    let water = new Water(1, 1);
+    let waterData = new Float32Array(4);
+    /* Линейная выборка из float-текстуры — расширение; без него вода
+       ступенчатая, но работает. */
+    const waterFilter = renderer.extensions.has("OES_texture_float_linear") ? THREE.LinearFilter : THREE.NearestFilter;
     const resize = () => {
       w = host.clientWidth;
       h = host.clientHeight;
+      water = new Water(w, h);
+      waterData = new Float32Array(water.nx * water.ny * 4);
+      waterU.uWaterTex.value.dispose();
+      const tex = new THREE.DataTexture(waterData, water.nx, water.ny, THREE.RGBAFormat, THREE.FloatType);
+      tex.minFilter = tex.magFilter = waterFilter;
+      tex.needsUpdate = true;
+      waterU.uWaterTex.value = tex;
+      waterU.uWaterMap.value.set(w / (water.cell * water.nx), h / (water.cell * water.ny), 0.5 / water.nx, 0.5 / water.ny);
       // updateStyle НЕ отключать: без CSS-размера канвас растягивается
       // до своих физических пикселей, и на экране с dpr=2 сцена выходит
       // вдвое крупнее вёрстки и уезжает за край.
@@ -751,7 +769,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     /* ── указатель ─────────────────────────────────────────────── */
 
     const rawMouse = new THREE.Vector2(-9999, -9999);
-    const uvMouse = new THREE.Vector2(0.5, 0.5);
 
     /* Присутствие руки, 0..1.
 
@@ -780,11 +797,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let cursor = "";
 
     const onMove = (e: PointerEvent) => {
-      touched = true;
       hoverTarget = 1;
       const r = rect;
       rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
-      uvMouse.set((e.clientX - r.left) / w, 1 - (e.clientY - r.top) / h);
       if (dragging) {
         // Путь считаем до того, как сдвинем опору, иначе он всегда ноль.
         dragTravel += Math.hypot(e.clientX - dragLast.x, e.clientY - dragLast.y);
@@ -924,9 +939,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        касания. Из-за обратного порядка у меня раньше и выходил антимагнит:
        точки разбегались строго прочь, ровно и мертво.
 
-       Возврат — простое притяжение к дому, без пружины через ускорение.
-       Пружина проскакивала ноль и отбрасывала облако назад: то самое
-       «слишком сильный bounce». Здесь точка просто замедляется и встаёт.
+       Возврат — пружина с критическим затуханием (Илья, 2026-10-19: «как
+       у пингвина igloo — по параболе от места и по параболе обратно»).
+       Прежняя пружина проскакивала ноль и отбрасывала облако назад — «слишком
+       сильный bounce»; эта ровно на границе, где отскока ещё нет: точка
+       трогается домой сразу, разгоняется и мягко садится.
 
        Рука работает только по объекту перед камерой. Остальные шагают,
        лишь пока не улеглись после неё. */
@@ -956,7 +973,58 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const CURL = 0.0015;    // закрутка вбок, чтобы не расходились строем
     const DEPTH = 0.0059;   // разброс по глубине: одни ближе, другие дальше
 
+    /* Илья попросил возврат как у пингвина igloo и «быстрее, как на 120 к/с»
+       (2026-10-19). Удар остался прежним, поменялись возврат и время полёта:
+       трение выше (0.82 вместо 0.95) — без долгого дрейфа, — и пружина вместо
+       притяжения по экспоненте: вместе с этим трением она критическая,
+       точка трогается домой сразу, разгоняется и мягко садится, 90% пути —
+       за ~0,65 с (подбирали 1,2 → 1,0 → 0,85 → 0,43 → 0,65; Илья: «чуть
+       быстрее, так же плавно», «ещё в два раза», потом «в полтора раза
+       медленнее»). Критичность держится парой: трение f и пружина
+       K = 1 + f − 2√f. Трение и пружина гасят полёт раньше, поэтому удар сильнее
+       в KICK раз — точки улетают так же далеко, как прежде (замер: мах
+       800 px/с — 22 px против 21, 1600 px/с — 48 против 48).
+
+       Пробовали и жидкость по образцу igloo (рука толкает поле, точки плывут
+       по нему) — пропали мгновенный удар, закрутка и разлёт по глубине,
+       Илья: «раньше было лучше». Поле осталось только у воды фона. Пробовали
+       «стыковку» — домой с постоянной скоростью, без торможения у места, —
+       Илья откатил: возврат вышел хуже. */
+    const FRICTION = 0.82;
+    const SPRING = 0.0089;
+    /* Полёт вплетённым, а не по прямой (Илья, 2026-10-19: «у пингвина они
+       в полёте переплетаются, играют между собой и только потом встают»).
+       У igloo на каждую точку всё время действует вихревой шум, и каждая
+       читает его в своём темпе — соседи расходятся и закручиваются. Здесь
+       то же: вихревое течение без стоков (ротор от суммы синусов), темп
+       свой у точки. Вихрь будит удар руки и гасит время, а не расстояние:
+       привязанный к отлёту, он сам раскачивал точку и держал её в ~55 px
+       от дома, слово не собиралось. */
+    const WEAVE = 0.3;      // сила вихря, px/кадр²
+    const WEAVE_L = 260;    // размер вихря, px
+    const WEAVE_T = 0.35;   // сколько секунд точка «помнит» удар
+    /* Пружина — для всего, что откинула кисть, с любого расстояния. Облако
+       после распыления возвращается по-старому, медленно и от дальних
+       к ближним: быстрым возвратом оно сжималось целиком «размытым
+       прямоугольником» слова, разгоралось на скорости и обгоняло раскрутку
+       слова назад (Илья, 2026-10-19). Такие точки метит само распыление,
+       а не дальность: по дальности сильный мах кистью тоже попадал
+       в медленный возврат, и дальние точки возвращались вдвое дольше ближних. */
+    const KICK = 2.4;
+    /* Рука сквозь зерно (Илья, 2026-10-19: «у пингвина ты проходишь через
+       частицы, а не ведёшь по ним, как по ряби»). У igloo точки под рукой
+       перенимают скорость течения и тянутся за ней — отлёт там ~25% высоты
+       фигуры против наших ~6%. Здесь так же: к прежнему удару точка под
+       кистью перенимает долю скорости самой руки — тем сильнее, чем ближе.
+       Замер на сфере: мах 800 px/с уносит на ~90 px — 25% её высоты. */
+    const CARRY = 0.85; // доля скорости руки, которую берёт точка (Илья: 85%)
+    const GRIP = 0.9;                     // как быстро берёт: доля разницы за кадр
+    /** Скачок курсора больше этого за кадр — не мах, а возврат руки в окно. */
+    const TELEPORT = 160;
+
+    let physT = 0;
     const stepPhysics = (dt: number, active: Body | null, settled: boolean) => {
+      physT += dt;
       // Скорость руки сглаживаем и ограничиваем: рывок мышью через весь
       // экран иначе выстреливает облако одним кадром.
       const raw = ptrPrev.x > -9000 && rawMouse.x > -9000
@@ -974,6 +1042,16 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const speed = Math.min(handVel.length(), 120);
       const moving = speed > 0.35 && hover > 0.01 && settled;
       handNow = Math.min(1, speed / 60) * hover;
+
+      /* Вода — везде, где прошла рука, и на ходу тоже: мешаешь толщу, а не
+         объект. Успокоилась — ни шага, ни заливки текстуры. */
+      if ((raw.x || raw.y) && Math.hypot(raw.x, raw.y) < TELEPORT && hover > 0.01)
+        water.splat(rawMouse.x - raw.x, rawMouse.y - raw.y, rawMouse.x, rawMouse.y, h * WATER_R);
+      if (water.stirred) {
+        water.step(dt * 60);
+        water.fill(waterData);
+        waterU.uWaterTex.value.needsUpdate = true;
+      }
       if (probe) {
         probe.rawSpeed = Math.max(probe.rawSpeed, Math.hypot(raw.x, raw.y));
         probe.speed = Math.max(probe.speed, speed);
@@ -984,7 +1062,12 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const vhy = handVel.y;
 
       // Трение и возврат — за кадр, приведённые к реальному шагу времени.
-      const fric = Math.pow(0.95, dt * 60);
+      const fric = Math.pow(FRICTION, dt * 60);
+      const step = dt * 60;
+      // Скорость руки в тех же единицах, что у точек: пиксели за кадр по 60 к/с.
+      const perFrame = 1 / Math.max(step, 0.25);
+      const pull = SPRING * dt * 60;
+      const wane = Math.exp(-dt / WEAVE_T);
       // Возврат вдвое медленнее прежнего: точка дольше идёт домой, и
       // доворот отдачи успевает прочитаться целиком.
       const home = 1 - Math.pow(1 - 0.0075, dt * 60);
@@ -1006,7 +1089,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
            физики, и на пролёте по аллее она давала заминки по 200 мс. */
         const engaged = isActive && (moving || (dragging && body.grip === "spray"));
         if (!engaged && !body.restless) continue;
-        const { vel, disp, give, spray } = body;
+        const { vel, disp, give, sprayed, stir, spray } = body;
         // Дом — та форма, в которой объект сейчас стоит: на аллее или в комнате.
         const base2 = body.morph > 0.5 ? body.b.points : body.a.points;
         // У сферы дом ещё и повёрнут, и у каждой точки своя глубина: рука
@@ -1023,6 +1106,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         for (let i = 0; i < n; i++) {
           const i3 = i * 3;
           let vx = vel[i3];
+          /** Насколько точка под рукой: от этого — какую долю её скорости берёт. */
+          let carry = 0;
           let vy = vel[i3 + 1];
           let vz = vel[i3 + 2];
 
@@ -1046,28 +1131,67 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
               const t2 = dist / HIT;
               const near = (1 - t2) * (1 - t2);
               const s = speed * near * give[i];
-              vx += vhx * s * SWEEP;
-              vy += vhy * s * SWEEP;
+              const k = s * KICK;
+              vx += vhx * k * SWEEP;
+              vy += vhy * k * SWEEP;
               if (dist > 1) {
-                vx += (dx / dist) * s * PUSH;
-                vy += (dy / dist) * s * PUSH;
+                vx += (dx / dist) * k * PUSH;
+                vy += (dy / dist) * k * PUSH;
               }
-              vx += (-dy / (dist + 60)) * s * CURL;
-              vy += (dx / (dist + 60)) * s * CURL;
-              vz += (Math.random() - 0.5) * s * DEPTH;
+              vx += (-dy / (dist + 60)) * k * CURL;
+              vy += (dx / (dist + 60)) * k * CURL;
+              vz += (Math.random() - 0.5) * k * DEPTH;
+              carry = near;
+              if (near > stir[i]) stir[i] = near;
             }
           }
 
           vx *= fric;
           vy *= fric;
           vz *= fric;
+          /* Скорость руки точка берёт уже после трения: иначе трение съедало
+             её в том же кадре, и при быстром возврате точки шли не на 85%
+             скорости руки, а на 64%. */
+          if (carry > 0) {
+            const take = 1 - Math.pow(1 - GRIP * carry, step);
+            const want = CARRY * (0.6 + 0.4 * Math.min(1, give[i] / 1.85));
+            vx += (vhx * perFrame * want - vx) * take;
+            vy += (vhy * perFrame * want - vy) * take;
+          }
+          if (spread) sprayed[i] = 1;
+          else if (sprayed[i] && disp[i3] * disp[i3] + disp[i3 + 1] * disp[i3 + 1] + disp[i3 + 2] * disp[i3 + 2] < 1)
+            sprayed[i] = 0;
+          if (!spread && !sprayed[i]) {
+            if (stir[i] > 0.01) {
+              // Вихрь в месте точки, во времени точки: ψ = sin a·cos b + ½ sin c,
+              // скорость — (∂ψ/∂y, −∂ψ/∂x), течение без стоков, точки не слипаются.
+              const own = (give[i] - 0.35) / 1.5;
+              const tt = physT * (1 + 0.7 * own) + own * 9;
+              const wk = (Math.PI * 2) / WEAVE_L;
+              const px = base2[i * 2] + disp[i3];
+              const py = base2[i * 2 + 1] + disp[i3 + 1];
+              const a = px * wk + tt * 0.9;
+              const b = py * wk * 1.3 - tt * 0.7;
+              const c = (px + py) * wk * 0.7 + tt * 1.3;
+              const fly = stir[i] * WEAVE * step;
+              stir[i] *= wane;
+              vx += (-1.3 * Math.sin(a) * Math.sin(b) + 0.35 * Math.cos(c)) * fly;
+              vy += -(Math.cos(a) * Math.cos(b) + 0.35 * Math.cos(c)) * fly;
+              vz += Math.sin(tt * 1.1 + own * 20) * fly * 0.6;
+            }
+            vx -= disp[i3] * pull;
+            vy -= disp[i3 + 1] * pull;
+            vz -= disp[i3 + 2] * pull;
+          }
+          // Унесённую распылением ведёт прежний возврат — до самого дома.
+          const scattered = sprayed[i] === 1;
           vel[i3] = vx;
           vel[i3 + 1] = vy;
           vel[i3 + 2] = vz;
 
-          let dx2 = disp[i3] + vx;
-          let dy2 = disp[i3 + 1] + vy;
-          let dz2 = disp[i3 + 2] + vz;
+          let dx2 = disp[i3] + vx * step;
+          let dy2 = disp[i3 + 1] + vy * step;
+          let dz2 = disp[i3 + 2] + vz * step;
 
           if (spread) {
             /* Форма — облако в объёме: каждая точка уходит в своё место
@@ -1081,7 +1205,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             dx2 += (rm[0] * sx + rm[3] * sy + rm[6] * sz - dx2) * hold;
             dy2 += (rm[1] * sx + rm[4] * sy + rm[7] * sz - dy2) * hold;
             dz2 += (rm[2] * sx + rm[5] * sy + rm[8] * sz - dz2) * hold;
-          } else {
+          } else if (scattered) {
             /* Домой — по прямой из того места, где точку застали.
 
                Чем дальше её унесло, тем резвее она возвращается: после
@@ -1107,7 +1231,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           disp[i3 + 1] = dy2;
           disp[i3 + 2] = dz2;
           const r2 = dx2 * dx2 + dy2 * dy2;
-          if (r2 + dz2 * dz2 > 0.25) restless = true;
+          if (r2 + dz2 * dz2 > 0.25 || vx * vx + vy * vy + vz * vz > 0.01) restless = true;
         }
         body.restless = restless;
 
@@ -1206,7 +1330,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let last = performance.now();
     const started = last;
     let enter = 0;
-    let trailTick = 0;
 
     /* Камера стоит на месте, едут объекты.
 
@@ -1240,17 +1363,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       enter = Math.min(1, enter + dt / 1.6);
       const eased = 1 - Math.pow(1 - enter, 3);
 
-      // След обновляем не каждый кадр, иначе восемь точек лежат
-      // друг на друге и хвоста не видно.
-      trailTick += dt;
-      if (trailTick > 0.055) {
-        trailTick = 0;
-        for (let i = TRAIL - 1; i > 0; i--) trailPos[i].copy(trailPos[i - 1]);
-        trailPos[0].copy(uvMouse);
-      }
-      const trailGain = touched ? 0.5 * hover : 0;
-      for (let i = 0; i < TRAIL; i++) trailW[i] = (1 - i / TRAIL) * trailGain;
-
       // Сила перетаскивания нарастает и спадает плавно: резкий перепад
       // рвёт штрихи роя пополам.
       drag += ((dragging && !spinning ? 1 : 0) - drag) * Math.min(1, k * 0.9);
@@ -1259,9 +1371,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Поле светлеет на разгоне: движение чувствуется всем экраном,
       // а не только тем, что уезжает.
       fieldUniforms.uSpeed.value = speed;
-      fieldUniforms.uLens.value = uvMouse;
-      fieldUniforms.uDrag.value = drag;
-      fieldUniforms.uHasPtr.value = rawMouse.x > -9000 ? hover : 0;
 
       onFrameRef.current?.({
         progress,

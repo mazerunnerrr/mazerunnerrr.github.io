@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import type { Project } from "@/content";
 import { STATUS } from "@/lib/status";
+import { Flip } from "@/components/Flip";
+import { STATUS_LABEL, UI, type Lang } from "@/lib/i18n";
 
 /**
  * Содержимое проекта — одно на отдельную страницу и на комнату проекта в мире,
@@ -13,8 +15,19 @@ import { STATUS } from "@/lib/status";
  * брошенная в мир, — Илья забраковал её 2026-10-16. В комнате заголовки
  * на ступень ниже: h1 у главной уже есть.
  */
-export function ProjectBody({ project, hero, room = false }: { project: Project; hero: ReactNode; room?: boolean }) {
+export function ProjectBody({
+  project,
+  hero,
+  lang,
+  room = false,
+}: {
+  project: Project;
+  hero: ReactNode;
+  lang: Lang;
+  room?: boolean;
+}) {
   const s = STATUS[project.status];
+  const t = UI[lang];
   const Title = room ? "h2" : "h1";
   const Sub = room ? "h3" : "h2";
 
@@ -22,7 +35,9 @@ export function ProjectBody({ project, hero, room = false }: { project: Project;
     <header className={room ? "" : "mt-[clamp(40px,10vh,110px)] border-b border-[var(--line)] pb-[clamp(22px,4vh,42px)]"}>
       <div className="flex items-center gap-2.5">
         <span className={`h-[5px] w-[5px] shrink-0 rounded-full ${s.dot}`} aria-hidden />
-        <span className={`eyebrow ${s.text}`}>{project.status}</span>
+        <span className={`eyebrow ${s.text}`}>
+          <Flip text={STATUS_LABEL[lang][project.status]} />
+        </span>
       </div>
 
       <Title
@@ -44,7 +59,7 @@ export function ProjectBody({ project, hero, room = false }: { project: Project;
       ) : null}
 
       <p className={`eyebrow text-[var(--sand-faint)] ${room ? "mt-4" : "mt-7"}`}>
-        {project.year} · {project.role}
+        <Flip text={`${project.year} · ${project.role}`} />
       </p>
     </header>
   );
@@ -86,7 +101,7 @@ export function ProjectBody({ project, hero, room = false }: { project: Project;
           room ? "text-[clamp(20px,1.8vw,26px)]" : "mt-[clamp(36px,6vh,72px)] text-[clamp(22px,2.6vw,32px)]"
         }`}
       >
-        Что сделал
+        {t.whatIDid}
       </Sub>
       <ul className={room ? "mt-4 space-y-2.5" : "mt-5 space-y-3"}>
         {project.did.map((item) => (
@@ -174,7 +189,7 @@ export function ProjectBody({ project, hero, room = false }: { project: Project;
             <img
               key={src}
               src={src}
-              alt={`${project.title}: экран ${i + 2}`}
+              alt={`${project.title}: ${t.screen} ${i + 2}`}
               width={1600}
               height={1000}
               loading="lazy"

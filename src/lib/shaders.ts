@@ -40,18 +40,14 @@ uniform vec2  uRes;
 uniform float uTime;
 uniform float uOct;
 uniform float uEnter;
-/* След руки: восемь последних положений и вес каждого по возрасту.
-   Одна точка курсора даёт «фонарик», след — ощущение, что материал
-   помнит движение. */
-uniform vec2  uTrail[8];
-uniform float uTrailW[8];
 uniform vec3  uVoid;
 uniform vec3  uAzure;
 uniform float uSpeed;
-/** Указатель в UV — центр линзы, гнущей материал. */
-uniform vec2  uLens;
-uniform float uDrag;
-uniform float uHasPtr;
+/* Вода, которую мешает рука (\`Water\` в fluid.ts): rg — насколько сдвинута
+   вода, px; b — муть; a — скорость течения. Илья выбрал все три слоя
+   разом: муть, свет сверху и взвесь (2026-10-19). */
+uniform sampler2D uWaterTex;
+uniform vec4  uWaterMap;
 /** Свет главы: у каждой точки маршрута своя подсветка с одной стороны. */
 uniform vec3  uTint;
 uniform float uTintAmt;
@@ -63,43 +59,44 @@ void main(){
   vec2 uv = vUv;
   float aspect = uRes.x / max(uRes.y, 1.0);
 
-  // Линза. Рука не сыплет частицы поверх картинки, а гнёт саму среду:
-  // координаты под курсором стягиваются к нему, и рисунок материала
-  // тянется, как стекло. Это то же семейство приёмов, что «жидкое
-  // стекло» в Dreamzone, и оно не читается как накладной эффект.
-  vec2 toLens = vec2((uv.x - uLens.x) * aspect, uv.y - uLens.y);
-  float lensDist = length(toLens);
-  float pull = exp(-lensDist * 3.2) * (0.055 + uDrag * 0.16) * uHasPtr;
-  vec2 warped = uv - normalize(toLens + vec2(0.0001)) * pull * vec2(1.0 / aspect, 1.0);
+  /* Мы в толще воды (Илья, 2026-10-19). Рука не светит фонариком —
+     прежняя линза с подсветкой под курсором читалась «высвечиванием», —
+     а мешает воду: всё, что в толще, сдвигается вместе с ней и медленно
+     возвращается, когда вода успокоится. */
+  vec4 wt = texture2D(uWaterTex, uv * uWaterMap.xy + uWaterMap.zw);
+  vec2 wuv = uv - wt.xy / uRes;
+  vec2 p = vec2(wuv.x * aspect, wuv.y);
 
-  vec2 p = vec2(warped.x * aspect, warped.y);
-
-  // Время идёт медленно: материал дышит, а не бурлит.
+  // Время идёт медленно: вода дышит, а не бурлит.
   float t = uTime * 0.035;
   float n = fbm(p * 1.5 + vec2(t, -t * 0.7), uOct);
   n = fbm(p * 1.9 + vec2(n * 0.5, n * 0.35 - t * 0.5), uOct);
-
-  // Возмущение от следа руки. Ближе и свежее — сильнее.
-  float stir = 0.0;
-  for (int i = 0; i < 8; i++){
-    vec2 d = vec2((uTrail[i].x - uv.x) * aspect, uTrail[i].y - uv.y);
-    float dist = length(d);
-    stir += uTrailW[i] * exp(-dist * 3.4);
-  }
-  stir = clamp(stir, 0.0, 1.4);
-
-  // Под самой линзой материал ещё и светлеет — как утолщение стекла.
-  float lensGlow = exp(-lensDist * 4.5) * uHasPtr * (0.10 + uDrag * 0.22);
 
   /* Полночный синий ровным цветом: сверху на тон светлее, книзу глубже.
 
      Раньше фон был углём с пыльно-голубыми разводами, прожилками и косым
      светом — Илья забраковал «оттенки» (2026-10-16). Шум остался едва
-     заметным дыханием материала, а свет дают только рука и скорость. */
+     заметным дыханием, а всё остальное появляется только от руки. */
   vec3 col = mix(uVoid * 0.82, uVoid * 1.18, smoothstep(0.0, 1.0, uv.y));
   col += uAzure * (n - 0.5) * 0.03;
-  col += uAzure * (stir * 0.12 + uSpeed * 0.07);
-  col += uAzure * lensGlow * 0.6;
+  col += uAzure * uSpeed * 0.07;
+
+  /* Муть: рука поднимает со дна взвесь, она клубится по течению и долго
+     оседает. Само облако несёт поле в JS, здесь ему дают зерно — рыхлые
+     клочья, а не гладкое пятно. */
+  float grain = fbm(p * 7.0 + vec2(n * 1.2, -t * 2.0), 4.0);
+  // Гребни шума — тонкие волокна, как взбаламученный ил, а не пятно света.
+  float wisp = pow(1.0 - abs(grain * 2.0 - 1.0), 4.0);
+  float silt = min(wt.z, 1.0) * wisp;
+  col += uAzure * silt * 0.3;
+
+  /* Свет сверху: мягкие косые лучи от далёкой поверхности, к глубине
+     гаснут. Вода, сдвинутая рукой, их гнёт — видно, что толща живая. */
+  float sx = wuv.x * aspect + (1.0 - wuv.y) * 0.32;
+  float rays = fbm(vec2(sx * 2.6, wuv.y * 0.35 + t * 0.6), 4.0);
+  rays = smoothstep(0.42, 0.8, rays) * smoothstep(0.05, 1.0, wuv.y);
+  col += uAzure * rays * 0.075;
+
   /* Свет главы — заливка от края экрана, а не пятно: радиальное свечение
      по центру — примета шаблона. Степень держит свет у своего края. */
   float wash = clamp(dot(uv - 0.5, uTintDir) + 0.5, 0.0, 1.0);
@@ -366,6 +363,14 @@ void main(){
   P.xy += aDisp.xy / persp;
   P.z += aDisp.z;
 
+  /* Живая материя: каждая точка всё время чуть шевелится сама по себе, как
+     зерно в ладони, — у пингвина igloo тело «кипит» и в покое (Илья,
+     2026-10-19). Своя частота и фаза у каждой точки, поэтому слово не
+     дышит целиком; размах — пиксель с небольшим, и надпись читается. */
+  float alivePh = aSeed * 43.0;
+  float aliveFr = 1.6 + fract(aSeed * 7.31) * 1.8;
+  P.xy += vec2(sin(uTime * aliveFr + alivePh), cos(uTime * aliveFr * 0.83 + alivePh * 1.7)) * 1.2 / persp;
+
   // Поблёскивание: у каждой точки своя редкая короткая вспышка. Степень
   // синуса держит её тёмной почти всё время — получается искра, а не
   // общая пульсация, от которой надпись «дышит» целиком и мельтешит.
@@ -463,6 +468,9 @@ uniform float uFar;
 uniform float uAlpha;
 /** Скорость маршрута 0..1: на ходу пыль чуть крупнее. */
 uniform float uSpeed;
+/** Вода, которую мешает рука: пыль — взвесь в ней, её уносит течением. */
+uniform sampler2D uWaterTex;
+uniform vec4 uWaterMap;
 varying float vA;
 varying float vSeed;
 
@@ -474,10 +482,19 @@ void main(){
   p.y += cos(uTime * 0.04 + aSeed * 17.0) * 8.0;
   float depth = uCamZ - z;
   float persp = uBaseZ / max(depth, 1.0);
+  /* Там, где пылинка видна на экране, вода сдвинута рукой — сдвигаем и её,
+     в пикселях экрана. Дальние уходят чуть меньше: толща между ними
+     и рукой гасит течение. */
+  vec4 sp = projectionMatrix * modelViewMatrix * vec4(p.x, p.y, z, 1.0);
+  vec2 suv = sp.xy / max(sp.w, 1.0) * 0.5 + 0.5;
+  vec4 wv = texture2D(uWaterTex, suv * uWaterMap.xy + uWaterMap.zw);
+  p.xy += wv.xy / persp * clamp(persp, 0.4, 1.0);
   float far = 1.0 - smoothstep(uFar * 0.55, uFar, depth);
   // Точка у самого объектива — клякса во весь экран: гасим заранее.
   float near = smoothstep(uBaseZ * 0.06, uBaseZ * 0.3, depth);
   vA = uAlpha * far * near * (0.35 + aSeed * 0.65);
+  // В течении частица ловит свет и вспыхивает — видно, где прошла рука.
+  vA *= 1.0 + min(wv.a / 8.0, 1.0) * 1.5;
   vSeed = aSeed;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p.x, p.y, z, 1.0);
   gl_PointSize = clamp((0.9 + aSeed * 1.4) * persp, 0.6, 5.0) * uPixelRatio * (1.0 + uSpeed);

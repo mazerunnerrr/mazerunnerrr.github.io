@@ -31,6 +31,9 @@ const DUCK_GAIN = 0.4;
 export class Ambience {
   private ctx: AudioContext;
   private master: GainNode;
+  /** Посетитель ушёл с вкладки — звук стихает, вернулся — возвращается. */
+  private awayGain: GainNode;
+  private away = false;
   /** Приглушение в комнате: срез верхов и чуть тише — музыка уходит «за стену». */
   private duckGain: GainNode;
   private duckFilter: BiquadFilterNode;
@@ -54,6 +57,7 @@ export class Ambience {
     this.ctx = ctx;
     this.master = ctx.createGain();
     this.master.gain.value = 0;
+    this.awayGain = ctx.createGain();
     this.duckGain = ctx.createGain();
     this.duckFilter = ctx.createBiquadFilter();
     this.duckFilter.type = "lowpass";
@@ -64,7 +68,7 @@ export class Ambience {
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0.35;
     this.freq = new Uint8Array(this.analyser.frequencyBinCount);
-    this.master.connect(this.duckGain).connect(this.duckFilter).connect(this.analyser).connect(ctx.destination);
+    this.master.connect(this.awayGain).connect(this.duckGain).connect(this.duckFilter).connect(this.analyser).connect(ctx.destination);
 
     if (music) {
       const a = new Audio(music);
@@ -127,7 +131,7 @@ export class Ambience {
   set(on: boolean) {
     this.on = on;
     const t = this.ctx.currentTime;
-    if (on) {
+    if (on && !this.away) {
       void this.ctx.resume();
       void this.track?.play().catch(() => {});
     }
@@ -141,6 +145,31 @@ export class Ambience {
         this.track?.pause();
         void this.ctx.suspend();
       }, 1500);
+  }
+
+  /** Ушли на другую вкладку или свернули окно — звук стихает и встаёт
+      на паузу: на фоне звук сайта никому не нужен. Вернулись — поднимается
+      с того же места, если был включён. Кривая как у igloo.inc: τ 0,35 с
+      в обе стороны, 95% пути за секунду. Пауза — когда уже −40 дБ, чтобы
+      обрыв не щёлкнул; у igloo паузы нет, но песня не должна уходить вперёд. */
+  setAway(away: boolean) {
+    this.away = away;
+    const t = this.ctx.currentTime;
+    const g = this.awayGain.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.setTargetAtTime(away ? 0 : 1, t, 0.35);
+    if (!this.on) return;
+    if (away)
+      window.setTimeout(() => {
+        if (!this.away) return;
+        this.track?.pause();
+        void this.ctx.suspend();
+      }, 1600);
+    else {
+      void this.ctx.resume();
+      void this.track?.play().catch(() => {});
+    }
   }
 
   /** Несколько раз в секунду: рука и пролёт, оба от 0 до 1. */

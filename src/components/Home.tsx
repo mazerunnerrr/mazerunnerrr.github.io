@@ -7,8 +7,12 @@ import type { Contacts, Project, Site, Skill } from "@/content";
 import { ContactForm } from "@/components/ContactForm";
 import { Ambience } from "@/lib/ambience";
 import { Cover } from "@/components/Cover";
+import { Flip, flipIn } from "@/components/Flip";
 import { ProjectBody } from "@/components/ProjectBody";
 import { STATUS } from "@/lib/status";
+import { FLIP_HOVER, scramble } from "@/lib/scramble";
+import { LANGS, STATUS_LABEL, UI, type Lang } from "@/lib/i18n";
+import { setLang, useLang } from "@/lib/useLang";
 
 /* Маршрут — аллея-кольцо, как у igloo.inc: имя → проекты по одному →
    контакты, и снова имя. У имени и у каждого проекта своя комната: нажал
@@ -61,7 +65,19 @@ const fade = (el: HTMLElement, opacity: number, own: boolean) => {
   el.style.opacity = String(opacity);
   const off = !own || opacity < 0.05;
   if (el.hasAttribute("data-faded") !== off) el.toggleAttribute("data-faded", off);
+  lightUp(el, opacity);
 };
+
+/** Слой проявился — его мелкие надписи перещёлкиваются, как табло. */
+const lightUp = (el: HTMLElement, opacity: number) => {
+  const lit = opacity >= 0.05;
+  if (el.hasAttribute("data-lit") === lit) return;
+  el.toggleAttribute("data-lit", lit);
+  if (lit) flipIn(el);
+};
+
+/** Навели на кнопку или ссылку — её надпись перещёлкивается. */
+const flipHover = (e: React.PointerEvent<HTMLElement>) => flipIn(e.currentTarget, FLIP_HOVER);
 
 /** Адрес без служебной части: в строке рядом со ссылкой она лишняя. */
 const plain = (url: string) => url.replace(/^mailto:/, "").replace(/^https?:\/\//, "");
@@ -69,23 +85,22 @@ const plain = (url: string) => url.replace(/^mailto:/, "").replace(/^https?:\/\/
 /* Объект из частиц — герой, текст — приборы. Всё, что написано, стоит
    по углам мелким моноширинным шрифтом или выноской у объекта. */
 export function Home({
-  site,
-  skills,
-  projects,
-  contacts,
+  content,
 }: {
-  site: Site;
-  skills: Skill[];
-  projects: Project[];
-  contacts: Contacts;
+  content: Record<Lang, { site: Site; skills: Skill[]; projects: Project[]; contacts: Contacts }>;
 }) {
+  /* Язык меняет только текст: сцена и маршрут от него не зависят, поэтому
+     всё, что уходит в сцену, мемоизировано по значениям, общим для обоих. */
+  const lang = useLang();
+  const t = UI[lang];
+  const { site, skills, projects, contacts } = content[lang];
   const stops = useMemo<Stop[]>(
     () => [
-      { kind: "name", label: "имя" },
-      ...projects.map((p): Stop => ({ kind: "project", label: `проект · ${p.title}`, project: p })),
-      { kind: "contacts", label: "контакты" },
+      { kind: "name", label: t.stopName },
+      ...projects.map((p): Stop => ({ kind: "project", label: `${t.stopProject} · ${p.title}`, project: p })),
+      { kind: "contacts", label: t.stopContacts },
     ],
-    [projects]
+    [projects, t]
   );
   const N = stops.length;
   const FIRST_PROJECT = 1;
@@ -97,15 +112,16 @@ export function Home({
 
   /** Якоря, с которых встают на точку сразу, без пролёта: так страница
       проекта возвращает к своему проекту, а не заново на имя. */
+  const slugs = projects.map((p) => p.slug).join(" ");
   const hashStops = useMemo(() => {
-    const map: Record<string, number> = { "#about": 0, "#skills": 0, "#contacts": stops.length - 1 };
-    stops.forEach((s, i) => {
-      if (s.kind !== "project") return;
-      map[`#${s.project.slug}`] = i;
-      map["#projects"] ??= i;
+    const list = slugs ? slugs.split(" ") : [];
+    const map: Record<string, number> = { "#about": 0, "#skills": 0, "#contacts": list.length + 1 };
+    list.forEach((slug, i) => {
+      map[`#${slug}`] = i + 1;
+      map["#projects"] ??= i + 1;
     });
     return map;
-  }, [stops]);
+  }, [slugs]);
 
   /* Объекты точек. Массив мемоизирован по значениям, а не по ссылкам
      на пропсы: новый на каждый рендер пересобирал бы сцену. */
@@ -141,28 +157,17 @@ export function Home({
   /* Ориентиры на переходах: перед первым проектом — ворота раздела, на
      остальных — арки. Между двумя проектами ориентира нет: там сфера не
      улетает, а пересобирается на месте. */
-  const landmarks = useMemo<Landmark[]>(
-    () =>
-      stops.flatMap((s, k): Landmark[] => {
-        const next = stops[(k + 1) % stops.length];
-        if (s.kind === "project" && next.kind === "project") return [];
-        const gate = next.kind === "project" && s.kind !== "project";
-        return [{ at: k + 0.5, kind: gate ? "gate" : "arcs" }];
-      }),
-    [stops]
-  );
+  const count = projects.length;
+  const landmarks = useMemo<Landmark[]>(() => {
+    const kinds: Stop["kind"][] = ["name", ...Array<Stop["kind"]>(count).fill("project"), "contacts"];
+    return kinds.flatMap((s, k): Landmark[] => {
+      const next = kinds[(k + 1) % kinds.length];
+      if (s === "project" && next === "project") return [];
+      const gate = next === "project" && s !== "project";
+      return [{ at: k + 0.5, kind: gate ? "gate" : "arcs" }];
+    });
+  }, [count]);
   const GATE = landmarks.findIndex((m) => m.kind === "gate");
-
-  /** Строка-связка на переходе от точки k к следующей. Между проектами
-      связок нет: это один раздел. */
-  const bridgeOf = (k: number) => {
-    const to = stops[(k + 1) % stops.length].kind;
-    const from = stops[k].kind;
-    if (to === "project" && from !== "project") return site.bridges.toProjects;
-    if (to === "contacts") return site.bridges.toContacts;
-    if (to === "name") return site.bridges.toName;
-    return undefined;
-  };
 
   const layers = useRef<(HTMLDivElement | null)[]>([]);
   const tagTop = useRef<(HTMLDivElement | null)[]>([]);
@@ -176,11 +181,6 @@ export function Home({
   const routeRef = useRef<HTMLSpanElement>(null);
   const lastLabel = useRef("");
   const gateRef = useRef<HTMLSpanElement>(null);
-  const bridgeRef = useRef<HTMLParagraphElement>(null);
-  /** Связка задерживается после прибытия: с какой точки пришли и когда. */
-  const bridgeNear = useRef(0);
-  const bridgeAt = useRef(-1e9);
-  const bridgeSeg = useRef(-1);
   const waveRefs = useRef<(SVGPathElement | null)[]>([]);
   const wavePhase = useRef(new Float32Array(LINES.length));
   const waveBands = useRef(new Float32Array(LINES.length));
@@ -211,6 +211,13 @@ export function Home({
     ambienceRef.current?.set(next);
     setSound(next);
   };
+  /* Ушёл со вкладки — звук стихает, вернулся — возвращается, если был
+     включён (Илья, 2026-10-19, по образцу igloo.inc). */
+  useEffect(() => {
+    const onVisibility = () => ambienceRef.current?.setAway(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   /* В комнате музыка плавно уходит «за стену» и играет фоном, на аллее
      возвращается — как у Active Theory (Илья, 2026-10-18). */
   useEffect(() => {
@@ -337,42 +344,17 @@ export function Home({
     if (gateRef.current) {
       const vis = gate ? gate.vis * corridor : 0;
       gateRef.current.style.opacity = String(vis);
+      lightUp(gateRef.current, vis);
       if (gate && vis > 0.01) gateRef.current.style.transform = `translate(-50%, ${-gate.r - 34}px)`;
     }
 
-    /* Строка-связка — титр внизу по центру: видна на переходе и ещё
-       несколько секунд после прибытия, чтобы её успели прочитать. На ходу
-       вперёд — связка этого перехода; назад — та же, но без задержки. */
     const now = performance.now();
-    if (bridgeRef.current) {
-      if (near !== bridgeNear.current) {
-        if (near === (bridgeNear.current + 1) % N) bridgeAt.current = now;
-        bridgeNear.current = near;
-      }
-      const base = Math.floor(progress);
-      const frac = progress - base;
-      const seg = ((base % N) + N) % N;
-      const flight = Math.min(clamp01((frac - 0.08) / 0.2), clamp01((0.92 - frac) / 0.2));
-      const linger = clamp01(1 - (now - bridgeAt.current - 3500) / 700);
-      const lingerSeg = (near - 1 + N) % N;
-      /* Перелёт и задержка складываются через максимум: на ходу вперёд
-         связка набирает яркость в полёте и так и стоит, пока не истечёт
-         задержка. Раньше прозрачность в конце перехода прыгала с нуля
-         сразу на полную. Текст при этом тот же — сегмент один. */
-      const k = flight > 0.01 ? seg : lingerSeg;
-      const text = bridgeOf(k) ?? "";
-      if (k !== bridgeSeg.current) {
-        bridgeSeg.current = k;
-        bridgeRef.current.textContent = text;
-      }
-      bridgeRef.current.style.opacity = String(ease(Math.max(flight, linger)) * corridor * (text ? 1 : 0));
-    }
 
     // Номер точки на круге — только при смене, а не каждый кадр.
-    const label = room !== null ? `${route[room]} · внутри` : route[near];
+    const label = room !== null ? `${route[room]} · ${t.inside}` : route[near];
     if (label !== lastLabel.current) {
       lastLabel.current = label;
-      if (routeRef.current) routeRef.current.textContent = label;
+      if (routeRef.current) scramble(routeRef.current, label);
     }
 
     // Звук слушает руку и пролёт несколько раз в секунду — чаще не нужно.
@@ -429,7 +411,7 @@ export function Home({
   const closeButton = (k: number) => (
     <>
       <span className="instrument pointer-events-none absolute bottom-[var(--gutter)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[var(--sand-dim)]">
-        ↑ прокрути вверх — назад
+        <Flip text={t.scrollBack} />
       </span>
       <button
         ref={(el) => {
@@ -437,9 +419,10 @@ export function Home({
         }}
         type="button"
         onClick={closeRoom}
+        onPointerEnter={flipHover}
         className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
       >
-        закрыть · esc
+        <Flip text={t.close} />
       </button>
     </>
   );
@@ -454,9 +437,10 @@ export function Home({
       type="button"
       // detail === 0 — нажали Enter или пробел, а не мышью.
       onClick={(e) => openRoom(k, e.detail === 0)}
+      onPointerEnter={flipHover}
       className="instrument pointer-events-auto text-[var(--color-sand)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-azure)]"
     >
-      {text}
+      <Flip text={text} />
     </button>
   );
 
@@ -537,7 +521,7 @@ export function Home({
             >
               <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] flex w-[min(460px,40vw)] flex-col items-start gap-3">
                 <h2 ref={contactsTitleRef} id="contacts" tabIndex={-1} className="instrument text-[var(--sand-dim)]">
-                  Контакты · {contacts.name}
+                  <Flip text={`${t.contacts} · ${contacts.name}`} />
                 </h2>
                 {contacts.note ? (
                   <p className="max-w-[40ch] text-[14px] font-extralight leading-[1.7] text-[var(--sand-dim)]">
@@ -551,11 +535,12 @@ export function Home({
                       <a
                         href={l.url}
                         {...(l.url.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer noopener" })}
+                        onPointerEnter={flipHover}
                         className="group pointer-events-auto flex items-baseline justify-between gap-6 py-3 transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-azure)]"
                       >
                         <span className="font-display text-[26px] font-light leading-none">{l.label}</span>
                         <span className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] group-hover:text-[var(--color-azure)]">
-                          {plain(l.url)}
+                          <Flip text={plain(l.url)} />
                         </span>
                       </a>
                     </li>
@@ -568,7 +553,7 @@ export function Home({
               {contacts.formUrl ? (
                 // В полях формы выделять и править текст нужно — им можно.
                 <div className="absolute bottom-[var(--gutter)] right-[var(--gutter)] w-[min(420px,36vw)] select-text">
-                  <ContactForm url={contacts.formUrl} />
+                  <ContactForm url={contacts.formUrl} lang={lang} />
                 </div>
               ) : null}
             </div>
@@ -578,7 +563,7 @@ export function Home({
         /* Точка с комнатой: на аллее только выноска у объекта, как у igloo —
            у проекта номер и имя сверху слева, вход снизу справа; у имени —
            только вход. Текст первого экрана Илья убрал: «не смотрится». */
-        const t = tags(k);
+        const tag = tags(k);
         const st = s.kind === "project" ? STATUS[s.project.status] : null;
         return (
           <div
@@ -591,27 +576,27 @@ export function Home({
             className={`pointer-events-none absolute inset-0 ${k === 0 ? "" : "opacity-0"}`}
           >
             {s.kind === "project" && st ? (
-              <div ref={t.top} className="absolute left-0 top-0">
+              <div ref={tag.top} className="absolute left-0 top-0">
                 <div className="flex -translate-y-full flex-col gap-1 pb-4">
                   <h2
-                    ref={t.title}
+                    ref={tag.title}
                     id={k === FIRST_PROJECT ? "projects" : undefined}
                     className="instrument whitespace-nowrap text-[var(--color-sand)]"
                   >
-                    {`проект ${pad(k - FIRST_PROJECT + 1)} / ${pad(projects.length)} · ${s.project.title}`}
+                    <Flip text={`${t.stopProject} ${pad(k - FIRST_PROJECT + 1)} / ${pad(projects.length)} · ${s.project.title}`} />
                   </h2>
                   <span className="flex items-center gap-2.5 whitespace-nowrap">
                     <span className={`h-[5px] w-[5px] shrink-0 rounded-full ${st.dot}`} aria-hidden />
                     <span className={`instrument ${st.text}`}>
-                      {s.project.status} · {s.project.year}
+                      <Flip text={`${STATUS_LABEL[lang][s.project.status]} · ${s.project.year}`} />
                     </span>
                   </span>
                 </div>
               </div>
             ) : null}
-            <div ref={t.bottom} className="absolute left-0 top-0">
+            <div ref={tag.bottom} className="absolute left-0 top-0">
               <div className="-translate-x-full whitespace-nowrap pt-4 text-right">
-                {enterButton(k, s.kind === "project" ? "открыть проект ↵" : "обо мне ↵")}
+                {enterButton(k, s.kind === "project" ? t.openProject : t.aboutEnter)}
               </div>
             </div>
           </div>
@@ -625,10 +610,12 @@ export function Home({
              первого экрана и отдельной точкой с кольцами. */
           return roomShell(
             k,
-            "Обо мне",
+            t.about,
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-[clamp(32px,6vw,110px)]">
               <div className="flex flex-col gap-[clamp(16px,2.6vh,26px)]">
-                <p className="eyebrow text-[var(--sand-faint)]">{site.status}</p>
+                <p className="eyebrow text-[var(--sand-faint)]">
+                  <Flip text={site.status} />
+                </p>
                 <h2 className="font-display text-[clamp(38px,4.2vw,62px)] font-light leading-[1.02] tracking-[-0.02em]">
                   {site.alias}
                 </h2>
@@ -640,11 +627,13 @@ export function Home({
                 </p>
               </div>
               <div>
-                <h3 className="font-display text-[clamp(20px,1.8vw,26px)] font-light leading-tight">Что делаю</h3>
+                <h3 className="font-display text-[clamp(20px,1.8vw,26px)] font-light leading-tight">{t.whatIDo}</h3>
                 <ul className="mt-5 space-y-5">
                   {skills.map((x) => (
                     <li key={x.title}>
-                      <h4 className="instrument text-[var(--color-sand)]">{x.title}</h4>
+                      <h4 className="instrument text-[var(--color-sand)]">
+                        <Flip text={x.title} />
+                      </h4>
                       <p className="mt-1.5 max-w-[56ch] text-[13.5px] font-extralight leading-[1.65] text-[var(--sand-dim)]">
                         {x.lead}
                       </p>
@@ -662,12 +651,15 @@ export function Home({
           p.title,
           <ProjectBody
             project={p}
+            lang={lang}
             room
             hero={
               p.video || p.shots.length ? (
                 <div onPointerEnter={() => setMonitor(true)} onPointerLeave={() => setMonitor(false)}>
-                  <Cover video={p.video} shots={p.shots} alt={`${p.title}: экраны`} active={monitor && room === k} />
-                  <span className="instrument mt-2 block text-[var(--sand-dim)]">экраны проекта · наведи</span>
+                  <Cover video={p.video} shots={p.shots} alt={`${p.title}: ${t.screens}`} active={monitor && room === k} />
+                  <span className="instrument mt-2 block text-[var(--sand-dim)]">
+                    <Flip text={t.screensHint} />
+                  </span>
                 </div>
               ) : null
             }
@@ -676,25 +668,25 @@ export function Home({
         );
       })}
 
-      {/* ── повествование: подпись ворот и строка-связка ────────── */}
+      {/* ── повествование: подпись ворот ───────────────────────── */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <span
           ref={gateRef}
           className="instrument absolute left-1/2 top-1/2 whitespace-nowrap text-[var(--color-sand)] opacity-0"
         >
-          проекты · 01–{pad(projects.length)}
+          <Flip text={`${t.projects} · 01–${pad(projects.length)}`} />
         </span>
-        <p
-          ref={bridgeRef}
-          className="font-display absolute bottom-[calc(var(--gutter)+36px)] left-1/2 w-[min(640px,80vw)] -translate-x-1/2 text-center text-[clamp(18px,1.6vw,24px)] font-light leading-[1.3] text-[var(--color-sand)] opacity-0"
-        />
       </div>
 
       {/* ── приборы: на всём круге ─────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[var(--gutter)] top-[var(--gutter)] flex flex-col gap-0.5">
-          <span className="instrument text-[var(--color-sand)]">{site.alias}</span>
-          <span className="instrument text-[var(--sand-dim)]">{site.status}</span>
+          <span className="instrument text-[var(--color-sand)]">
+            <Flip text={site.alias} />
+          </span>
+          <span className="instrument text-[var(--sand-dim)]">
+            <Flip text={site.status} />
+          </span>
           <span ref={routeRef} className="instrument text-[var(--sand-dim)]">
             {route[0]}
           </span>
@@ -705,23 +697,24 @@ export function Home({
             приборов, а звук — линия, которая оживает волной того, что
             играет. Работает и из комнаты: сначала выводит на аллею. */}
         <nav
-          aria-label="Переходы и звук"
+          aria-label={t.nav}
           className="pointer-events-auto absolute right-[var(--gutter)] top-[var(--gutter)] flex items-center gap-4"
         >
           {projects.length > 0 ? (
             <a
               href="#projects"
               onClick={(e) => jump(FIRST_PROJECT, e)}
+              onPointerEnter={flipHover}
               className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
             >
-              работы
+              <Flip text={t.work} />
             </a>
           ) : null}
           <button
             type="button"
             onClick={toggleSound}
             aria-pressed={sound}
-            aria-label={sound ? "Выключить звук" : "Включить звук"}
+            aria-label={sound ? t.soundOff : t.soundOn}
             className={`flex h-6 items-center transition-colors duration-500 ease-[var(--ease-out-deep)] ${
               sound ? "text-[var(--color-azure)]" : "text-[var(--sand-faint)] hover:text-[var(--color-sand)]"
             }`}
@@ -752,10 +745,36 @@ export function Home({
           <a
             href="#contacts"
             onClick={(e) => jump(CONTACTS, e)}
+            onPointerEnter={flipHover}
             className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
           >
-            контакт
+            <Flip text={t.contact} />
           </a>
+          {/* Язык: английский по умолчанию, русский — по выбору. Мир при смене
+              не перезагружается, меняются только надписи. */}
+          <span role="group" aria-label={t.language} className="flex items-center gap-1.5">
+            {LANGS.map((l, i) => (
+              <span key={l} className="flex items-center gap-1.5">
+                {i > 0 ? (
+                  <span aria-hidden className="instrument text-[var(--sand-faint)]">
+                    /
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  lang={l}
+                  onClick={() => setLang(l)}
+                  onPointerEnter={flipHover}
+                  aria-pressed={lang === l}
+                  className={`instrument transition-colors duration-500 ease-[var(--ease-out-deep)] ${
+                    lang === l ? "text-[var(--color-sand)]" : "text-[var(--sand-dim)] hover:text-[var(--color-sand)]"
+                  }`}
+                >
+                  <Flip text={l} />
+                </button>
+              </span>
+            ))}
+          </span>
         </nav>
       </div>
     </main>

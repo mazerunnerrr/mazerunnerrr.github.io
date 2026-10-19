@@ -44,7 +44,7 @@ const state = () =>
       if (!el) return "нет";
       return `${(+getComputedStyle(el).opacity).toFixed(2)}${el.hasAttribute("data-faded") ? " погас" : ""}`;
     };
-    const about = [...document.querySelectorAll("main button")].find((b) => b.textContent.includes("обо мне"));
+    const about = [...document.querySelectorAll("main button")].find((b) => /about me|обо мне/i.test(b.textContent));
     const aboutLayer = about?.closest("main > div");
     return {
       имя: aboutLayer
@@ -88,19 +88,20 @@ await settle();
 console.log("колесо → 1       ", JSON.stringify(await state()));
 
 await fresh();
-await page.click("nav >> text=работы", { timeout: 3000 });
+// По адресу ссылки, а не по слову: надписи двуязычные и перещёлкиваются.
+await page.click("nav a[href='#projects']", { timeout: 3000 });
 await settle();
 console.log("клик «работы»    ", JSON.stringify(await state()), "фокус:", await focused());
 
 await fresh();
-await page.click("nav >> text=контакт", { timeout: 3000 });
+await page.click("nav a[href='#contacts']", { timeout: 3000 });
 await settle();
 console.log("клик «контакт»   ", JSON.stringify(await state()), "фокус:", await focused());
 
 /* Под погасшей «обо мне» на контактах не должна ловиться она сама.
    Спрашиваем, кто под курсором, а не кликаем вслепую. */
 const hit = await page.evaluate(() => {
-  const ghost = [...document.querySelectorAll("main button")].find((x) => x.textContent.includes("обо мне"));
+  const ghost = [...document.querySelectorAll("main button")].find((x) => /about me|обо мне/i.test(x.textContent));
   const r = ghost.getBoundingClientRect();
   const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
   const b = el?.closest("a, button");

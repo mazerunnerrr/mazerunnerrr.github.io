@@ -15,6 +15,16 @@ backend:
 media_folder: public/media
 public_folder: /media
 
+# Два языка (Илья, 2026-10-19). Русский — основной: его поля в корне файла,
+# как и раньше. Английский — в ключе `en` того же файла, вкладкой рядом
+# с русским в форме. Пустое английское поле на сайте показывает русское.
+# Поля, где язык не важен (адрес, год, картинки, ссылки), копируются
+# в английский сами (`i18n: duplicate`).
+i18n:
+  structure: single_file_default_root
+  locales: [ru, en]
+  default_locale: ru
+
 collections:
   - name: projects
     label: Проекты
@@ -23,6 +33,7 @@ collections:
     extension: json
     format: json
     create: true
+    i18n: true
     slug: "{{fields.slug}}"
     summary: "{{title}}"
     sortable_fields: [year, title]
@@ -30,66 +41,86 @@ collections:
       - name: title
         label: Название
         widget: string
+        i18n: true
+        required: [ru]
       - name: slug
         label: Адрес страницы
         widget: string
+        i18n: duplicate
         pattern: ["^[a-z0-9-]+$", "Только латиница в нижнем регистре, цифры и дефис"]
         hint: "Станет адресом вида /work/адрес/ и именем файла. Потом не меняется."
       - name: year
         label: Год
         widget: string
+        i18n: duplicate
         hint: "Год или диапазон: 2026 или 2025–2026"
       - name: role
         label: Роль
         widget: string
+        i18n: true
+        required: [ru]
       - name: status
         label: Статус
         widget: select
+        i18n: duplicate
+        hint: "Выбирается по-русски, на английской версии сайта переводится сам"
         options: ["в работе", "личный проект", "разбор и архитектура", "запущен"]
       - name: summary
         label: Суть одной строкой
         widget: string
+        i18n: true
         required: false
         hint: "Показывается на плитке под названием"
       - name: lead
         label: Задача и решение
         widget: text
+        i18n: true
+        required: [ru]
         hint: "Абзац: что за задача и почему решена так"
       - name: did
         label: Что сделал
         widget: list
+        i18n: true
+        required: [ru]
         hint: "3–6 пунктов строго о сделанном. Без «участвовал» и «помогал»"
       - name: stack
         label: Технологии
         widget: list
+        i18n: true
+        required: [ru]
         hint: "По одной на строку: Python, FastAPI, SQLite"
       - name: facts
         label: Цифры
         widget: list
+        i18n: true
         required: false
         fields:
-          - { name: value, label: Число, widget: string }
-          - { name: label, label: Подпись, widget: string }
+          - { name: value, label: Число, widget: string, i18n: true }
+          - { name: label, label: Подпись, widget: string, i18n: true }
       - name: video
         label: Видео на обложку
         widget: file
+        i18n: duplicate
         required: false
         hint: "Есть видео — оно идёт обложкой вместо скриншотов"
       - name: shots
         label: Скриншоты
         widget: list
+        i18n: duplicate
         required: false
         field: { name: image, label: Экран, widget: image }
       - name: links
         label: Ссылки
         widget: list
+        i18n: true
         required: false
         fields:
-          - { name: label, label: Подпись, widget: string }
-          - { name: url, label: Адрес, widget: string }
+          - { name: label, label: Подпись, widget: string, i18n: true }
+          - { name: url, label: Адрес, widget: string, i18n: duplicate }
       - name: accent
         label: Акцентный цвет
         widget: select
+        i18n: duplicate
         required: false
         options:
           - { label: "Песочный", value: amber }
@@ -100,37 +131,39 @@ collections:
 
   - name: settings
     label: Тексты сайта
+    i18n: true
     files:
       - name: site
         label: Первый экран
         file: content/site.json
         format: json
+        i18n: true
         fields:
           - name: alias
             label: Псевдоним
             widget: string
+            i18n: duplicate
             hint: "Из него собирается слово из частиц и заголовок вкладки"
           - name: thesis
             label: Тезис
             widget: string
+            i18n: true
+            required: [ru]
           - name: intro
             label: Абзац под тезисом
             widget: text
+            i18n: true
+            required: [ru]
           - name: status
             label: Строка статуса
             widget: string
+            i18n: true
+            required: [ru]
             hint: "Угол первого экрана: формат работы, часовой пояс, занятость"
-          - name: bridges
-            label: Строки-связки между точками
-            widget: object
-            hint: "Короткая фраза, которая появляется на переходе и ведёт сюжет. Пусто — на этом переходе фразы нет"
-            fields:
-              - { name: toProjects, label: "Имя → Проекты", widget: string, required: false }
-              - { name: toContacts, label: "Проекты → Контакты", widget: string, required: false }
-              - { name: toName, label: "Контакты → снова имя", widget: string, required: false }
           - name: music
             label: Музыка
             widget: file
+            i18n: duplicate
             required: false
             hint: "mp3, играет по кругу по переключателю звука. Пусто — звучит процедурный ветер мира. Ставить только трек, на который есть права"
 
@@ -138,33 +171,41 @@ collections:
         label: Что делаю
         file: content/skills.json
         format: json
+        i18n: true
         fields:
           - name: items
             label: Направления
             widget: list
+            i18n: true
+            required: [ru]
             fields:
-              - { name: title, label: Название, widget: string }
-              - { name: lead, label: Одна строка о пользе, widget: text }
+              - { name: title, label: Название, widget: string, i18n: true }
+              - { name: lead, label: Одна строка о пользе, widget: text, i18n: true }
 
       - name: contacts
         label: Контакты
         file: content/contacts.json
         format: json
+        i18n: true
         fields:
-          - { name: name, label: Имя, widget: string }
+          - { name: name, label: Имя, widget: string, i18n: true, required: [ru] }
           - name: note
             label: Строка над ссылками
             widget: text
+            i18n: true
             required: false
             hint: "Необязательно: что писать и когда ответишь"
           - name: links
             label: Ссылки
             widget: list
+            i18n: true
+            required: [ru]
             fields:
-              - { name: label, label: Подпись, widget: string }
-              - { name: url, label: Адрес, widget: string }
+              - { name: label, label: Подпись, widget: string, i18n: true }
+              - { name: url, label: Адрес, widget: string, i18n: duplicate }
           - name: formUrl
             label: Адрес приёмника формы
             widget: string
+            i18n: duplicate
             required: false
             hint: "Адрес воркера вида https://helias-contact.<аккаунт>.workers.dev. Пусто — формы на сайте нет, только ссылки"
