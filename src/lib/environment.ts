@@ -27,7 +27,7 @@ export type ChapterLight = {
 
 /** Ориентир на переходе: `at` — где он на маршруте, например 1.5 — между
     второй и третьей точкой. */
-export type Landmark = { at: number; kind: "gate" | "arcs" };
+export type Landmark = { at: number; kind: "gate" };
 
 /** Ориентир на экране: радиус в пикселях и видимость — для подписи у ворот. */
 export type MarkFrame = { r: number; vis: number };
@@ -81,22 +81,19 @@ function ring(out: number[], R: number, count: number, from = 0, span = Math.PI 
 }
 
 /** Ворота — одно кольцо с рисками наружу, как шкала прибора: два кольца
-    рядом читались двойной линией (Илья, 2026-10-19). Арки — три дуги:
-    видно, что это проход, но не путаешь с воротами раздела. */
-function markShape(kind: Landmark["kind"], h: number) {
+    рядом читались двойной линией (Илья, 2026-10-19). Арок на остальных
+    переходах больше нет: три дуги вокруг уходящей сферы читались рваным
+    ореолом (Илья, 2026-10-20). */
+function markShape(h: number) {
   const out: number[] = [];
-  if (kind === "gate") {
-    ring(out, h * 0.47, 1900);
-    for (let t = 0; t < 48; t++) {
-      const a = (t / 48) * Math.PI * 2;
-      const long = t % 4 === 0 ? 0.08 : 0.04;
-      for (let i = 0; i < 12; i++) {
-        const r = h * (0.47 + (long * i) / 12);
-        out.push(Math.cos(a) * r, Math.sin(a) * r, 0);
-      }
+  ring(out, h * 0.47, 1900);
+  for (let t = 0; t < 48; t++) {
+    const a = (t / 48) * Math.PI * 2;
+    const long = t % 4 === 0 ? 0.08 : 0.04;
+    for (let i = 0; i < 12; i++) {
+      const r = h * (0.47 + (long * i) / 12);
+      out.push(Math.cos(a) * r, Math.sin(a) * r, 0);
     }
-  } else {
-    for (let k = 0; k < 3; k++) ring(out, h * 0.56, 700, (k * Math.PI * 2) / 3 + 0.3, Math.PI * 0.55);
   }
   return new Float32Array(out);
 }
@@ -200,8 +197,7 @@ export class Environment {
         uSpeed: { value: 0 },
       };
       // Ворота раздела ярче арок: это событие, а не просто проход.
-      const gate = m.kind === "gate";
-      return { points: this.add(markShape(m.kind, h), u), u, at: m.at, R: h * (gate ? 0.47 : 0.56), bright: gate ? 1.4 : 0.6 };
+      return { points: this.add(markShape(h), u), u, at: m.at, R: h * 0.47, bright: 1.4 };
     });
   }
 

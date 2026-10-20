@@ -31,7 +31,24 @@ const WATER_R = 0.2;
 /** За какую долю пути до соседней точки объект собирается или уходит. */
 const PASS = 0.6;
 /** Секунды на раскрытие комнаты и на обратную сборку. */
-const UNFOLD = 1.2;
+const UNFOLD = 2.1;
+/* Ход раскрытия сферы во времени, таблицей по 1/20 (Илья, 2026-10-20:
+   «погружение линейное — нужно как откат к сцене: плавно начинает и плавно
+   останавливает внутри сферы»). Глаз читает погружение как наезд — по
+   логарифму видимого масштаба, а не по пикселям. Таблица подобрана обратным
+   счётом: наезд идёт той же кубической кривой, что откат аллеи к точке
+   (journey.ts), — трогается мягко, быстрее всего на пролёте сквозь стенку
+   и долго, гладко садится внутри. Считана для сферы 0.2 → 1.5 высоты
+   со сдвигом 0.55, FOV 50: всё в долях высоты, от размера окна не зависит. */
+const UNFOLD_CURVE = [
+  0, 0.001, 0.004, 0.013, 0.032, 0.062, 0.107, 0.169, 0.249, 0.352, 0.481,
+  0.611, 0.719, 0.806, 0.875, 0.926, 0.962, 0.984, 0.996, 1, 1,
+];
+const unfoldAt = (t: number) => {
+  const x = Math.max(0, Math.min(1, t)) * 20;
+  const k = Math.min(19, Math.floor(x));
+  return UNFOLD_CURVE[k] + (UNFOLD_CURVE[k + 1] - UNFOLD_CURVE[k]) * (x - k);
+};
 
 /** Точка маршрута: объект на аллее и, если есть, его комната. */
 export type StationSpec = {
@@ -44,7 +61,7 @@ export type StationSpec = {
   /** Что делает зажатая кнопка. "spray" — распыление и раскрутка, только
       у имени; "spin" — сфера вертится за рукой в любую сторону, как планеты
       в приложении Mole, а раскрывается по нажатию (Илья, 2026-10-18).
-      Нет — зажатие объект не трогает: свою реакцию придумаем позже. */
+      Нет — зажатие объект не трогает. */
   grip?: "spray" | "spin";
   /** Насколько притушить объект в комнате, чтобы текст поверх читался: 0..1. */
   dim?: number;
@@ -52,13 +69,30 @@ export type StationSpec = {
   media?: { video?: string; images: string[] };
   /** Свет главы — подсветка фона, пока камера у этой точки. */
   light?: ChapterLight;
+  /** Свет комнаты: пока она открыта, фон тонируется её цветом. */
+  roomLight?: ChapterLight;
+  /** Как объект прилетает на аллею и как уходит с неё (`uFlow` в шейдере).
+      Нет — разворот очередью и дождь в камеру, как у всех. */
+  arrive?: "implode";
+  leave?: "streak" | "scatter";
+  /** Пересобирается на месте с соседней надписью, у которой тоже стоит этот
+      флаг, — как две сферы подряд. */
+  reform?: boolean;
 };
+
+const FLOW = { streak: 1, implode: 2, scatter: 3 } as const;
 
 /** Во сколько раз гуще имени сфера проекта: мелкой сетке нужна сплошная
     линия на каждом ребре, а на редкой и кадр не разобрать. */
 const SPHERE_DENSITY = 4.4;
 /** Радиан поворота имени на пиксель хода руки. */
 const TWIST_PER_PX = 0.0055;
+/* Вход в «обо мне» — как распыление рукой: облако расходится от слова
+   целиком и ровно; обратно собирается так же. Прежде точки трогались
+   вразнобой и шли дугой к зрителю — «с разных сторон в разные позиции»;
+   потом стартовали с полной скорости — «резко» (Илья, 2026-10-20). Синус:
+   мягкий старт, ровный ход, мягкая посадка, в обе стороны одинаково. */
+const burstAt = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * t);
 /** Собственное вращение сферы, радиан в секунду: оборот за три минуты.
     Втрое быстрее мешало глазам (Илья, 2026-10-18). */
 const SPHERE_SPIN = 0.035;
@@ -120,6 +154,11 @@ type Props = {
   onExit?: () => void;
   /** Ориентиры на переходах между точками. Массив стабильный, как и stations. */
   landmarks?: Landmark[];
+  /** Первый кадр с объектами нарисован — можно снимать заставку. */
+  onLoaded?: () => void;
+  /** Начинать сборку имени из облака. Пока false, точки ждут на стартовых
+      местах: сборку должно быть видно, а не пропустить за заставкой. */
+  start?: boolean;
 };
 
 
@@ -144,6 +183,7 @@ type Body = {
     uLift: { value: number };
     uSolid: { value: number };
     uSwap: { value: number };
+    uFlow: { value: number };
     uTex0: { value: THREE.Texture | null };
     uTex1: { value: THREE.Texture | null };
     uTexMix: { value: number };
@@ -168,8 +208,13 @@ type Body = {
   disp: Float32Array;
   /** Податливость каждой точки: без разброса облако летит ровным строем. */
   give: Float32Array;
-  /** 1 — точку унесло распылением, и домой её ведёт прежний медленный возврат. */
+  /** 1 — точку унесло распылением, и домой её ведёт свой возврат (`RETURN_T`). */
   sprayed: Uint8Array;
+  /** Возврат распылённой точки: сколько пути пройдено (0..1, −1 — ещё не начат),
+      откуда она пошла (`trip`) и как быстро идёт (доля пути в секунду). */
+  back: Float32Array;
+  trip: Float32Array;
+  pace: Float32Array;
   /** Насколько точку «разбудил» удар руки: пока не угасло, её крутит вихрь. */
   stir: Float32Array;
   /** Куда и насколько далеко уходит точка при распылении рукой. */
@@ -185,7 +230,7 @@ type Body = {
 
 const NO_MARKS: Landmark[] = [];
 
-export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = NO_MARKS }: Props) {
+export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = NO_MARKS, onLoaded, start = true }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLDivElement>(null);
   // Колбэк держим в рефе: попади он в зависимости эффекта, сцена
@@ -193,11 +238,15 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
   const onFrameRef = useRef(onFrame);
   const onPickRef = useRef(onPick);
   const onExitRef = useRef(onExit);
+  const onLoadedRef = useRef(onLoaded);
+  const startRef = useRef(start);
   // Свежий колбэк кладём в реф после рендера, а не во время него.
   useEffect(() => {
     onFrameRef.current = onFrame;
     onPickRef.current = onPick;
     onExitRef.current = onExit;
+    onLoadedRef.current = onLoaded;
+    startRef.current = start;
   });
 
   useEffect(() => {
@@ -225,9 +274,12 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        раскрывается во времени. Выход — замок снят, объект собирается
        обратно, и колесо ведёт дальше с того же места. */
     let room: number | null = null;
+    /** Чьим светом тонирован фон: остаётся и после выхода, пока комната гаснет. */
+    let litRoom: number | null = null;
     const setRoom = (k: number | null) => {
       if (k !== null && !stations[k]?.room) return;
       room = k;
+      if (k !== null) litRoom = k;
       journey.lock(k !== null);
       if (k !== null) journey.goTo(k);
     };
@@ -292,6 +344,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         });
       };
       tick();
+      // Сцены не будет — заставке ждать нечего.
+      onLoadedRef.current?.();
       return () => {
         cancelAnimationFrame(raf);
         detachJourney();
@@ -421,6 +475,12 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const QUAT_ID = new THREE.Quaternion();
     /** Рука сейчас крутит имя. */
     let twisting = false;
+    /* Отпустил — слово раскручивается назад тем же законом, что облако идёт
+       домой: синусом за UNSPIN_T, без рывка на старте. По экспоненте оно
+       срывалось с полной скорости, а облако теперь раскручивается вместе
+       со словом — и дёргалось бы с ним (Илья, 2026-10-20). */
+    const unspinFrom = new THREE.Quaternion();
+    let unspinT = 1;
 
     /** Сглаженная скорость руки в пикселях за кадр. */
     const handVel = new THREE.Vector2();
@@ -447,9 +507,20 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       N
     );
     const lights = stations.map((s) => s.light);
-    /** Свет главы на этом положении маршрута — в фон. Цвет в sRGB, как и фон. */
+    const roomTint = new THREE.Color();
+    /** Свет главы на этом положении маршрута — в фон. Цвет в sRGB, как и фон.
+        В комнате проекта фон уходит в её цвет — как у Active Theory, где цвет
+        проекта красит всю комнату (Илья, 2026-10-19). */
     const lightUp = (progress: number) => {
       const l = chapterLight(lights, progress);
+      const r = litRoom === null ? undefined : stations[litRoom]?.roomLight;
+      if (r && roomAmount > 0) {
+        const into = roomAmount;
+        l.color.lerp(roomTint.set(r.color), into);
+        l.amount += (r.amount - l.amount) * into;
+        l.dir[0] += (r.dir[0] - l.dir[0]) * into;
+        l.dir[1] += (r.dir[1] - l.dir[1]) * into;
+      }
       fieldUniforms.uTint.value.copy(l.color).convertLinearToSRGB();
       fieldUniforms.uTintAmt.value = l.amount;
       fieldUniforms.uTintDir.value.set(l.dir[0], l.dir[1]);
@@ -476,6 +547,16 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       return out;
     };
 
+    /* Личное число точки — от её номера, а не случайное: от него в шейдере
+       её размер, глубина в толще слова, шевеление и искры. При пересборке
+       «@» в имя точка №i уезжает на место точки №i имени, и со случайными
+       числами каждая в миг смены прыгала на несколько пикселей и меняла
+       размер (Илья, 2026-10-20). С общим числом они совпадают во всём. */
+    const seedOf = (i: number) => {
+      const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+      return x - Math.floor(x);
+    };
+
     const makeBody = (a: Shape, b: Shape, w: number, h: number, spec: StationSpec): Body => {
       const n = a.points.length / 2;
       const solid = !!a.z;
@@ -491,7 +572,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         const r = spread * (0.5 + Math.random() * 0.6);
         from[i * 2] = Math.cos(ang) * r;
         from[i * 2 + 1] = Math.sin(ang) * r;
-        seed[i] = Math.random();
+        seed[i] = seedOf(i);
       }
 
       // Физика начинается с чистого листа: скорости и смещения по нулям.
@@ -499,6 +580,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const disp = new Float32Array(n * 3);
       const give = new Float32Array(n);
       const sprayed = new Uint8Array(n);
+      const back = new Float32Array(n).fill(-1);
+      const trip = new Float32Array(n * 3);
+      const pace = new Float32Array(n);
       const stir = new Float32Array(n);
       const spray = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
@@ -525,6 +609,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       geo.setAttribute("aVel", velAttr);
       geo.setAttribute("aHomeA", new THREE.BufferAttribute(homes(a), 3));
       geo.setAttribute("aHomeB", new THREE.BufferAttribute(homes(b), 3));
+      // Дом у соседа по пересборке; пока соседа нет — свой же.
+      geo.setAttribute("aOther", new THREE.BufferAttribute(homes(a), 3));
       geo.setAttribute("aFrom", new THREE.BufferAttribute(from, 2));
       geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
       // Какие точки остаются видны внутри раскрытой сферы; у плоских форм — все.
@@ -547,10 +633,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         uCzB: { value: b.cz ?? 0 },
         // Надпись раскрывается волной, с отрывом от плоскости; сетка сферы —
         // разом и ровно, как раскладная игрушка: точки только расходятся.
-        uLag: { value: solid ? 0 : 0.35 },
-        uLift: { value: solid ? 0 : 1 },
+        // У облака «обо мне» ни очереди, ни дуги к зрителю — оно расходится
+        // целиком, как при распылении рукой.
+        uLag: { value: solid || spec.room === "burst" ? 0 : 0.35 },
+        uLift: { value: solid || spec.room === "burst" ? 0 : 1 },
         uSolid: { value: solid ? 1 : 0 },
         uSwap: { value: 0 },
+        uFlow: { value: 0 },
         uTex0: { value: null as THREE.Texture | null },
         uTex1: { value: null as THREE.Texture | null },
         uTexMix: { value: 0 },
@@ -575,7 +664,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       points.visible = false;
       scene.add(points);
       const body: Body = {
-        points, geo, mat, u, a, b, n, vel, disp, give, sprayed, stir, spray, dispAttr, velAttr,
+        points, geo, mat, u, a, b, n, vel, disp, give, sprayed, back, trip, pace, stir, spray, dispAttr, velAttr,
         morph: 0, restless: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
       };
       if (spec.media) loadMedia(body, spec.media);
@@ -701,6 +790,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         body.morph = room === i ? 1 : 0;
         bodies[i] = body;
         dirty = true;
+      }
+      // Надпись, которая пересобирается в следующую, получает её дома.
+      for (let i = 0; i < N; i++) {
+        const next = bodies[(i + 1) % N];
+        const body = bodies[i];
+        if (!body || !next || !stations[i].reform || !stations[(i + 1) % N].reform || body.n !== next.n) continue;
+        body.geo.setAttribute("aOther", new THREE.BufferAttribute(homes(next.a), 3));
       }
     };
 
@@ -913,6 +1009,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Отпустили — цель сбрасывается, и точки идут домой напрямую,
       // из того положения, в котором их застали.
       dragTravel = 0;
+      if (twisting) {
+        unspinFrom.copy(nameQ);
+        unspinT = 0;
+      }
       twisting = false;
 
       // Нажатие на объект с комнатой — вход, в любом месте аллеи.
@@ -956,7 +1056,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     /* Замерная точка для доводки удара: сколько скорости руки доходит до точек
        и насколько их уносит. Живёт только в дев-режиме — в сборку не попадает,
        там `probe` равен null и лишний проход по облаку не делается. */
-    type Probe = { rawSpeed: number; speed: number; maxDisp: number; moved: number };
+    type Probe = { rawSpeed: number; speed: number; maxDisp: number; moved: number; dispNow: number; meanNow: number };
     const probe: Probe | null =
       process.env.NODE_ENV === "production"
         ? null
@@ -965,9 +1065,14 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             speed: 0,
             maxDisp: 0,
             moved: 0,
+            dispNow: 0,
+            meanNow: 0,
           });
 
     const HIT = 52;         // радиус, в котором рука вообще что-то задевает
+    /* В облаке «обо мне» точки редкие: кистью в 52 px рука задевала единицы,
+       и казалось, что ведёшь по облаку поверху (Илья, 2026-10-20). */
+    const HIT_ROOM = 130;
     const SWEEP = 0.0030;   // увлечение по ходу руки — основная сила
     const PUSH = 0.0010;    // отталкивание от точки касания
     const CURL = 0.0015;    // закрутка вбок, чтобы не расходились строем
@@ -1021,6 +1126,16 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const GRIP = 0.9;                     // как быстро берёт: доля разницы за кадр
     /** Скачок курсора больше этого за кадр — не мах, а возврат руки в окно. */
     const TELEPORT = 160;
+    /* Возврат облака после распыления (Илья, 2026-10-20: «слишком долго
+       встают на места, вымораживает»). Было 5,9 с: самый быстрый ход в первые
+       доли секунды, дальше длинный хвост. Теперь каждая точка идёт домой
+       за своё время — от ~0,8 с для ближних до ~1,3 с для дальних: разгоняется
+       от места, где её застали, и мягко садится. Ближние встают раньше, и
+       слово собирается от середины облака, а не сжимается целиком. */
+    const RETURN_T0 = 0.75; // с — время пути для точки у самого дома
+    const RETURN_T1 = 0.55; // с — сколько добавляют 1000 px дальности (по корню)
+    /** За сколько слово раскручивается назад — как самая дальняя точка облака. */
+    const UNSPIN_T = RETURN_T0 + RETURN_T1;
 
     let physT = 0;
     const stepPhysics = (dt: number, active: Body | null, settled: boolean) => {
@@ -1038,7 +1153,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
          держим слабым, чтобы рывок не размазывался по кадрам, а потолок
          поднимаем — он остаётся только страховкой от броска мышью через
          весь экран. */
-      handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.55);
+      // Скачок курсора — не мах: он влетел в окно или его бросили через
+      // экран. Перенятая скорость такого скачка выстреливала точки столбом.
+      if (Math.hypot(raw.x, raw.y) > TELEPORT) handVel.set(0, 0);
+      else handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.55);
       const speed = Math.min(handVel.length(), 120);
       const moving = speed > 0.35 && hover > 0.01 && settled;
       handNow = Math.min(1, speed / 60) * hover;
@@ -1068,9 +1186,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const perFrame = 1 / Math.max(step, 0.25);
       const pull = SPRING * dt * 60;
       const wane = Math.exp(-dt / WEAVE_T);
-      // Возврат вдвое медленнее прежнего: точка дольше идёт домой, и
-      // доворот отдачи успевает прочитаться целиком.
-      const home = 1 - Math.pow(1 - 0.0075, dt * 60);
       /* Распыление — не удар, а удержание.
 
          Пока кнопка зажата, точка тянется к своей цели и там стоит: облако
@@ -1089,7 +1204,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
            физики, и на пролёте по аллее она давала заминки по 200 мс. */
         const engaged = isActive && (moving || (dragging && body.grip === "spray"));
         if (!engaged && !body.restless) continue;
-        const { vel, disp, give, sprayed, stir, spray } = body;
+        const { vel, disp, give, sprayed, back, trip, pace, stir, spray } = body;
         // Дом — та форма, в которой объект сейчас стоит: на аллее или в комнате.
         const base2 = body.morph > 0.5 ? body.b.points : body.a.points;
         // У сферы дом ещё и повёрнут, и у каждой точки своя глубина: рука
@@ -1101,6 +1216,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         const sprays = body.grip === "spray";
         const spread = isActive && dragging && sprays;
         const n = body.n;
+        const hit = !body.solid && body.morph > 0.5 ? HIT_ROOM : HIT;
         let restless = false;
 
         for (let i = 0; i < n; i++) {
@@ -1127,8 +1243,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             const dx = bx + disp[i3] - hx;
             const dy = by + disp[i3 + 1] - hy;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < HIT) {
-              const t2 = dist / HIT;
+            if (dist < hit) {
+              const t2 = dist / hit;
               const near = (1 - t2) * (1 - t2);
               const s = speed * near * give[i];
               const k = s * KICK;
@@ -1158,8 +1274,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             vx += (vhx * perFrame * want - vx) * take;
             vy += (vhy * perFrame * want - vy) * take;
           }
-          if (spread) sprayed[i] = 1;
-          else if (sprayed[i] && disp[i3] * disp[i3] + disp[i3 + 1] * disp[i3 + 1] + disp[i3 + 2] * disp[i3 + 2] < 1)
+          if (spread) {
+            sprayed[i] = 1;
+            back[i] = -1;
+            // Распыление — удержание, а не удар: вихрь от руки, задевавшей
+            // облако, не должен раскачать точку, когда она долетит домой.
+            stir[i] = 0;
+          } else if (sprayed[i] && disp[i3] * disp[i3] + disp[i3 + 1] * disp[i3 + 1] + disp[i3 + 2] * disp[i3 + 2] < 1)
             sprayed[i] = 0;
           if (!spread && !sprayed[i]) {
             if (stir[i] > 0.01) {
@@ -1206,25 +1327,36 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             dy2 += (rm[1] * sx + rm[4] * sy + rm[7] * sz - dy2) * hold;
             dz2 += (rm[2] * sx + rm[5] * sy + rm[8] * sz - dz2) * hold;
           } else if (scattered) {
-            /* Домой — по прямой из того места, где точку застали.
+            /* Домой — по прямой из того места, где точку застали: плавный
+               разгон и такое же плавное торможение, по синусу. Кубы давали
+               рывок — пик скорости втрое выше среднего — и долгое доползание
+               в конце (Илья, 2026-10-20: «быстро, но плавно»); у синуса пик
+               в полтора раза выше среднего, и последний отрезок не тянется.
 
-               Чем дальше её унесло, тем резвее она возвращается: после
-               распыления облако собирается бодро, а лёгкое касание всё так
-               же оседает мягко. */
-            /* Возврат ускоряется у самого дома, а не вдали от него.
-
-               Раньше разгон зависел только от дальности: далёкие точки шли
-               резво, а у своих мест еле ползли — облако подолгу висело
-               расплывчатым, хотя все уже почти на местах. Теперь дальний
-               участок медленный, а у самого дома точка разгоняется. */
-            const away = Math.hypot(dx2, dy2, dz2);
-            const near = 1 - Math.min(1, away / 200);
-            // Ускорение у дома мягче прежнего (было ×12): последний отрезок
-            // читался щелчком — скачком в конце, а не посадкой.
-            const rate = Math.min(0.35, home * (1 + away / 400) * (1 + near * near * 5));
-            dx2 *= 1 - rate;
-            dy2 *= 1 - rate;
-            dz2 *= 1 - rate;
+               Путь запоминается в осях повёрнутого слова и каждый кадр
+               поворачивается вместе с ним: слово раскручивается назад, и облако
+               раскручивается с ним, стягиваясь, — точки идут домой по спирали,
+               а не по прямой (Илья, 2026-10-20). Удар руки по летящей точке
+               сдвигает начало её пути — она сбивается и летит дальше. */
+            if (back[i] < 0) {
+              trip[i3] = rm[0] * dx2 + rm[1] * dy2 + rm[2] * dz2;
+              trip[i3 + 1] = rm[3] * dx2 + rm[4] * dy2 + rm[5] * dz2;
+              trip[i3 + 2] = rm[6] * dx2 + rm[7] * dy2 + rm[8] * dz2;
+              pace[i] = 1 / (RETURN_T0 + RETURN_T1 * Math.sqrt(Math.hypot(dx2, dy2, dz2) / 1000));
+              back[i] = 0;
+            } else {
+              trip[i3] += (rm[0] * vx + rm[1] * vy + rm[2] * vz) * step;
+              trip[i3 + 1] += (rm[3] * vx + rm[4] * vy + rm[5] * vz) * step;
+              trip[i3 + 2] += (rm[6] * vx + rm[7] * vy + rm[8] * vz) * step;
+            }
+            const t = (back[i] = Math.min(1, back[i] + dt * pace[i]));
+            const left = 0.5 + 0.5 * Math.cos(Math.PI * t);
+            const lx = trip[i3] * left;
+            const ly = trip[i3 + 1] * left;
+            const lz = trip[i3 + 2] * left;
+            dx2 = rm[0] * lx + rm[3] * ly + rm[6] * lz;
+            dy2 = rm[1] * lx + rm[4] * ly + rm[7] * lz;
+            dz2 = rm[2] * lx + rm[5] * ly + rm[8] * lz;
           }
 
           disp[i3] = dx2;
@@ -1238,14 +1370,19 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         if (probe && isActive) {
           let max = 0;
           let cnt = 0;
+          let sum = 0;
           for (let i = 0; i < n; i++) {
             const i3 = i * 3;
             const d = Math.hypot(disp[i3], disp[i3 + 1], disp[i3 + 2]);
             if (d > max) max = d;
             if (d > 2) cnt++;
+            sum += d;
           }
           probe.maxDisp = Math.max(probe.maxDisp, max);
           probe.moved = Math.max(probe.moved, cnt);
+          // Текущее, а не рекорд: по нему меряется время возврата.
+          probe.dispNow = max;
+          probe.meanNow = sum / n;
         }
 
         body.dispAttr.needsUpdate = true;
@@ -1257,6 +1394,46 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
     /** Насколько раскрыта комната — всем остальным это сигнал уйти в туман. */
     let roomAmount = 0;
+
+    /* Пересборка надписи в соседнюю (контакты ⇄ имя): точки на виду у одной
+       из двух надписей. В миг смены та, что выходит на вид, перенимает
+       у прежней сдвиги и скорости точек от руки — иначе всё, что рука успела
+       отодвинуть, разом прыгало на место: крутишь назад с имени, курсор
+       над словом, и в первый же кадр перехода слово «перескакивало»
+       (Илья, 2026-10-20). Точка №i у обеих одна и та же (seedOf). */
+    const reformFrom = stations.findIndex((s, k) => s.reform && stations[(k + 1) % N]?.reform);
+    let reformHolder = -1;
+    const handOver = (from: Body, to: Body) => {
+      to.vel.set(from.vel);
+      to.disp.set(from.disp);
+      to.sprayed.set(from.sprayed);
+      to.back.set(from.back);
+      to.trip.set(from.trip);
+      to.pace.set(from.pace);
+      to.stir.set(from.stir);
+      to.restless = true;
+      to.dispAttr.needsUpdate = true;
+      to.velAttr.needsUpdate = true;
+    };
+    const keepReform = (progress: number) => {
+      if (reformFrom < 0) return;
+      const a = bodies[reformFrom];
+      const b = bodies[(reformFrom + 1) % N];
+      if (!a || !b || a.n !== b.n) return;
+      const d = ringOffset(progress, reformFrom, N);
+      if (d <= 0 || d >= 1) {
+        reformHolder = -1;
+        return;
+      }
+      // Та же граница, что прячет уходящую (away < 0.999) и показывает приходящую.
+      const holder = d < 0.999 ? reformFrom : (reformFrom + 1) % N;
+      if (reformHolder >= 0 && holder !== reformHolder) {
+        const from = bodies[reformHolder];
+        const to = bodies[holder];
+        if (from && to) handOver(from, to);
+      }
+      reformHolder = holder;
+    };
 
     /** Ставит объекты по местам на аллее и ведёт раскрытие комнат. Отдаёт
         объект перед камерой и можно ли сейчас трогать его рукой. */
@@ -1272,7 +1449,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         // клик по дальнему объекту сперва подвозит к нему.
         const want = room === k && Math.abs(ringOffset(progress, k, N)) < 0.35 ? 1 : 0;
         b.morph = reduced ? want : Math.max(0, Math.min(1, b.morph + Math.sign(want - b.morph) * (dt / UNFOLD)));
-        roomAmount = Math.max(roomAmount, b.morph);
+        // Мир гаснет и текст комнаты проявляется в такт видимому раскрытию, а не по часам.
+        roomAmount = Math.max(roomAmount, b.solid ? unfoldAt(b.morph) : burstAt(b.morph));
       }
 
       for (let k = 0; k < N; k++) {
@@ -1282,7 +1460,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
            в другую на месте: сетка та же, волна снизу вверх переплетает
            точки, и на шаре уже другой проект (Илья, 2026-10-18). */
         const other = (((k + (d > 0 ? 1 : -1)) % N) + N) % N;
-        const swap = other !== k && !!b?.solid && !!bodies[other]?.solid;
+        const swap =
+          other !== k &&
+          ((!!b?.solid && !!bodies[other]?.solid) || (!!stations[k].reform && !!stations[other].reform));
         // Подлёт — минус, уход — плюс; на точке ноль.
         const pass = swap ? 0 : Math.sign(d) * Math.min(1, Math.abs(d) / PASS);
         const away = swap ? Math.min(1, Math.abs(d)) : Math.abs(pass);
@@ -1303,9 +1483,17 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         // Уходящий ближе к камере, чем подлетающий: рисуется поверх.
         b.points.renderOrder = d > 0 ? 1 : 0;
         b.u.uPass.value = pass;
-        b.u.uSwap.value = swap ? Math.max(-1, Math.min(1, d)) : 0;
+        // Прилёт — пока объект впереди, уход — когда он позади.
+        const flow = pass < 0 ? stations[k].arrive : stations[k].leave;
+        b.u.uFlow.value = flow ? FLOW[flow] : 0;
+        /* Волна пересборки — только на аллее. В раскрытой сфере она прятала
+           верхнюю половину: фронт волны считается по радиусу маленькой
+           сферы, а комната в 7,5 раза больше. Камера после входа доезжает
+           до точки бесконечно малыми шагами, волна оставалась включённой,
+           и во второй сфере не хватало половины (Илья, 2026-10-20). */
+        b.u.uSwap.value = swap && b.morph < 0.001 ? Math.max(-1, Math.min(1, d)) : 0;
         b.u.uVis.value = vis;
-        b.u.uMorph.value = b.morph;
+        b.u.uMorph.value = b.solid ? unfoldAt(b.morph) : burstAt(b.morph);
         b.u.uDim.value = (stations[k].dim ?? 0) * b.morph;
         stepShots(b, t);
         // Видео на сфере крутится, только пока она рядом: дальние стоят.
@@ -1330,6 +1518,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let last = performance.now();
     const started = last;
     let enter = 0;
+    /** Первый кадр с именем нарисован — заставку можно снимать. Один раз. */
+    let loadedSent = false;
+    const loaded = () => {
+      if (loadedSent || !bodies[0]) return;
+      loadedSent = true;
+      onLoadedRef.current?.();
+    };
 
     /* Камера стоит на месте, едут объекты.
 
@@ -1356,11 +1551,12 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       camera.position.z = baseZ;
       stepSphereRot(dt);
       const { active, settled } = place(progress, dt, t);
+      keepReform(progress);
       stepPhysics(dt, active, settled);
       env.update(progress, speed, roomAmount, baseZ, camera.position.z);
       lightUp(progress);
 
-      enter = Math.min(1, enter + dt / 1.6);
+      if (startRef.current) enter = Math.min(1, enter + dt / 1.6);
       const eased = 1 - Math.pow(1 - enter, 3);
 
       // Сила перетаскивания нарастает и спадает плавно: резкий перепад
@@ -1387,7 +1583,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       shared.uEnter.value = enter;
       // Отпустили — слово ложится обратно читаемым: поворот плавно сходит
       // к исходному, без отскока.
-      if (!twisting) nameQ.slerp(QUAT_ID, 1 - Math.exp(-dt * 2.2));
+      if (!twisting && unspinT < 1) {
+        unspinT = Math.min(1, unspinT + dt / UNSPIN_T);
+        nameQ.slerpQuaternions(unspinFrom, QUAT_ID, 0.5 - 0.5 * Math.cos(Math.PI * unspinT));
+      }
       nameRot.setFromMatrix4(rotM4.makeRotationFromQuaternion(nameQ));
       shared.uCamZ.value = camera.position.z;
       shared.uBaseZ.value = baseZ;
@@ -1398,6 +1597,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       camera.position.y = -dragVec.y * 0.05 * drag;
 
       renderer.render(scene, camera);
+      loaded();
     };
 
     if (reduced) {
@@ -1431,6 +1631,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           hand: 0,
         });
         renderer.render(scene, camera);
+        loaded();
       };
       still();
     } else {

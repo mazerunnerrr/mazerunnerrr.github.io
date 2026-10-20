@@ -34,7 +34,8 @@ page.on("console", (m) => {
 const settle = () => page.waitForTimeout(mode === "reduce" ? 400 : 3200);
 const fresh = async () => {
   await page.goto(URL, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2000);
+  // Заставка (Loader.tsx) держит экран около трёх секунд.
+  await page.waitForTimeout(3800);
 };
 
 const state = () =>

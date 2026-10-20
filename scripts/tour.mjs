@@ -90,8 +90,9 @@ const run = async () => {
 
   await page.goto(url, { waitUntil: "networkidle" });
 
-  // Сбор облака — это часть показа, поэтому просто ждём и смотрим.
-  await page.waitForTimeout(2600);
+  // Заставка (около трёх секунд), затем сбор облака — это часть показа,
+  // поэтому просто ждём и смотрим.
+  await page.waitForTimeout(5200);
 
   if (mobile) {
     // На тач-устройстве мыши нет: показываем касанием и прокруткой.
@@ -157,11 +158,12 @@ const run = async () => {
       }
     }
 
-    /* 6. Аллея. Одна точка — 900 пикселей колеса (`pxPerStop` в journey.ts),
-          десять щелчков по 90. Нарочно недокручиваем: шесть щелчков —
-          и рука замирает; через секунду доводка плавно довозит до точки. */
+    /* 6. Аллея. Одна точка — 1400 пикселей колеса (`PX_PER_STOP` в journey.ts),
+          один жест довозит не дальше соседней. Нарочно недокручиваем: девять
+          щелчков по 90 — чуть больше полпути; рука замирает — доводка плавно
+          довозит до точки. */
     await page.mouse.move(W * 0.55, H * 0.5);
-    await wheel(6);
+    await wheel(9);
     await page.waitForTimeout(3400);
 
     // 7. Сфера проекта: зажал и повёл — вертится в любую сторону, как
@@ -175,16 +177,18 @@ const run = async () => {
     await page.waitForTimeout(2200);
     await page.mouse.click(W * 0.5, H * 0.5);
     await page.waitForTimeout(3000);
-    await glide(page, [W * 0.5, H * 0.5], [W * 0.83, H * 0.36], 35);
-    await page.waitForTimeout(2200);
+    // Комната — один экран: кадр с видео наклоняется за рукой, под ним суть.
+    await glide(page, [W * 0.5, H * 0.5], [W * 0.8, H * 0.3], 35);
+    await glide(page, [W * 0.8, H * 0.3], [W * 0.25, H * 0.7], 45);
+    await page.waitForTimeout(1600);
     // Изнутри сетку тоже вертят рукой, а под рукой точки разлетаются.
     await page.mouse.move(W * 0.62, H * 0.7);
     await page.mouse.down();
     await glide(page, [W * 0.62, H * 0.7], [W * 0.3, H * 0.55], 35, 16);
     await page.mouse.up();
     await page.waitForTimeout(1600);
-    await glide(page, [W * 0.3, H * 0.55], [W * 0.5, H * 0.5], 25);
-    await wheel(-3);
+    // Выход — Esc (или прокрутка вверх с первой главы).
+    await page.keyboard.press("Escape");
     await page.waitForTimeout(2400);
 
     // 8. Следующий проект: сфера не улетает, а пересобирается на месте.

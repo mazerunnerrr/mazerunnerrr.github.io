@@ -5,11 +5,12 @@ import { Scene, type FrameInfo, type SceneApi, type StationSpec } from "@/compon
 import type { ChapterLight, Landmark } from "@/lib/environment";
 import type { Contacts, Project, Site, Skill } from "@/content";
 import { ContactForm } from "@/components/ContactForm";
+import { Loader } from "@/components/Loader";
 import { Ambience } from "@/lib/ambience";
-import { Cover } from "@/components/Cover";
 import { Flip, flipIn } from "@/components/Flip";
-import { ProjectBody } from "@/components/ProjectBody";
-import { STATUS } from "@/lib/status";
+import { clamp01, ease, fade, lightUp } from "@/lib/layer";
+import { ProjectRoom, type RoomUpdate } from "@/components/ProjectRoom";
+import { ACCENT_HEX, STATUS, accentOf } from "@/lib/status";
 import { FLIP_HOVER, scramble } from "@/lib/scramble";
 import { LANGS, STATUS_LABEL, UI, type Lang } from "@/lib/i18n";
 import { setLang, useLang } from "@/lib/useLang";
@@ -23,16 +24,12 @@ type Stop =
   | { kind: "project"; label: string; project: Project }
   | { kind: "contacts"; label: string };
 
-const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-/** Проявление с разгоном и торможением: по прямой оно обрывается на полной
-    яркости, и конец читается скачком. */
-const ease = (x: number) => x * x * (3 - 2 * x);
-
 /* Свет глав. Каждая точка подсвечена по-своему внутри полночного синего:
-   имя — тёплым снизу, как рассвет; у раздела проектов свой голографический
-   свет снизу; контакты — янтарём сбоку. Сила малая: это настроение, а не пятно. */
-const LIGHT: Record<"name" | "projects" | "contacts", ChapterLight> = {
-  name: { color: "#d8b98a", amount: 0.1, dir: [-0.55, -0.85] },
+   у раздела проектов свой голографический свет снизу; контакты — янтарём
+   сбоку. Сила малая: это настроение, а не пятно. У имени света нет: тёплый
+   «рассвет» снизу слева читался на синем грязно-серым пятном (Илья,
+   2026-10-20). */
+const LIGHT: Record<"projects" | "contacts", ChapterLight> = {
   projects: { color: "#6f8fff", amount: 0.16, dir: [0, -1] },
   contacts: { color: "#d6a96a", amount: 0.11, dir: [0.9, -0.4] },
 };
@@ -53,28 +50,6 @@ const LINES = [
   { crests: 4, speed: 2.4, amp: 0.7, width: 0.9, opacity: 0.55 },
   { crests: 6, speed: 3.2, amp: 0.5, width: 0.7, opacity: 0.45 },
 ];
-
-/* Прозрачность слоя плюс метка «погас» для CSS: кнопки погасшего слоя
-   перестают ловить клики. Метка пишется только при смене, не каждый кадр.
-
-   Метка зависит не только от прозрачности, но и от того, чья сейчас точка.
-   Камера, застывшая между точками, оставляла соседний слой почти невидимым,
-   но кликабельным: невидимые контакты перехватывали нажатие на соседа.
-   Теперь нажатия принимает только ближайшая к камере точка. */
-const fade = (el: HTMLElement, opacity: number, own: boolean) => {
-  el.style.opacity = String(opacity);
-  const off = !own || opacity < 0.05;
-  if (el.hasAttribute("data-faded") !== off) el.toggleAttribute("data-faded", off);
-  lightUp(el, opacity);
-};
-
-/** Слой проявился — его мелкие надписи перещёлкиваются, как табло. */
-const lightUp = (el: HTMLElement, opacity: number) => {
-  const lit = opacity >= 0.05;
-  if (el.hasAttribute("data-lit") === lit) return;
-  el.toggleAttribute("data-lit", lit);
-  if (lit) flipIn(el);
-};
 
 /** Навели на кнопку или ссылку — её надпись перещёлкивается. */
 const flipHover = (e: React.PointerEvent<HTMLElement>) => flipIn(e.currentTarget, FLIP_HOVER);
@@ -125,46 +100,67 @@ export function Home({
 
   /* Объекты точек. Массив мемоизирован по значениям, а не по ссылкам
      на пропсы: новый на каждый рендер пересобирал бы сцену. */
-  /** Кадры проектов — по значениям, а не по ссылкам: см. выше. */
-  const media = JSON.stringify(projects.map((p) => ({ video: p.video, images: p.shots })));
+  /** Кадры и цвет комнаты проектов — по значениям, а не по ссылкам: см. выше. */
+  const spheres = JSON.stringify(
+    projects.map((p) => ({ media: { video: p.video, images: p.shots.map((s) => s.image) }, tint: ACCENT_HEX[accentOf(p)] }))
+  );
   const stations = useMemo<StationSpec[]>(
     () => [
       /* Имя. Распыление зажатой рукой — только у него: это первый экран
          и его фирменный жест. Нажатие раскрывает имя облаком — комната
          «обо мне». */
-      { shape: { kind: "text", text: site.alias }, room: "burst", grip: "spray", dim: 0.6, light: LIGHT.name },
+      /* Имя уходит к проектам, как прыжок на скорость света: точки по очереди
+         с разгоном летят по своим лучам в камеру, слово расходится от центра,
+         не теряя линий букв. После контактов «@» пересобирается в имя прямо
+         на месте — круг замкнулся, мы снова в начале (Илья, 2026-10-20). */
+      {
+        shape: { kind: "text", text: site.alias },
+        room: "burst",
+        grip: "spray",
+        dim: 0.6,
+        leave: "streak",
+        reform: true,
+      },
       /* Проекты — сферы-сетки одного вида, на каждой проступает кадр
          проекта: сразу видно, что это работы и что по ним можно нажать.
          Зажал и повёл — сфера вертится в любую сторону; нажал — она
          раскрывается, как раскладная игрушка, и ты внутри (Илья,
          2026-10-16 и 18). Оболочку внутри притушиваем слабо: ты должен
          видеть, что стоишь внутри сферы. */
-      ...(JSON.parse(media) as StationSpec["media"][]).map(
-        (m): StationSpec => ({
+      /* Первая сфера стягивается извне — материя имени пролетает сквозь
+         камеру, а навстречу ей собирается шар; последняя уходит к контактам
+         разлётом: раскручивается, и точки срываются во все стороны. Между
+         двумя сферами — пересборка на месте. */
+      ...(JSON.parse(spheres) as { media: StationSpec["media"]; tint: string }[]).map(
+        ({ media, tint }, i, all): StationSpec => ({
+          ...(i === 0 ? { arrive: "implode" as const } : {}),
+          ...(i === all.length - 1 ? { leave: "scatter" as const } : {}),
           shape: { kind: "sphere", r: 0.2 },
           room: { kind: "sphere", r: 1.5, cz: 0.55 },
           grip: "spin",
           dim: 0.05,
-          media: m,
+          media,
           light: LIGHT.projects,
+          // В комнате фон уходит в цвет проекта (Илья, 2026-10-19).
+          roomLight: { color: tint, amount: 0.24, dir: [0.2, -1] },
         })
       ),
-      { shape: { kind: "text", text: "@" }, light: LIGHT.contacts },
+      /* «@» приходит стяжкой из-за краёв экрана, уходит пересборкой в имя;
+         зажатая рука распыляет и крутит его, как имя (Илья, 2026-10-20). */
+      { shape: { kind: "text", text: "@" }, grip: "spray", light: LIGHT.contacts, arrive: "implode", reform: true },
     ],
-    [site.alias, media]
+    [site.alias, spheres]
   );
 
-  /* Ориентиры на переходах: перед первым проектом — ворота раздела, на
-     остальных — арки. Между двумя проектами ориентира нет: там сфера не
-     улетает, а пересобирается на месте. */
+  /* Ориентир на переходах один — ворота раздела перед первым проектом.
+     Арки на остальных переходах убраны: вокруг уходящей сферы они читались
+     рваным ореолом (Илья, 2026-10-20). */
   const count = projects.length;
   const landmarks = useMemo<Landmark[]>(() => {
     const kinds: Stop["kind"][] = ["name", ...Array<Stop["kind"]>(count).fill("project"), "contacts"];
     return kinds.flatMap((s, k): Landmark[] => {
       const next = kinds[(k + 1) % kinds.length];
-      if (s === "project" && next === "project") return [];
-      const gate = next === "project" && s !== "project";
-      return [{ at: k + 0.5, kind: gate ? "gate" : "arcs" }];
+      return next === "project" && s !== "project" ? [{ at: k + 0.5, kind: "gate" }] : [];
     });
   }, [count]);
   const GATE = landmarks.findIndex((m) => m.kind === "gate");
@@ -187,8 +183,35 @@ export function Home({
   const waveFlat = useRef(true);
   const waveAt = useRef(0);
   const apiRef = useRef<SceneApi | null>(null);
-  // Монитор с обложкой проекта листает кадры только под рукой.
-  const [monitor, setMonitor] = useState(false);
+
+  /* Комната проекта пишет каждый кадр в style сама (`bind`): кадр
+     наклоняется за рукой. */
+  const roomUpdaters = useRef<(RoomUpdate | null)[]>([]);
+  const binders = useMemo(
+    () =>
+      Array.from({ length: N }, (_, k) => (fn: RoomUpdate | null) => {
+        roomUpdaters.current[k] = fn;
+      }),
+    [N]
+  );
+  /** Рука над окном, −1..1 от центра: кадр комнаты наклоняется за ней. */
+  const pointer = useRef({ x: 0, y: 0 });
+  const tilt = useRef({ x: 0, y: 0, at: 0 });
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointer.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, []);
+
+  /* Заставка: сцена сообщает, что первый кадр готов; заставка, уходя,
+     разрешает сборку имени — её должно быть видно. */
+  const [loaded, setLoaded] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const onLoaded = useCallback(() => setLoaded(true), []);
+  const onRevealed = useCallback(() => setRevealed(true), []);
 
   /* Открытая комната. Состояние React — меняется по нажатию, а не каждый
      кадр. Слой комнаты гаснет вслед за материей уже после закрытия, поэтому
@@ -339,6 +362,20 @@ export function Home({
       fade(el, lastRoom.current === k ? ease(clamp01((amount - 0.35) / 0.65)) : 0, room === k);
     }
 
+    /* Комната проекта: наклон кадра за рукой. Сглажен кадронезависимо,
+       иначе кадр дрожит вслед за каждым пикселем мыши. */
+    const lit = lastRoom.current;
+    const update = lit === null ? null : roomUpdaters.current[lit];
+    if (update) {
+      const at = performance.now();
+      const dtt = Math.min(0.05, (at - (tilt.current.at || at)) / 1000);
+      tilt.current.at = at;
+      const kt = 1 - Math.pow(0.04, dtt);
+      tilt.current.x += (pointer.current.x - tilt.current.x) * kt;
+      tilt.current.y += (pointer.current.y - tilt.current.y) * kt;
+      update(tilt.current.x, tilt.current.y);
+    }
+
     /* Подпись ворот раздела — над их верхней дугой, пока ворота в кадре. */
     const gate = GATE >= 0 ? marks[GATE] : undefined;
     if (gateRef.current) {
@@ -408,11 +445,13 @@ export function Home({
 
   /** Выход из комнаты: кнопка вверху справа и подсказка внизу по центру —
       путь назад прокруткой вверх, как у igloo. Кнопку одну Илья не нашёл. */
-  const closeButton = (k: number) => (
+  const closeButton = (k: number, hint: boolean) => (
     <>
-      <span className="instrument pointer-events-none absolute bottom-[var(--gutter)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[var(--sand-dim)]">
-        <Flip text={t.scrollBack} />
-      </span>
+      {hint ? (
+        <span className="instrument pointer-events-none absolute bottom-[var(--gutter)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[var(--sand-dim)]">
+          <Flip text={t.scrollBack} />
+        </span>
+      ) : null}
       <button
         ref={(el) => {
           closeRefs.current[k] = el;
@@ -464,8 +503,9 @@ export function Home({
 
   /** Комната — один экран поверх притушенной сцены. Если окно ниже,
       содержимое прокручивается целиком, без видимой полосы: в комнате
-      колесо отдано ему. */
-  const roomShell = (k: number, label: string, children: React.ReactNode, accent?: string) => (
+      колесо отдано ему. Комната проекта (`fixed`) не прокручивается: она
+      ровно в экран, и подсказка выхода у неё своя, сверху. */
+  const roomShell = (k: number, label: string, children: React.ReactNode, accent?: string, fixed = false) => (
     <div
       key={`room-${k}`}
       ref={roomRef(k)}
@@ -478,13 +518,17 @@ export function Home({
     >
       {/* Ровная синева под текстом: материя вокруг видна, но не спорит с буквами. */}
       <div className="room-veil absolute inset-0" aria-hidden />
-      {closeButton(k)}
-      <div
-        data-room-scroll
-        className="no-scrollbar pointer-events-auto absolute inset-0 overflow-y-auto overscroll-contain px-[var(--gutter)] pb-[calc(var(--gutter)+40px)] pt-[calc(var(--gutter)+150px)]"
-      >
-        {children}
-      </div>
+      {closeButton(k, !fixed)}
+      {fixed ? (
+        children
+      ) : (
+        <div
+          data-room-scroll
+          className="no-scrollbar pointer-events-auto absolute inset-0 overflow-y-auto overscroll-contain px-[var(--gutter)] pb-[calc(var(--gutter)+40px)] pt-[calc(var(--gutter)+150px)]"
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 
@@ -500,6 +544,8 @@ export function Home({
         onReady={onReady}
         onPick={openRoom}
         onExit={closeRoom}
+        onLoaded={onLoaded}
+        start={revealed}
       />
 
       {/* Заголовок для поиска и скринридеров: частицы их не заменяют. */}
@@ -571,7 +617,7 @@ export function Home({
             ref={layerRef(k)}
             data-faded={k === 0 ? undefined : true}
             inert={room !== null}
-            data-accent={s.kind === "project" ? s.project.accent : undefined}
+            data-accent={s.kind === "project" ? accentOf(s.project) : undefined}
             onFocus={() => follow(k)}
             className={`pointer-events-none absolute inset-0 ${k === 0 ? "" : "opacity-0"}`}
           >
@@ -649,22 +695,14 @@ export function Home({
         return roomShell(
           k,
           p.title,
-          <ProjectBody
+          <ProjectRoom
             project={p}
             lang={lang}
-            room
-            hero={
-              p.video || p.shots.length ? (
-                <div onPointerEnter={() => setMonitor(true)} onPointerLeave={() => setMonitor(false)}>
-                  <Cover video={p.video} shots={p.shots} alt={`${p.title}: ${t.screens}`} active={monitor && room === k} />
-                  <span className="instrument mt-2 block text-[var(--sand-dim)]">
-                    <Flip text={t.screensHint} />
-                  </span>
-                </div>
-              ) : null
-            }
+            open={room === k}
+            bind={binders[k]}
           />,
-          p.accent
+          accentOf(p),
+          true
         );
       })}
 
@@ -777,6 +815,8 @@ export function Home({
           </span>
         </nav>
       </div>
+
+      <Loader title={site.alias} ready={loaded} onDone={onRevealed} />
     </main>
   );
 }

@@ -50,7 +50,8 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 
 await page.goto(url, { waitUntil: "networkidle" });
-await page.waitForTimeout(2500);
+// Заставка (около трёх секунд) и сбор облака.
+await page.waitForTimeout(5000);
 
 await page.evaluate(() => {
   const canvas = document.querySelector("canvas");
@@ -119,8 +120,8 @@ await page.waitForTimeout(4200);
 
 /* 7. Маршрут — полный круг: имя → кольца → проект → «@» → снова имя.
 
-   Одна точка — ровно 900 пикселей колеса (`pxPerStop` в journey.ts), то есть
-   десять щелчков по 90. Прежние щелчки по 80 с перелётом оставляли камеру
+   Один жест колеса довозит не дальше соседней точки (journey.ts): десять
+   щелчков по 90 — больше полпути, доводка довезёт. Прежние щелчки по 80 с перелётом оставляли камеру
    между объектами, а на кольце это видно сразу. */
 const nextStop = async () => {
   await page.mouse.move(W * 0.5, H * 0.5);

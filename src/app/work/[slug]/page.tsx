@@ -23,7 +23,7 @@ export async function generateMetadata({
   const project = find((await params).slug);
   const site = getSite();
   if (!project) return { title: site.alias };
-  const description = project.summary ?? project.lead.slice(0, 160);
+  const description = project.summary ?? project.task?.slice(0, 160);
   const url = `/work/${project.slug}/`;
   /* Канонический адрес и превью задаём здесь же: из корневого layout сюда
      протекали адрес главной и её картинка, и ссылка на проект в мессенджере
@@ -37,7 +37,7 @@ export async function generateMetadata({
       url,
       title: `${project.title} — ${site.alias}`,
       description,
-      ...(project.shots[0] ? { images: [project.shots[0]] } : {}),
+      ...(project.shots[0] ? { images: [project.shots[0].image] } : {}),
     },
   };
 }

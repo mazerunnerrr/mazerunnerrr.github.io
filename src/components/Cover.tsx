@@ -38,15 +38,27 @@ export function Cover({
   shots,
   alt,
   active,
+  fill = false,
 }: {
   video?: string;
   shots: string[];
   alt: string;
   active: boolean;
+  /** Заполнить рамку целиком: в кадре комнаты пропорции задаёт сам кадр. */
+  fill?: boolean;
 }) {
   const reduced = useReducedMotion();
   const [frame, setFrame] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  /* Кадры декодируются сразу, как обложка появилась в DOM, а не в миг
+     первого показа: в комнате проекта слой проявляется в конце погружения,
+     и декодирование трёх скриншотов в этот миг останавливало картинку
+     на пятую долю секунды — погружение читалось оборванным. */
+  useEffect(() => {
+    boxRef.current?.querySelectorAll("img").forEach((img) => void img.decode().catch(() => {}));
+  }, [shots]);
 
   useEffect(() => {
     if (!active || reduced || shots.length < 2) return;
@@ -64,7 +76,7 @@ export function Cover({
   if (!video && !shots.length) return null;
 
   return (
-    <div className="relative aspect-[3/2] w-full overflow-hidden bg-[var(--color-surface)]">
+    <div ref={boxRef} className={`${fill ? "absolute inset-0" : "relative aspect-[3/2] w-full"} overflow-hidden bg-[var(--color-surface)]`}>
       {video ? (
         <video
           ref={videoRef}

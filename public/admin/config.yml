@@ -65,50 +65,80 @@ collections:
         i18n: duplicate
         hint: "Выбирается по-русски, на английской версии сайта переводится сам"
         options: ["в работе", "личный проект", "разбор и архитектура", "запущен"]
+      # Комната проекта в мире — один экран: видео или скриншоты, под ними суть,
+      # цифры и ссылки. Остальные поля — полный кейс на странице проекта, в том
+      # порядке, в каком они идут здесь. Пустое поле — раздела нет.
       - name: summary
-        label: Суть одной строкой
-        widget: string
+        label: Суть
+        widget: text
         i18n: true
         required: false
-        hint: "Показывается на плитке под названием"
-      - name: lead
-        label: Задача и решение
+        hint: "Комната и страница проекта: 2–3 строки, до ~30 слов — что это и зачем"
+      - name: task
+        label: Задача
         widget: text
         i18n: true
         required: [ru]
-        hint: "Абзац: что за задача и почему решена так"
+        hint: "Страница проекта, раздел «Задача»: что болело и почему понадобилось решение"
+      - name: solution
+        label: Решение
+        widget: text
+        i18n: true
+        required: false
+        hint: "Страница проекта, раздел «Решение»: как решил и почему именно так"
+      - name: result
+        label: Итог
+        widget: text
+        i18n: true
+        required: false
+        hint: "Страница проекта, раздел «Итог»: что изменилось после запуска"
+      - name: facts
+        label: Цифры
+        widget: list
+        i18n: true
+        required: false
+        hint: "Комната и страница проекта: 2–3 числа с подписью, например «848 МБ» + «памяти на сервере»"
+        fields:
+          - { name: value, label: Число, widget: string, i18n: true }
+          - { name: label, label: Подпись, widget: string, i18n: true }
+      - name: scheme
+        label: Схема устройства
+        widget: image
+        i18n: duplicate
+        required: false
+        hint: "Страница проекта, раздел «Как устроено»: схема картинкой, лучше 1600×1000"
       - name: did
         label: Что сделал
         widget: list
         i18n: true
         required: [ru]
         hint: "3–6 пунктов строго о сделанном. Без «участвовал» и «помогал»"
+        summary: "{{fields.title}}"
+        fields:
+          - { name: title, label: Коротко, widget: string, i18n: true, hint: "До ~8 слов — начало пункта, выделено" }
+          - { name: detail, label: Подробно, widget: text, i18n: true, required: false, hint: "Продолжение пункта на странице проекта" }
       - name: stack
         label: Технологии
         widget: list
         i18n: true
         required: [ru]
         hint: "По одной на строку: Python, FastAPI, SQLite"
-      - name: facts
-        label: Цифры
-        widget: list
-        i18n: true
-        required: false
-        fields:
-          - { name: value, label: Число, widget: string, i18n: true }
-          - { name: label, label: Подпись, widget: string, i18n: true }
       - name: video
         label: Видео на обложку
         widget: file
         i18n: duplicate
         required: false
-        hint: "Есть видео — оно идёт обложкой вместо скриншотов"
+        hint: "Есть видео — оно играет в комнате вместо скриншотов"
       - name: shots
         label: Скриншоты
         widget: list
-        i18n: duplicate
+        i18n: true
         required: false
-        field: { name: image, label: Экран, widget: image }
+        hint: "Листаются в комнате, если нет видео; на странице проекта — с подписями. 1600×1000"
+        summary: "{{fields.caption}}"
+        fields:
+          - { name: image, label: Экран, widget: image, i18n: duplicate }
+          - { name: caption, label: Подпись, widget: string, i18n: true, required: false, hint: "Что на экране и зачем" }
       - name: links
         label: Ссылки
         widget: list
@@ -118,7 +148,7 @@ collections:
           - { name: label, label: Подпись, widget: string, i18n: true }
           - { name: url, label: Адрес, widget: string, i18n: duplicate }
       - name: accent
-        label: Акцентный цвет
+        label: Цвет комнаты
         widget: select
         i18n: duplicate
         required: false
@@ -127,7 +157,7 @@ collections:
           - { label: "Терракота", value: clay }
           - { label: "Пыльно-голубой", value: azure }
           - { label: "Шалфей", value: sage }
-        hint: "Пусто — будет пыльно-голубой"
+        hint: "Им тонируется комната проекта. Пусто — цвет статуса"
 
   - name: settings
     label: Тексты сайта

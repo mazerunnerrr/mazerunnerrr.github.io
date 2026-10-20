@@ -32,6 +32,15 @@ export type Accent = "amber" | "clay" | "azure" | "sage";
 
 export type Link = { label: string; url: string };
 
+/** Скриншот с подписью: что на экране и зачем. Подпись видна под кадром
+    и в комнате, и на странице проекта. */
+export type Shot = { image: string; caption?: string };
+
+/** Пункт «что сделал»: коротко — строка в комнате, подробно — продолжение
+    на странице проекта. Комната — несколько строк у кадра, длинный пункт
+    там не помещается (Илья, 2026-10-19). */
+export type Done = { title: string; detail?: string };
+
 export type Site = {
   /** Слово, которое собирается из частиц, и заголовок вкладки. */
   alias: string;
@@ -73,16 +82,21 @@ export type Project = {
   status: ProjectStatus;
   /** Суть одной строкой — для плитки на маршруте. */
   summary?: string;
-  /** Абзац: что за задача и почему она так решена. */
-  lead: string;
+  /* Кейс главами: задача → решение → итог. Каждая — глава комнаты проекта,
+     пустая пропускается (Илья, 2026-10-19). */
+  task?: string;
+  solution?: string;
+  result?: string;
   /** 3–6 пунктов строго о сделанном. Без «участвовал» и «помогал». */
-  did: string[];
+  did: Done[];
   stack: string[];
   /** Цифры вида «90» + «коммитов». */
   facts: { value: string; label: string }[];
+  /** Схема устройства картинкой — кадр главы «как устроено». */
+  scheme?: string;
   /** Видео на обложку, путь от корня сайта. Нет видео — обложка из скриншотов. */
   video?: string;
-  shots: string[];
+  shots: Shot[];
   links: Link[];
   accent?: Accent;
 };
@@ -100,12 +114,16 @@ const read = <T>(file: string): T => {
 const opt = (v?: string) => (v?.trim() ? v : undefined);
 
 /** Английское поверх русского: пустая строка или пустой список в переводе
-    не затирают оригинал. Списки сводятся по порядку, пункт к пункту. */
+    не затирают оригинал. Списки сводятся по порядку, пункт к пункту; пункт,
+    которого в переводе нет, остаётся русским, а не пропадает — иначе один
+    подписанный по-английски скриншот съедал остальные. */
 const fill = (ru: unknown, en: unknown): unknown => {
   if (typeof ru === "string") return typeof en === "string" && en.trim() ? en : ru;
   if (Array.isArray(ru)) {
     if (!Array.isArray(en) || en.length === 0) return ru;
-    return en.map((x, i) => (i < ru.length ? fill(ru[i], x) : x));
+    return Array.from({ length: Math.max(ru.length, en.length) }, (_, i) =>
+      i >= en.length ? ru[i] : i < ru.length ? fill(ru[i], en[i]) : en[i]
+    );
   }
   if (ru && typeof ru === "object") {
     const out: Record<string, unknown> = { ...ru };
@@ -153,17 +171,26 @@ export const getProjects = (lang: Lang = "en"): Project[] =>
   readdirSync(join(ROOT, "projects"))
     .filter((name) => name.endsWith(".json"))
     .map((name) => {
-      const p = readIn<Omit<Project, "slug"> & { accent?: string }>(`projects/${name}`, lang);
+      const p = readIn<
+        Omit<Project, "slug" | "did" | "shots"> & { accent?: string; did?: (Done | string)[]; shots?: (Shot | string)[] }
+      >(`projects/${name}`, lang);
       const project: Project = {
         ...p,
         slug: name.slice(0, -".json".length),
         summary: opt(p.summary),
+        task: opt(p.task),
+        solution: opt(p.solution),
+        result: opt(p.result),
+        scheme: opt(p.scheme),
         video: opt(p.video),
         accent: opt(p.accent) as Accent | undefined,
-        did: p.did ?? [],
+        // Строка вместо объекта — запись старого вида: читаем её как пункт без подробностей.
+        did: (p.did ?? []).map((d) => (typeof d === "string" ? { title: d } : { ...d, detail: opt(d.detail) })),
         stack: p.stack ?? [],
         facts: p.facts ?? [],
-        shots: p.shots ?? [],
+        shots: (p.shots ?? [])
+          .map((x) => (typeof x === "string" ? { image: x } : { ...x, caption: opt(x.caption) }))
+          .filter((x) => x.image),
         links: p.links ?? [],
       };
       return { project, ru: readIn<Omit<Project, "slug">>(`projects/${name}`, "ru") };

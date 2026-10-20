@@ -4,15 +4,24 @@
   "role": "ПЛЕЙСХОЛДЕР",
   "status": "в работе",
   "summary": "Пример проекта — чтобы видеть переход между сферами. Удалить в админке, когда появится настоящий второй проект",
-  "lead": "ПЛЕЙСХОЛДЕР — абзац о задаче и о том, почему она решена именно так.",
+  "task": "ПЛЕЙСХОЛДЕР — абзац о задаче и о том, почему она решена именно так.",
+  "solution": "",
+  "result": "",
   "did": [
-    "ПЛЕЙСХОЛДЕР — что сделано"
+    {
+      "title": "ПЛЕЙСХОЛДЕР",
+      "detail": "что сделано"
+    }
   ],
   "stack": [],
   "facts": [],
+  "scheme": "",
   "video": "",
   "shots": [
-    "/media/placeholder-primer.jpg"
+    {
+      "image": "/media/placeholder-primer.jpg",
+      "caption": ""
+    }
   ],
   "links": [],
   "accent": "",
@@ -20,9 +29,14 @@
     "title": "PLACEHOLDER",
     "role": "PLACEHOLDER",
     "summary": "Sample project to show the transition between spheres. Delete it in the admin panel once a real second project exists",
-    "lead": "PLACEHOLDER: a paragraph about the task and why it was solved this way.",
+    "task": "PLACEHOLDER: a paragraph about the task and why it was solved this way.",
+    "solution": "",
+    "result": "",
     "did": [
-      "PLACEHOLDER: what was done"
+      {
+        "title": "PLACEHOLDER",
+        "detail": "what was done"
+      }
     ]
   }
 }

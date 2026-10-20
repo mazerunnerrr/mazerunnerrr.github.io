@@ -53,6 +53,10 @@ export function generateMetadata(): Metadata {
       description,
     },
     twitter: { card: "summary_large_image", title: site.alias, description },
+    /* Сайт и так тёмный. Dark Reader, не видя этой метки, дописывал свои
+       атрибуты к линиям волны звука до гидратации, и React ругался на
+       несовпадение разметки (Илья, 2026-10-20). Метку он соблюдает сам. */
+    other: { "darkreader-lock": "true" },
   };
 }
 
