@@ -163,25 +163,24 @@ body {
 .room-tint {
   background: radial-gradient(ellipse 60% 55% at 52% 45%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 72%);
 }
-/* Кадр на стенке сферы: срезанные углы и волосяной контур поверх картинки. */
+/* Экран комнаты проекта при WebGL рисует сцена, с каплей под рукой
+   (roomSurface.ts): вёрстка остаётся для раскладки и замеров, но не видна.
+   Её синева и свечение — тоже в сцене, под кадром: поверх канваса они
+   тонировали бы и сам кадр. */
+:root[data-gl] .room-gl-media {
+  visibility: hidden;
+}
+:root[data-gl] [data-accent] > .room-veil,
+:root[data-gl] .room-tint {
+  display: none;
+}
+/* Кадр на стенке сферы — просто картинка, без рамки: срезанные углы
+   и контур Илья снял 2026-10-21 («нахрена они нужны»). */
 .room-frame {
-  clip-path: polygon(22px 0, calc(100% - 22px) 0, 100% 22px, 100% calc(100% - 22px), calc(100% - 22px) 100%, 22px 100%, 0 calc(100% - 22px), 0 22px);
+  border-radius: 18px;
+  overflow: hidden;
   background: color-mix(in srgb, var(--color-surface) 85%, var(--accent));
   will-change: transform, opacity;
-}
-.room-frame::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
-}
-.room-text {
-  max-width: 46ch;
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 1.65;
-  color: var(--color-sand);
 }
 
 /* Заставка (Loader.tsx): точки кольца загораются по кругу; уходя, кольцо

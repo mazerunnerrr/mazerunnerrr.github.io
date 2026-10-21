@@ -35,12 +35,14 @@ export const useReducedMotion = () =>
  */
 export function Cover({
   video,
+  poster,
   shots,
   alt,
   active,
   fill = false,
 }: {
   video?: string;
+  poster?: string;
   shots: string[];
   alt: string;
   active: boolean;
@@ -69,7 +71,8 @@ export function Cover({
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    if (active && !reduced) void el.play().catch(() => {});
+    // Кадр комнаты рисует сцена (data-gl) — своё видео не нужно, не тратим декодер.
+    if (active && !reduced && !document.documentElement.hasAttribute("data-gl")) void el.play().catch(() => {});
     else el.pause();
   }, [active, reduced]);
 
@@ -81,6 +84,7 @@ export function Cover({
         <video
           ref={videoRef}
           src={video}
+          poster={poster}
           muted
           loop
           playsInline
@@ -102,8 +106,6 @@ export function Cover({
           />
         ))
       )}
-      {/* Волосяная рамка вместо тени: тени в этом дизайне не используются. */}
-      <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_1px_var(--line)]" />
     </div>
   );
 }

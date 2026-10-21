@@ -129,6 +129,12 @@ collections:
         i18n: duplicate
         required: false
         hint: "Есть видео — оно играет в комнате вместо скриншотов"
+      - name: poster
+        label: Кадр до видео
+        widget: image
+        i18n: duplicate
+        required: false
+        hint: "Стоит на месте видео, пока оно грузится. Тот же размер, что у видео"
       - name: shots
         label: Скриншоты
         widget: list

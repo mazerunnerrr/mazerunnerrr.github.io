@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { buildShape, burstShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
 import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG, REFORM_END } from "@/lib/shaders";
 import { Journey } from "@/lib/journey";
+import { RoomSurfaces, sphereGlow, type RoomLayout } from "@/lib/roomSurface";
 import { Water } from "@/lib/fluid";
 import {
   Environment,
@@ -114,6 +115,8 @@ const inOutExpo = (t: number, s = 5) => {
 /** Собственное вращение сферы, радиан в секунду: оборот за три минуты.
     Втрое быстрее мешало глазам (Илья, 2026-10-18). */
 const SPHERE_SPIN = 0.035;
+/** Яркость кадра, светящегося внутри сферы (сам свет сжат в GLOW_FRAG). */
+const GLOW = 1;
 /** Инерция брошенной рукой сферы: вязкое трение, 1/с, и сухое, рад/с². */
 const SPIN_DRAG = 0.5;
 const SPIN_DRY = 0.4;
@@ -155,6 +158,10 @@ export type SceneApi = {
   jumpTo: (stop: number) => void;
   /** Войти в комнату точки или выйти из неё (null). */
   setRoom: (stop: number | null) => void;
+  /** Вёрстка комнаты проекта измерилась: где кадр и название — их рисует сцена. */
+  roomLayout: (stop: number, layout: RoomLayout | null) => void;
+  /** Каждый кадр из onFrame: чья комната видна, насколько проявилась и где рука (−1..1). */
+  roomView: (stop: number | null, alpha: number, tiltX: number, tiltY: number) => void;
 };
 
 type Props = {
@@ -240,6 +247,8 @@ type Body = {
   stir: Float32Array;
   /** Куда и насколько далеко уходит точка при распылении рукой. */
   spray: Float32Array;
+  /** Кадр проекта, светящийся внутри сферы; у надписей нет. */
+  glow: ReturnType<typeof sphereGlow> | null;
   /** Распылили в комнате: облако идёт домой дольше и экспонентой (`ROOM_SLOW`). */
   calm: boolean;
   dispAttr: THREE.BufferAttribute;
@@ -303,15 +312,32 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       if (k !== null && !stations[k]?.room) return;
       room = k;
       if (k !== null) litRoom = k;
-      journey.lock(k !== null);
+      // Комнату проекта — в один экран — закрывает прокрутка в любую сторону.
+      journey.lock(k !== null, k !== null && stations[k]?.room !== "burst");
       if (k !== null) journey.goTo(k);
     };
+    /** Комната проекта в сцене (roomSurface.ts) — есть, только когда есть WebGL. */
+    let surfaces: RoomSurfaces | null = null;
+    /** Что о комнате сказала вёрстка в этом кадре. */
+    const view = { k: null as number | null, alpha: 0, tx: 0, ty: 0 };
     // Якоря вида href="#projects" при перехваченном скролле не работают:
     // прокручивать нечего. Кнопки должны двигать камеру.
     onReady?.({
       goTo: (stop: number) => journey.goTo(stop),
       jumpTo: (stop: number) => journey.jumpTo(stop),
       setRoom,
+      roomLayout: (stop, layout) => {
+        // Без WebGL рисовать нечего — и `dirty` в этом режиме не заведён.
+        if (!surfaces) return;
+        surfaces.layout(stop, layout);
+        dirty = true;
+      },
+      roomView: (stop, alpha, tiltX, tiltY) => {
+        view.k = stop;
+        view.alpha = alpha;
+        view.tx = tiltX;
+        view.ty = tiltY;
+      },
     });
 
     /** Положение объектов для вёрстки. Заводится однажды и переписывается
@@ -435,6 +461,15 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     field.frustumCulled = false;
     field.renderOrder = -1;
     scene.add(field);
+    surfaces = new RoomSurfaces(scene, waterU);
+    // Вёрстка комнаты прячет то, что теперь рисует сцена (globals.css).
+    document.documentElement.setAttribute("data-gl", "");
+    /** Комната проекта — перед самой отрисовкой, когда вёрстка уже сказала своё. */
+    const drawRoom = () => {
+      const k = view.k;
+      const b = k === null ? null : bodies[k];
+      surfaces?.update(k, view.alpha, view.tx, view.ty, b?.solid ? b.u : null, w, h);
+    };
 
     /* ── частицы ───────────────────────────────────────────────── */
 
@@ -694,6 +729,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       scene.add(points);
       const body: Body = {
         points, geo, mat, u, a, b, n, vel, disp, give, sprayed, back, trip, pace, stir, spray, dispAttr, velAttr,
+        glow: solid && spec.media ? sphereGlow(scene, u) : null,
         calm: false, morph: 0, restless: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
       };
       if (spec.media) loadMedia(body, spec.media);
@@ -781,6 +817,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         scene.remove(b.points);
         b.geo.dispose();
         b.mat.dispose();
+        if (b.glow) {
+          scene.remove(b.glow.mesh);
+          b.glow.mesh.geometry.dispose();
+          (b.glow.mesh.material as THREE.Material).dispose();
+        }
         for (const t of b.shots) t?.dispose();
         if (b.video) {
           b.video.pause();
@@ -876,6 +917,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       fieldUniforms.uRes.value.set(w, h);
       shared.uRes.value.set(w, h);
       fieldUniforms.uOct.value = w < 640 ? 3 : 5;
+      surfaces?.resize(w, h, dpr);
       syncRect();
       dirty = true;
       env.build(w, h, baseZ);
@@ -1210,6 +1252,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       if ((raw.x || raw.y) && Math.hypot(raw.x, raw.y) < TELEPORT && hover > 0.01)
         water.splat(rawMouse.x - raw.x, rawMouse.y - raw.y, rawMouse.x, rawMouse.y, h * WATER_R);
       if (water.stirred) {
+        // Быстрая вода — только в комнате проекта, по её экрану; «обо мне» не трогаем.
+        water.quick(view.k !== null && stations[view.k]?.room !== "burst" ? view.alpha : 0);
         water.step(dt * 60);
         water.fill(waterData);
         waterU.uWaterTex.value.needsUpdate = true;
@@ -1547,6 +1591,23 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         b.u.uSwap.value = swap && b.morph < 0.001 ? Math.max(-1, Math.min(1, d)) : 0;
         b.u.uVis.value = vis;
         b.u.uMorph.value = b.solid ? unfoldAt(b.morph) : burstAt(b.morph);
+        /* Кадр внутри сферы (Илья, 2026-10-21: «сфера должна просвечивать,
+           что в ней»): горит, пока сфера стоит собранной, — гаснет на подлёте
+           и уходе, как кадр на её точках, при раскрытии в комнату и при
+           пересборке в соседнюю, уступая её кадру. */
+        if (b.glow) {
+          const g = b.glow;
+          const fly = Math.min(1, Math.abs(pass) / 0.35);
+          const amt =
+            GLOW * b.u.uTexAmt.value * vis * (1 - unfoldAt(b.morph)) * (1 - fly * fly * (3 - 2 * fly)) *
+            (swap ? 1 - Math.min(1, Math.abs(d)) : 1);
+          g.mesh.visible = amt > 0.002 && b.points.visible;
+          g.u.uAmt.value = amt;
+          g.mesh.position.set(0, 0, b.a.cz ?? 0);
+          g.mesh.scale.set(2 * b.a.halfW, 2 * b.a.halfW, 1);
+          const ta = b.u.uTexAspect.value;
+          g.u.uScale.value.set(ta > 1 ? 1 / ta : 1, ta > 1 ? 1 : ta);
+        }
         b.u.uDim.value = (stations[k].dim ?? 0) * b.morph;
         stepShots(b, t);
         // Видео на сфере крутится, только пока она рядом: дальние стоят.
@@ -1629,6 +1690,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         marks: env.marksOnScreen,
         hand: handNow,
       });
+      drawRoom();
 
       fieldUniforms.uTime.value = t;
       fieldUniforms.uEnter.value = eased;
@@ -1684,6 +1746,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           marks: env.marksOnScreen,
           hand: 0,
         });
+        drawRoom();
         renderer.render(scene, camera);
         loaded();
       };
@@ -1707,6 +1770,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       window.removeEventListener("pointercancel", onUp);
       dropBodies();
       env.dispose();
+      surfaces?.dispose();
+      document.documentElement.removeAttribute("data-gl");
       renderer.dispose();
       if (renderer.domElement.parentNode === host) host.removeChild(renderer.domElement);
     };

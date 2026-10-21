@@ -31,6 +31,8 @@ export class Fluid {
   v: Float32Array;
   /** Самая быстрая клетка после шага — по ней видно, живо ли поле. */
   peak = 0;
+  /** Затухание скорости за кадр: в комнате вода быстрее (Water.quick). */
+  velKeep = VEL_KEEP;
   private u2: Float32Array;
   private v2: Float32Array;
   private p: Float32Array;
@@ -132,7 +134,7 @@ export class Fluid {
     }
     if (src !== p) p.set(src);
 
-    const keep = Math.pow(VEL_KEEP, k);
+    const keep = Math.pow(this.velKeep, k);
     let peak = 0;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
@@ -193,6 +195,8 @@ export class Water extends Fluid {
   silt: Float32Array;
   dx: Float32Array;
   dy: Float32Array;
+  private driftKeep = DRIFT_KEEP;
+  private driftGain = DRIFT_GAIN;
   /** Осталось ли что-то от руки: течение, муть или сдвиг. */
   stirred = false;
   private t1: Float32Array;
@@ -220,7 +224,7 @@ export class Water extends Fluid {
     super.step(k);
     const { nx, ny, cell, u, v } = this;
     const sk = Math.pow(SILT_KEEP, k);
-    const dk = Math.pow(DRIFT_KEEP, k);
+    const dk = Math.pow(this.driftKeep, k);
     let rest = 0;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
@@ -228,8 +232,8 @@ export class Water extends Fluid {
         const sx = i - (u[c] * k) / cell;
         const sy = j - (v[c] * k) / cell;
         const m = this.at(this.silt, sx, sy) * sk;
-        const a = (this.at(this.dx, sx, sy) + u[c] * k * DRIFT_GAIN) * dk;
-        const b = (this.at(this.dy, sx, sy) + v[c] * k * DRIFT_GAIN) * dk;
+        const a = (this.at(this.dx, sx, sy) + u[c] * k * this.driftGain) * dk;
+        const b = (this.at(this.dy, sx, sy) + v[c] * k * this.driftGain) * dk;
         this.t1[c] = m;
         this.t2[c] = a;
         this.t3[c] = b;
@@ -240,6 +244,19 @@ export class Water extends Fluid {
     [this.dx, this.t2] = [this.t2, this.dx];
     [this.dy, this.t3] = [this.t3, this.dy];
     this.stirred = rest > 0.05 || this.peak > 0.02;
+  }
+
+  /**
+   * Быстрая вода — в комнате проекта, `q` от 0 (аллея) до 1 (комната открыта).
+   * По экрану она расходится и стекается за ~0,3 с, а не за две (Илья,
+   * 2026-10-21: «медленно растекается, медленно стекается — быстрее
+   * и плавнее»). Набирается сдвиг сильнее, чтобы след был так же заметен.
+   * На аллее вода прежняя, тягучая.
+   */
+  quick(q: number) {
+    this.velKeep = VEL_KEEP + (0.955 - VEL_KEEP) * q;
+    this.driftKeep = DRIFT_KEEP + (0.95 - DRIFT_KEEP) * q;
+    this.driftGain = DRIFT_GAIN + (0.3 - DRIFT_GAIN) * q;
   }
 
   /** В текстуру для шейдеров: сдвиг воды (px), муть, скорость течения. */

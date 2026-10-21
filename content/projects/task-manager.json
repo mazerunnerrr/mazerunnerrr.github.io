@@ -1,136 +1,169 @@
 {
   "title": "Task Manager",
   "year": "2026",
-  "role": "Соло-разработчик",
+  "role": "Соло-разработчик: продукт, бэкенд, веб, Android и сервер",
   "status": "запущен",
-  "summary": "Личный task-time-manager",
-  "task": "Ни один из готовых менеджеров задач не подошёл, и вместо очередной попытки привыкнуть я написал свой — тот, которым буду пользоваться каждый день.",
-  "solution": "Один бэкенд отдаёт две разные поверхности: десктоп-канбан для работы за компьютером и мобильное приложение, отвечающее на один вопрос — что просрочено и что сегодня. Задачи уезжают в Google Calendar, так что день виден там же, где встречи. Сознательно без ORM и без сборки на фронте, чтобы через полгода можно было открыть и починить.",
-  "result": "",
+  "summary": "Таск-менеджер, которым я пользуюсь каждый день: канбан на компьютере, приложение на телефоне, Android-виджет и будильники на весь экран. Учебный материал он сам раскладывает на повторения по кривой забывания.",
+  "task": "Задачи жили в системных напоминаниях Samsung, и открыть их можно было только с телефона. На ноутбуке их не было вовсе. Я хотел один список на всех устройствах и при этом не терять то, что в Samsung работало хорошо: громкое напоминание на весь экран, которое звучит даже в беззвучном режиме. Вторая потребность появилась из учёбы. Материал нужно повторять по кривой забывания, это десять дат на каждую тему, и считать их вручную я бы не стал.",
+  "solution": "Один бэкенд на FastAPI и SQLite отдаёт и десктоп, и мобильную версию, а виджет и будильники ходят в тот же API. Фронт написан на чистом JavaScript без сборки: проект поддерживает один человек, и через год его должно быть так же просто чинить. Интерфейс телефона сделан как PWA, поэтому он обновляется с каждой выкаткой сервера. Нативный Android-код я написал только там, где веб не справляется. Web Push не умеет показывать экран поверх блокировки и играть звук будильника, поэтому сервер отдаёт готовое расписание, а телефон сам ставит будильники на неделю вперёд. В минуту напоминания сеть ему не нужна.",
+  "result": "С мая 2026 года это мой основной список дел. Он заменил напоминания Samsung и работает на Mac, в браузере и на Android. Через него прошло 275 задач, 87% из них закрыты. Ещё 150 повторений по 15 учебным темам расписаны автоматически.",
   "did": [
     {
-      "title": "Один FastAPI-бэкенд на два интерфейса",
-      "detail": "канбан с drag-and-drop на десктопе и мобильная PWA со сводкой на телефоне, плюс открытый REST API"
+      "title": "Канбан для компьютера и окно на Mac",
+      "detail": "Доска на три колонки с перетаскиванием, сферами, поиском и подпунктами внутри задачи. На Mac открывается отдельным приложением из Spotlight, на Windows работает в браузере."
     },
     {
-      "title": "Встроил повторение по кривой Эббингауза",
-      "detail": "материал разворачивается в десять задач — от «через час» до «раз в полгода», и расписание само держится в активных часах 08:00–22:30"
+      "title": "Мобильная версия как PWA",
+      "detail": "Вкладки «Сегодня», «Задачи», «Путь» и «Ещё». Свайп закрывает задачу, форма открывается на весь экран, фото ужимаются в браузере перед загрузкой. Ставится на домашний экран, получает Web Push и обновляется вместе с сервером, ничего не нужно скачивать из магазина."
     },
     {
-      "title": "Свёл задачи с Google Calendar",
-      "detail": "раз в час свободные слоты ищутся в рабочем окне, длинная задача дробится на части, повторы переводятся в RRULE, цвет события — по приоритету"
+      "title": "Android-виджет и будильники на весь экран",
+      "detail": "Нативная часть на Java без сторонних библиотек. Виджеты по сферам собираются в стек на домашнем экране. Напоминания трёх уровней по образцу Samsung, от короткого сигнала до длинной мелодии будильника, звучат в беззвучном режиме и умеют отсрочку. Телефон заряжает будильники на неделю вперёд, поэтому без сети напоминания всё равно приходят, а отметки «Готово» ждут связи в очереди."
     },
     {
-      "title": "Собрал нативное приложение для macOS",
-      "detail": "pywebview поверх системного WebKit, запуск через Spotlight, сервер поднимается на случайном свободном порту в том же процессе"
+      "title": "Повторения по кривой Эббингауза",
+      "detail": "Каждая тема получает 10 повторений в активные часы, с 08:00 до 22:30. Если повторил позже плана, остаток серии сдвигается на ту же разницу. Пропущенный шаг переезжает на следующий день. Повторения разных тем не встают на одну минуту. Тему можно поставить на паузу, и расписание продолжится с того места, где остановилось."
     },
     {
-      "title": "Вынес на VPS",
-      "detail": "Ubuntu 24.04 при 848 МБ памяти, Caddy с автоматическим HTTPS, вход по подписанной куке и PBKDF2-хешу пароля"
+      "title": "Сервер, вход и бэкапы",
+      "detail": "VPS с Caddy и systemd, HTTPS. Вход по паролю ставит подписанную куку на год, чтобы телефон не спрашивал пароль каждый день. Сервер каждую ночь снимает копию базы, ноутбук раз в час стягивает её к себе и хранит снимки за 14 дней. Выкатка кода делается одной командой."
     },
     {
-      "title": "Написал Android-виджет на Java без единой зависимости",
-      "detail": "точные будильники, три канала уведомлений, экран поверх блокировки, список переживает офлайн"
+      "title": "Google Calendar и дневник итогов",
+      "detail": "Задачи со сроком уходят в Google Calendar фоновым синком через Claude Cowork. Лента «Путь» хранит итоги дня и недели: приложение собирает сводку закрытых задач, Claude превращает её в связный текст, и он ложится в ленту."
     }
   ],
   "stack": [
     "Python",
     "FastAPI",
+    "Pydantic v2",
     "SQLite",
-    "ванильный JS",
-    "pywebview",
-    "PWA",
-    "Web Push",
-    "Java",
-    "Caddy"
+    "JavaScript (vanilla)",
+    "HTML / CSS",
+    "PWA: Service Worker, Web Push (VAPID)",
+    "Java, Android SDK: AppWidget, AlarmManager",
+    "pywebview (macOS)",
+    "Caddy",
+    "systemd",
+    "Bash, rsync",
+    "Google Calendar",
+    "Claude"
   ],
   "facts": [
     {
-      "value": "2",
-      "label": "интерфейса на одном бэкенде"
+      "value": "275",
+      "label": "задач с мая 2026, 87% закрыты"
     },
     {
-      "value": "10",
-      "label": "повторений по кривой Эббингауза"
+      "value": "4",
+      "label": "клиента на одном API: веб, PWA, Android, Mac"
     },
     {
-      "value": "848 МБ",
-      "label": "памяти на сервере"
+      "value": "150",
+      "label": "повторений по 15 темам расписаны без ручной работы"
     }
   ],
   "scheme": "",
-  "video": "",
+  "video": "/media/task-manager/video.mp4",
+  "poster": "/media/task-manager/poster.webp",
   "shots": [
     {
-      "image": "/media/placeholder-1.jpg",
-      "caption": ""
+      "image": "/media/task-manager/01-desktop-board.webp",
+      "caption": "Канбан на компьютере: колонки по статусу, кружок задачи в цвет сферы"
     },
     {
-      "image": "/media/placeholder-2.jpg",
-      "caption": ""
+      "image": "/media/task-manager/02-mobile-screens.webp",
+      "caption": "Телефон: задачи одной сферы, экран «Сегодня» и лента итогов «Путь»"
     },
     {
-      "image": "/media/placeholder-3.jpg",
-      "caption": ""
+      "image": "/media/task-manager/03-mobile-form.webp",
+      "caption": "Форма задачи с подпунктами и лист итога дня"
+    },
+    {
+      "image": "/media/task-manager/04-android-alarm.webp",
+      "caption": "Напоминания задачи и тот же созвон будильником на весь экран Android"
+    },
+    {
+      "image": "/media/task-manager/05-desktop-learning.webp",
+      "caption": "Повторения: прогресс по каждой теме, важность, напоминания и пауза на весь блок"
+    },
+    {
+      "image": "/media/task-manager/06-desktop-path.webp",
+      "caption": "«Путь» на компьютере: итоги дней и недель одной лентой"
     }
   ],
   "links": [],
-  "accent": "",
+  "accent": "azure",
   "en": {
-    "role": "Solo developer",
-    "summary": "Personal task and time manager",
-    "task": "None of the existing task managers fit, so instead of trying yet again to get used to one, I wrote my own, one I'd use every day.",
-    "solution": "A single backend serves two different surfaces: a desktop kanban for work at the computer and a mobile app that answers one question, what's overdue and what's on for today. Tasks go to Google Calendar, so the day shows up in the same place as meetings. I left out the ORM and the front-end build step on purpose, so I can open it in six months and fix it.",
-    "result": "",
+    "role": "Solo developer: product, backend, web, Android and server",
+    "summary": "A task manager I use daily: desktop kanban, a phone app, an Android widget and full-screen alarms. It also turns study material into a review schedule along the forgetting curve.",
+    "task": "My tasks lived in Samsung's built-in reminders, and I could only reach them from the phone. On the laptop they didn't exist at all. I wanted one list on every device without losing what Samsung did well: a loud full-screen reminder that rings even in silent mode. The second need came from studying. Material has to be reviewed along the forgetting curve, which means ten dates per topic, and I wasn't going to calculate those by hand.",
+    "solution": "One FastAPI and SQLite backend serves both the desktop and the mobile UI, and the widget and alarms talk to the same API. The frontend is plain JavaScript with no build step: one person maintains the project, and it has to stay easy to fix a year from now. The phone UI is a PWA, so it updates with every server deploy. I wrote native Android code only where the web falls short. Web Push can't show a screen over the lock screen or play an alarm sound, so the server publishes a ready schedule and the phone sets its own alarms a week ahead. When a reminder fires, the phone doesn't need the network.",
+    "result": "Since May 2026 it has been my main task list. It replaced Samsung's reminders and runs on the Mac, in the browser and on Android. 275 tasks have gone through it, 87% of them closed. Another 150 reviews across 15 study topics were scheduled automatically.",
     "did": [
       {
-        "title": "One FastAPI backend for two interfaces",
-        "detail": "a drag-and-drop kanban on desktop and a mobile PWA with a daily summary on the phone, plus an open REST API"
+        "title": "Desktop kanban and a native Mac window",
+        "detail": "A three-column board with drag and drop, spheres, search and checklists inside tasks. On a Mac it opens as its own app from Spotlight; on Windows it runs in the browser."
       },
       {
-        "title": "Added spaced repetition on the Ebbinghaus curve",
-        "detail": "material unfolds into ten tasks, from \"in an hour\" to \"every six months\", and the schedule keeps itself within active hours, 08:00–22:30"
+        "title": "Mobile version as a PWA",
+        "detail": "Tabs for Today, Tasks, Path and More. A swipe closes a task, the task form opens full screen, and photos are compressed in the browser before upload. It installs to the home screen, receives Web Push and updates with the server, with nothing to download from an app store."
       },
       {
-        "title": "Synced tasks with Google Calendar",
-        "detail": "every hour the service looks for free slots in the working window, splits long tasks into parts, turns repeats into RRULE and colors events by priority"
+        "title": "Android widget and full-screen alarms",
+        "detail": "Native Java code with no third-party libraries. Per-sphere widgets stack on the home screen. Reminders come in three levels modeled on Samsung's, from a short chime to a long alarm tune; they ring in silent mode and support snooze. The phone arms a week of alarms in advance, so reminders still fire offline, and tasks marked done without a connection wait in a queue."
       },
       {
-        "title": "Built a native macOS app",
-        "detail": "pywebview on top of the system WebKit, launched from Spotlight, with the server starting on a random free port in the same process"
+        "title": "Spaced repetition on the Ebbinghaus curve",
+        "detail": "Each topic gets 10 reviews within active hours, 08:00 to 22:30. A late review shifts the rest of the series by the same amount. A missed step moves to the next day. Reviews of different topics never land on the same minute. A topic can be paused, and its schedule resumes where it stopped."
       },
       {
-        "title": "Deployed to a VPS",
-        "detail": "Ubuntu 24.04 on 848 MB of memory, Caddy with automatic HTTPS, login via a signed cookie and a PBKDF2 password hash"
+        "title": "Server, login and backups",
+        "detail": "A VPS with Caddy and systemd over HTTPS. Logging in sets a signed cookie for a year, so the phone doesn't ask for the password every day. The server snapshots the database nightly; the laptop pulls a copy every hour and keeps 14 days of snapshots. Deploying code takes one command."
       },
       {
-        "title": "Wrote an Android widget in Java without a single dependency",
-        "detail": "exact alarms, three notification channels, a screen that shows over the lock screen, and a list that survives going offline"
+        "title": "Google Calendar sync and a progress journal",
+        "detail": "Tasks with a deadline go to Google Calendar through a background sync in Claude Cowork. The Path feed stores daily and weekly summaries: the app assembles a digest of closed tasks, Claude turns it into prose, and the result goes into the feed."
       }
-    ],
-    "stack": [
-      "Python",
-      "FastAPI",
-      "SQLite",
-      "vanilla JS",
-      "pywebview",
-      "PWA",
-      "Web Push",
-      "Java",
-      "Caddy"
     ],
     "facts": [
       {
-        "value": "2",
-        "label": "interfaces on one backend"
+        "value": "275",
+        "label": "tasks since May 2026, 87% closed"
       },
       {
-        "value": "10",
-        "label": "repetitions on the Ebbinghaus curve"
+        "value": "4",
+        "label": "clients on one API: web, PWA, Android, Mac"
       },
       {
-        "value": "848 MB",
-        "label": "of server memory"
+        "value": "150",
+        "label": "reviews across 15 topics, scheduled with no manual work"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/task-manager/01-desktop-board.webp",
+        "caption": "Desktop kanban: columns by status, each task dot in its sphere's color"
+      },
+      {
+        "image": "/media/task-manager/02-mobile-screens.webp",
+        "caption": "Phone: tasks of one sphere, the Today screen and the Path journal"
+      },
+      {
+        "image": "/media/task-manager/03-mobile-form.webp",
+        "caption": "Task form with a checklist, and the daily summary sheet"
+      },
+      {
+        "image": "/media/task-manager/04-android-alarm.webp",
+        "caption": "A task's reminders, and the same call as a full-screen Android alarm"
+      },
+      {
+        "image": "/media/task-manager/05-desktop-learning.webp",
+        "caption": "Spaced repetition: progress per topic, plus importance, reminders and pause for the whole block"
+      },
+      {
+        "image": "/media/task-manager/06-desktop-path.webp",
+        "caption": "Path on desktop: daily and weekly summaries in one feed"
       }
     ]
   }

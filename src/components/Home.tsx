@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scene, type FrameInfo, type SceneApi, type StationSpec } from "@/components/Scene";
+import type { RoomLayout } from "@/lib/roomSurface";
 import type { ChapterLight, Landmark } from "@/lib/environment";
 import type { Contacts, Project, Site, Skill } from "@/content";
 import { ContactForm } from "@/components/ContactForm";
@@ -196,6 +197,11 @@ export function Home({
       }),
     [N]
   );
+  /** Мерки комнат проекта — сцене, которая рисует их кадр и название. */
+  const layouts = useMemo(
+    () => Array.from({ length: N }, (_, k) => (l: RoomLayout | null) => apiRef.current?.roomLayout(k, l)),
+    [N]
+  );
   /** Рука над окном, −1..1 от центра: кадр комнаты наклоняется за ней. */
   const pointer = useRef({ x: 0, y: 0 });
   const tilt = useRef({ x: 0, y: 0, at: 0 });
@@ -386,6 +392,8 @@ export function Home({
       tilt.current.y += (pointer.current.y - tilt.current.y) * kt;
       update(tilt.current.x, tilt.current.y);
     }
+    // Кадр и название комнаты рисует сцена — ей те же проявление и рука.
+    apiRef.current?.roomView(lit, lit === null ? 0 : ease(clamp01((amount - 0.35) / 0.65)), tilt.current.x, tilt.current.y);
 
     /* Подпись ворот раздела — над их верхней дугой, пока ворота в кадре. */
     const gate = GATE >= 0 ? marks[GATE] : undefined;
@@ -711,6 +719,7 @@ export function Home({
             lang={lang}
             open={room === k}
             bind={binders[k]}
+            layout={layouts[k]}
           />,
           accentOf(p),
           true

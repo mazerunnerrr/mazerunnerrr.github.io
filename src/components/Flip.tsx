@@ -76,7 +76,8 @@ export function attachFlipHand() {
     raf = lights.size ? requestAnimationFrame(frame) : 0;
   };
   const leave = () => lights.forEach((l) => (l.at = -1));
-  const hostOf = (e: PointerEvent) => (e.target as Element | null)?.closest?.("a, button") ?? null;
+  // Кнопки и ссылки — и мелкие надписи, которые играют под рукой сами (`data-hand`).
+  const hostOf = (e: PointerEvent) => (e.target as Element | null)?.closest?.("a, button, [data-hand]") ?? null;
   const onMove = (e: PointerEvent) => {
     const h = hostOf(e);
     if (h !== host) {
@@ -118,7 +119,8 @@ export function attachFlipHand() {
     }
   };
   const onDown = (e: PointerEvent) => {
-    if (hostOf(e)?.querySelector("[data-flip]")) tick(1.6);
+    const h = hostOf(e);
+    if (h?.matches("a, button") && h.querySelector("[data-flip]")) tick(1.6);
   };
   window.addEventListener("pointermove", onMove, { passive: true });
   window.addEventListener("pointerdown", onDown, { passive: true });

@@ -96,6 +96,8 @@ export type Project = {
   scheme?: string;
   /** Видео на обложку, путь от корня сайта. Нет видео — обложка из скриншотов. */
   video?: string;
+  /** Кадр, который стоит на месте видео, пока оно грузится: без него — чёрный прямоугольник. */
+  poster?: string;
   shots: Shot[];
   links: Link[];
   accent?: Accent;
@@ -183,6 +185,7 @@ export const getProjects = (lang: Lang = "en"): Project[] =>
         result: opt(p.result),
         scheme: opt(p.scheme),
         video: opt(p.video),
+        poster: opt(p.poster),
         accent: opt(p.accent) as Accent | undefined,
         // Строка вместо объекта — запись старого вида: читаем её как пункт без подробностей.
         did: (p.did ?? []).map((d) => (typeof d === "string" ? { title: d } : { ...d, detail: opt(d.detail) })),

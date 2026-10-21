@@ -70,6 +70,7 @@ export function ProjectBody({ project, lang }: { project: Project; lang: Lang })
       {project.video ? (
         <video
           src={project.video}
+          poster={project.poster}
           controls
           playsInline
           preload="metadata"
