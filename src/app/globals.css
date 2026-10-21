@@ -107,10 +107,14 @@ body {
    под ним вспыхивает белым со своим ореолом и тлеет с хвостом. Свет только
    у самих букв: пятно поверх надписи выглядело «PNG-шкой». Надпись разбита
    на буквы, яркость каждой — `--l` (attachFlipHand в Flip.tsx). currentColor
-   здесь — цвет надписи, он же светлеет на наведении. */
-[data-split] > span {
-  color: color-mix(in srgb, var(--light) calc(var(--l, 0) * 100%), currentColor);
-  text-shadow: 0 0 0.7em color-mix(in srgb, var(--light) calc(var(--l, 0) * 75%), transparent);
+   здесь — цвет надписи, он же светлеет на наведении. Под @supports: без него
+   сборщик дописывает запасное правило без смешивания, и в браузере без
+   color-mix все буквы надписи горели бы белым навсегда. */
+@supports (color: color-mix(in srgb, red, red)) {
+  [data-split] > span {
+    color: color-mix(in srgb, var(--light) calc(var(--l, 0) * 100%), currentColor);
+    text-shadow: 0 0 0.7em color-mix(in srgb, var(--light) calc(var(--l, 0) * 75%), transparent);
+  }
 }
 
 /* Поля экрана: все приборы стоят на одном расстоянии от краёв. */
