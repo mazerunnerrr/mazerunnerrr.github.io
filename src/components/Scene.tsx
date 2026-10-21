@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { buildShape, burstShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
-import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG } from "@/lib/shaders";
+import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG, REFORM_END } from "@/lib/shaders";
 import { Journey } from "@/lib/journey";
 import { Water } from "@/lib/fluid";
 import {
@@ -30,7 +30,7 @@ const WATER_R = 0.2;
    маршрута не даёт на нём остановиться. */
 /** За какую долю пути до соседней точки объект собирается или уходит. */
 const PASS = 0.6;
-/** Секунды на раскрытие комнаты и на обратную сборку. */
+/** Секунды на раскрытие сферы в комнату и на обратную сборку. */
 const UNFOLD = 2.1;
 /* Ход раскрытия сферы во времени, таблицей по 1/20 (Илья, 2026-10-20:
    «погружение линейное — нужно как откат к сцене: плавно начинает и плавно
@@ -72,15 +72,22 @@ export type StationSpec = {
   /** Свет комнаты: пока она открыта, фон тонируется её цветом. */
   roomLight?: ChapterLight;
   /** Как объект прилетает на аллею и как уходит с неё (`uFlow` в шейдере).
-      Нет — разворот очередью и дождь в камеру, как у всех. */
-  arrive?: "implode";
+      Нет — разворот очередью и дождь в камеру, как у всех. "condense" —
+      сгущение из ничего, как обратный "scatter", но закручиваясь в другую сторону. */
+  arrive?: "implode" | "condense";
   leave?: "streak" | "scatter";
   /** Пересобирается на месте с соседней надписью, у которой тоже стоит этот
       флаг, — как две сферы подряд. */
   reform?: boolean;
 };
 
-const FLOW = { streak: 1, implode: 2, scatter: 3 } as const;
+const FLOW = { streak: 1, implode: 2, scatter: 3, condense: 4 } as const;
+/* Свой путь у некоторых переходов вместо общего PASS (Илья, 2026-10-21).
+   Имя уходит вслед за воротами, а не через полпути после них: ворота
+   уже за краями кадра, а буквы всё висели. Первая сфера начинает сгущаться,
+   когда ворота и имя ушли, — с общим PASS впереди потом долго было пусто,
+   и казалось, что крутишь не туда. */
+const REACH: Partial<Record<keyof typeof FLOW, number>> = { streak: 0.45, condense: 0.68 };
 
 /** Во сколько раз гуще имени сфера проекта: мелкой сетке нужна сплошная
     линия на каждом ребре, а на редкой и кадр не разобрать. */
@@ -90,12 +97,26 @@ const TWIST_PER_PX = 0.0055;
 /* Вход в «обо мне» — как распыление рукой: облако расходится от слова
    целиком и ровно; обратно собирается так же. Прежде точки трогались
    вразнобой и шли дугой к зрителю — «с разных сторон в разные позиции»;
-   потом стартовали с полной скорости — «резко» (Илья, 2026-10-20). Синус:
-   мягкий старт, ровный ход, мягкая посадка, в обе стороны одинаково. */
-const burstAt = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+   потом стартовали с полной скорости — «резко» (Илья, 2026-10-20). Синус
+   за 2,1 с вышел «очень медленно» (2026-10-21): теперь экспонента в обе
+   стороны за BURST — долгий мягкий разгон, быстрый пролёт, долгая посадка. */
+const burstAt = (t: number) => inOutExpo(t);
+/** Секунды на вход в «обо мне» и обратную сборку имени. */
+const BURST = 1.4;
+/** Экспонента в обе стороны: 0 → 1 с плавным разгоном и плавной посадкой.
+    `s` — крутизна: чем больше, тем дольше хвосты и резче середина. */
+const inOutExpo = (t: number, s = 5) => {
+  const x = Math.max(0, Math.min(1, t));
+  const lo = Math.pow(2, -s);
+  const half = (y: number) => (Math.pow(2, s * (2 * y - 1)) - lo) / (2 * (1 - lo));
+  return x < 0.5 ? half(x) : 1 - half(1 - x);
+};
 /** Собственное вращение сферы, радиан в секунду: оборот за три минуты.
     Втрое быстрее мешало глазам (Илья, 2026-10-18). */
 const SPHERE_SPIN = 0.035;
+/** Инерция брошенной рукой сферы: вязкое трение, 1/с, и сухое, рад/с². */
+const SPIN_DRAG = 0.5;
+const SPIN_DRY = 0.4;
 /** Каждые сколько секунд на сфере сменяется скриншот и за сколько. */
 const SHOT_HOLD = 4.5;
 const SHOT_FADE = 1.2;
@@ -219,6 +240,8 @@ type Body = {
   stir: Float32Array;
   /** Куда и насколько далеко уходит точка при распылении рукой. */
   spray: Float32Array;
+  /** Распылили в комнате: облако идёт домой дольше и экспонентой (`ROOM_SLOW`). */
+  calm: boolean;
   dispAttr: THREE.BufferAttribute;
   velAttr: THREE.BufferAttribute;
   /** Раскрытие в комнату сейчас, 0..1. */
@@ -458,9 +481,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     };
     const stepSphereRot = (dt: number) => {
       if (!spinning) {
-        // Отпустили — сфера докручивается по инерции и плавно гаснет.
+        /* Отпустили — сфера докручивается, как фиджет-спиннер (Илья, 2026-10-21:
+           «чуть меньше, чем у Mole»). Одно вязкое трение (было 2,4 в секунду)
+           гасило шар за полсекунды, а слабое тянуло хвост без конца; с сухим
+           остановка конечная: бросок на 8 рад/с крутится ~4,8 с, на 1 рад/с — ~1,6 с. */
         turnSphere(spinVel.x * dt, spinVel.y * dt);
-        spinVel.multiplyScalar(Math.exp(-dt * 2.4));
+        const v = spinVel.length();
+        if (v > 0) spinVel.multiplyScalar(Math.max(0, v * Math.exp(-dt * SPIN_DRAG) - SPIN_DRY * dt) / v);
       }
       turnSphere(SPHERE_SPIN * dt, 0);
       sphereRot.setFromMatrix4(rotM4.makeRotationFromQuaternion(sphereQ));
@@ -481,6 +508,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        со словом — и дёргалось бы с ним (Илья, 2026-10-20). */
     const unspinFrom = new THREE.Quaternion();
     let unspinT = 1;
+    /** Отпустили в комнате — раскрутка дольше и экспонентой, как облако (`ROOM_SLOW`). */
+    let unspinCalm = false;
 
     /** Сглаженная скорость руки в пикселях за кадр. */
     const handVel = new THREE.Vector2();
@@ -665,7 +694,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       scene.add(points);
       const body: Body = {
         points, geo, mat, u, a, b, n, vel, disp, give, sprayed, back, trip, pace, stir, spray, dispAttr, velAttr,
-        morph: 0, restless: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
+        calm: false, morph: 0, restless: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
       };
       if (spec.media) loadMedia(body, spec.media);
       return body;
@@ -1012,6 +1041,14 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       if (twisting) {
         unspinFrom.copy(nameQ);
         unspinT = 0;
+        unspinCalm = room !== null;
+      }
+      /* Рука встала и только потом отпустила — бросать нечего: скорость от
+         последнего движения гаснет за время стоянки. Иначе шар, долго
+         крутившийся по инерции, срывался бы с места после паузы. */
+      if (spinning) {
+        const idle = (performance.now() - spinAt) / 1000;
+        if (idle > 0.06) spinVel.multiplyScalar(Math.exp(-(idle - 0.06) / 0.04));
       }
       twisting = false;
 
@@ -1071,8 +1108,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
     const HIT = 52;         // радиус, в котором рука вообще что-то задевает
     /* В облаке «обо мне» точки редкие: кистью в 52 px рука задевала единицы,
-       и казалось, что ведёшь по облаку поверху (Илья, 2026-10-20). */
-    const HIT_ROOM = 130;
+       и казалось, что ведёшь по облаку поверху (Илья, 2026-10-20). Отзывчивость
+       подняли ещё раз (2026-10-21): кисть шире и бьёт в ROOM_KICK раз сильнее. */
+    const HIT_ROOM = 170;
+    const ROOM_KICK = 2.6;
     const SWEEP = 0.0030;   // увлечение по ходу руки — основная сила
     const PUSH = 0.0010;    // отталкивание от точки касания
     const CURL = 0.0015;    // закрутка вбок, чтобы не расходились строем
@@ -1136,6 +1175,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const RETURN_T1 = 0.55; // с — сколько добавляют 1000 px дальности (по корню)
     /** За сколько слово раскручивается назад — как самая дальняя точка облака. */
     const UNSPIN_T = RETURN_T0 + RETURN_T1;
+    /* В «обо мне» облако на весь экран, и тот же возврат проносил точки через
+       полэкрана за секунду и ставил разом (Илья, 2026-10-21: «быстро летят
+       и быстро останавливаются»). Там путь в ROOM_SLOW раз дольше и идёт
+       экспонентой: долгий разгон, быстрый пролёт, долгая посадка. */
+    const ROOM_SLOW = 1.5;
 
     let physT = 0;
     const stepPhysics = (dt: number, active: Body | null, settled: boolean) => {
@@ -1216,7 +1260,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         const sprays = body.grip === "spray";
         const spread = isActive && dragging && sprays;
         const n = body.n;
-        const hit = !body.solid && body.morph > 0.5 ? HIT_ROOM : HIT;
+        const roomy = !body.solid && body.morph > 0.5;
+        const hit = roomy ? HIT_ROOM : HIT;
+        const kick = roomy ? KICK * ROOM_KICK : KICK;
+        if (spread) body.calm = roomy;
         let restless = false;
 
         for (let i = 0; i < n; i++) {
@@ -1247,7 +1294,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
               const t2 = dist / hit;
               const near = (1 - t2) * (1 - t2);
               const s = speed * near * give[i];
-              const k = s * KICK;
+              const k = s * kick;
               vx += vhx * k * SWEEP;
               vy += vhy * k * SWEEP;
               if (dist > 1) {
@@ -1342,7 +1389,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
               trip[i3] = rm[0] * dx2 + rm[1] * dy2 + rm[2] * dz2;
               trip[i3 + 1] = rm[3] * dx2 + rm[4] * dy2 + rm[5] * dz2;
               trip[i3 + 2] = rm[6] * dx2 + rm[7] * dy2 + rm[8] * dz2;
-              pace[i] = 1 / (RETURN_T0 + RETURN_T1 * Math.sqrt(Math.hypot(dx2, dy2, dz2) / 1000));
+              pace[i] = 1 / ((RETURN_T0 + RETURN_T1 * Math.sqrt(Math.hypot(dx2, dy2, dz2) / 1000)) * (body.calm ? ROOM_SLOW : 1));
               back[i] = 0;
             } else {
               trip[i3] += (rm[0] * vx + rm[1] * vy + rm[2] * vz) * step;
@@ -1350,7 +1397,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
               trip[i3 + 2] += (rm[6] * vx + rm[7] * vy + rm[8] * vz) * step;
             }
             const t = (back[i] = Math.min(1, back[i] + dt * pace[i]));
-            const left = 0.5 + 0.5 * Math.cos(Math.PI * t);
+            const left = body.calm ? 1 - inOutExpo(t) : 0.5 + 0.5 * Math.cos(Math.PI * t);
             const lx = trip[i3] * left;
             const ly = trip[i3 + 1] * left;
             const lz = trip[i3 + 2] * left;
@@ -1411,6 +1458,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       to.trip.set(from.trip);
       to.pace.set(from.pace);
       to.stir.set(from.stir);
+      to.calm = from.calm;
       to.restless = true;
       to.dispAttr.needsUpdate = true;
       to.velAttr.needsUpdate = true;
@@ -1425,8 +1473,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         reformHolder = -1;
         return;
       }
-      // Та же граница, что прячет уходящую (away < 0.999) и показывает приходящую.
-      const holder = d < 0.999 ? reformFrom : (reformFrom + 1) % N;
+      // Та же граница, что прячет уходящую и показывает приходящую.
+      const holder = d < REFORM_END ? reformFrom : (reformFrom + 1) % N;
       if (reformHolder >= 0 && holder !== reformHolder) {
         const from = bodies[reformHolder];
         const to = bodies[holder];
@@ -1448,7 +1496,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         // Раскрываться комната начинает, когда камера уже почти у точки:
         // клик по дальнему объекту сперва подвозит к нему.
         const want = room === k && Math.abs(ringOffset(progress, k, N)) < 0.35 ? 1 : 0;
-        b.morph = reduced ? want : Math.max(0, Math.min(1, b.morph + Math.sign(want - b.morph) * (dt / UNFOLD)));
+        b.morph = reduced
+          ? want
+          : Math.max(0, Math.min(1, b.morph + Math.sign(want - b.morph) * (dt / (b.solid ? UNFOLD : BURST))));
         // Мир гаснет и текст комнаты проявляется в такт видимому раскрытию, а не по часам.
         roomAmount = Math.max(roomAmount, b.solid ? unfoldAt(b.morph) : burstAt(b.morph));
       }
@@ -1464,7 +1514,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           other !== k &&
           ((!!b?.solid && !!bodies[other]?.solid) || (!!stations[k].reform && !!stations[other].reform));
         // Подлёт — минус, уход — плюс; на точке ноль.
-        const pass = swap ? 0 : Math.sign(d) * Math.min(1, Math.abs(d) / PASS);
+        // Прилёт — пока объект впереди, уход — когда он позади.
+        const flow = d < 0 ? stations[k].arrive : stations[k].leave;
+        const pass = swap ? 0 : Math.sign(d) * Math.min(1, Math.abs(d) / ((flow && REACH[flow]) || PASS));
         const away = swap ? Math.min(1, Math.abs(d)) : Math.abs(pass);
         // В комнате остальной мир гаснет: сцена принадлежит ей одной.
         const own = room === k || (b?.morph ?? 0) > 0;
@@ -1479,12 +1531,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         f.vis = b ? vis * (1 - away) : 0;
         if (!b) continue;
 
-        b.points.visible = vis > 0.002 && away < 0.999;
+        // Уходящая надпись пересборки прячется раньше конца пути — там, где
+        // приходящая уже встала на точку и её можно трогать (REFORM_END).
+        const gone = swap && !b.solid && d > 0 ? REFORM_END : 0.999;
+        b.points.visible = vis > 0.002 && away < gone;
         // Уходящий ближе к камере, чем подлетающий: рисуется поверх.
         b.points.renderOrder = d > 0 ? 1 : 0;
         b.u.uPass.value = pass;
-        // Прилёт — пока объект впереди, уход — когда он позади.
-        const flow = pass < 0 ? stations[k].arrive : stations[k].leave;
         b.u.uFlow.value = flow ? FLOW[flow] : 0;
         /* Волна пересборки — только на аллее. В раскрытой сфере она прятала
            верхнюю половину: фронт волны считается по радиусу маленькой
@@ -1584,8 +1637,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Отпустили — слово ложится обратно читаемым: поворот плавно сходит
       // к исходному, без отскока.
       if (!twisting && unspinT < 1) {
-        unspinT = Math.min(1, unspinT + dt / UNSPIN_T);
-        nameQ.slerpQuaternions(unspinFrom, QUAT_ID, 0.5 - 0.5 * Math.cos(Math.PI * unspinT));
+        unspinT = Math.min(1, unspinT + dt / (UNSPIN_T * (unspinCalm ? ROOM_SLOW : 1)));
+        const back = unspinCalm ? inOutExpo(unspinT) : 0.5 - 0.5 * Math.cos(Math.PI * unspinT);
+        nameQ.slerpQuaternions(unspinFrom, QUAT_ID, back);
       }
       nameRot.setFromMatrix4(rotM4.makeRotationFromQuaternion(nameQ));
       shared.uCamZ.value = camera.position.z;

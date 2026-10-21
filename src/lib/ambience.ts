@@ -27,6 +27,16 @@ const OPEN_HZ = 18000;
 const DUCK_HZ = 320;
 /** Громкость в комнате от обычной: музыка уходит в фон и не отвлекает. */
 const DUCK_GAIN = 0.4;
+/** Громкость щелчка надписи и самый частый щелчок, с. */
+const TICK_GAIN = 0.09;
+const TICK_GAP = 0.035;
+/* Громкость трека из админки (Илья, 2026-10-21: «на средней громкости Мака —
+   как на максимальной»). Трек сведён громко: −8,7 LUFS, пики +1,4 dBFS, —
+   на 5 дБ громче, чем ютуб приводит любой ролик (−14 LUFS). Фоновой музыке
+   место ниже: ×0,25 (−12 дБ) даёт ~−21,5 LUFS, и шкала Мака снова работает
+   от тихого к громкому. Другой коммерческий трек сведён так же, ±2 дБ.
+   Убавка стоит после анализатора: волна в переключателе её не замечает. */
+const MUSIC_GAIN = 0.25;
 
 export class Ambience {
   private ctx: AudioContext;
@@ -51,6 +61,12 @@ export class Ambience {
   private windFilter: BiquadFilterNode | null = null;
   private track: HTMLAudioElement | null = null;
   private on = false;
+  /** Щелчки надписей — мимо фильтра комнаты и мимо волны, сразу в колонки. */
+  private ui: GainNode;
+  /** Итоговая громкость звука мира — после анализатора. */
+  private level: GainNode;
+  private click: AudioBuffer;
+  private lastTick = 0;
 
   constructor(music?: string) {
     const ctx = new AudioContext();
@@ -68,7 +84,27 @@ export class Ambience {
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0.35;
     this.freq = new Uint8Array(this.analyser.frequencyBinCount);
-    this.master.connect(this.awayGain).connect(this.duckGain).connect(this.duckFilter).connect(this.analyser).connect(ctx.destination);
+    this.level = ctx.createGain();
+    this.level.gain.value = music ? MUSIC_GAIN : 1;
+    this.master.connect(this.awayGain).connect(this.duckGain).connect(this.duckFilter).connect(this.analyser);
+    this.analyser.connect(this.level).connect(ctx.destination);
+    this.ui = ctx.createGain();
+    this.ui.gain.value = TICK_GAIN;
+    this.ui.connect(ctx.destination);
+    /* Щелчок — как колесо выбора времени в будильнике iPhone (Илья, 2026-10-21:
+       «премиальный звук»): не шорох, а чистый короткий «тк» — три затухающих
+       тона без шумового хвоста: искра 4 кГц, основной 1,5 кГц и телесный
+       750 Гц. Из четырёх на слух Илья выбрал этот, «деревянный»: прежний
+       (5,2 / 2,1 / 1,05 кГц) был почти тем, но звонче. Вход за 0,3 мс — без
+       ступеньки в колонках. Собирается один раз, дальше только проигрывается. */
+    const n = Math.round(ctx.sampleRate * 0.014);
+    this.click = ctx.createBuffer(1, n, ctx.sampleRate);
+    const c = this.click.getChannelData(0);
+    const tone = (t: number, hz: number, tau: number) => Math.sin(2 * Math.PI * hz * t) * Math.exp(-t / tau);
+    for (let i = 0; i < n; i++) {
+      const t = i / ctx.sampleRate;
+      c[i] = Math.min(1, t / 0.0003) * (0.3 * tone(t, 4000, 0.0003) + tone(t, 1500, 0.0013) + 0.55 * tone(t, 750, 0.0024));
+    }
 
     if (music) {
       const a = new Audio(music);
@@ -170,6 +206,22 @@ export class Ambience {
       void this.ctx.resume();
       void this.track?.play().catch(() => {});
     }
+  }
+
+  /** Щелчок надписи под рукой. Ровный, как у колеса iPhone: высота и громкость
+      гуляют едва-едва, на 2% и 8%, — дробь звучит живой, но одним и тем же
+      механизмом. Звук выключен или вкладка в фоне — тишина. */
+  tick(k = 1) {
+    const t = this.ctx.currentTime;
+    if (!this.on || this.away || t - this.lastTick < TICK_GAP) return;
+    this.lastTick = t;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.click;
+    src.playbackRate.value = 0.98 + Math.random() * 0.04;
+    const g = this.ctx.createGain();
+    g.gain.value = k * (0.92 + Math.random() * 0.16);
+    src.connect(g).connect(this.ui);
+    src.start(t);
   }
 
   /** Несколько раз в секунду: рука и пролёт, оба от 0 до 1. */

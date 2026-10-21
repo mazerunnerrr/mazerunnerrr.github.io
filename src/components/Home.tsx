@@ -7,11 +7,11 @@ import type { Contacts, Project, Site, Skill } from "@/content";
 import { ContactForm } from "@/components/ContactForm";
 import { Loader } from "@/components/Loader";
 import { Ambience } from "@/lib/ambience";
-import { Flip, flipIn } from "@/components/Flip";
+import { attachFlipHand, Flip, flipIn } from "@/components/Flip";
 import { clamp01, ease, fade, lightUp } from "@/lib/layer";
 import { ProjectRoom, type RoomUpdate } from "@/components/ProjectRoom";
 import { ACCENT_HEX, STATUS, accentOf } from "@/lib/status";
-import { FLIP_HOVER, scramble } from "@/lib/scramble";
+import { FLIP_HOVER, scramble, setTicker } from "@/lib/scramble";
 import { LANGS, STATUS_LABEL, UI, type Lang } from "@/lib/i18n";
 import { setLang, useLang } from "@/lib/useLang";
 
@@ -51,8 +51,8 @@ const LINES = [
   { crests: 6, speed: 3.2, amp: 0.5, width: 0.7, opacity: 0.45 },
 ];
 
-/** Навели на кнопку или ссылку — её надпись перещёлкивается. */
-const flipHover = (e: React.PointerEvent<HTMLElement>) => flipIn(e.currentTarget, FLIP_HOVER);
+/** Навели на кнопку или ссылку — её надпись перещёлкивается со щелчками. */
+const flipHover = (e: React.PointerEvent<HTMLElement>) => flipIn(e.currentTarget, FLIP_HOVER, true);
 
 /** Адрес без служебной части: в строке рядом со ссылкой она лишняя. */
 const plain = (url: string) => url.replace(/^mailto:/, "").replace(/^https?:\/\//, "");
@@ -127,13 +127,15 @@ export function Home({
          раскрывается, как раскладная игрушка, и ты внутри (Илья,
          2026-10-16 и 18). Оболочку внутри притушиваем слабо: ты должен
          видеть, что стоишь внутри сферы. */
-      /* Первая сфера стягивается извне — материя имени пролетает сквозь
-         камеру, а навстречу ей собирается шар; последняя уходит к контактам
-         разлётом: раскручивается, и точки срываются во все стороны. Между
-         двумя сферами — пересборка на месте. */
+      /* Первая сфера сгущается из ничего — обратный разлёт последней, но
+         закручиваясь в другую сторону (Илья, 2026-10-21: стяжка уже есть
+         у «@»). Материя имени тем временем пролетает сквозь камеру.
+         Последняя уходит к контактам разлётом:
+         раскручивается, и точки срываются во все стороны. Между двумя
+         сферами — пересборка на месте. */
       ...(JSON.parse(spheres) as { media: StationSpec["media"]; tint: string }[]).map(
         ({ media, tint }, i, all): StationSpec => ({
-          ...(i === 0 ? { arrive: "implode" as const } : {}),
+          ...(i === 0 ? { arrive: "condense" as const } : {}),
           ...(i === all.length - 1 ? { leave: "scatter" as const } : {}),
           shape: { kind: "sphere", r: 0.2 },
           room: { kind: "sphere", r: 1.5, cz: 0.55 },
@@ -225,6 +227,15 @@ export function Home({
   const ambienceRef = useRef<Ambience | null>(null);
   const lastSound = useRef(0);
   useEffect(() => () => ambienceRef.current?.close(), []);
+  // Надписи под рукой: цифры и щелчки. Щёлкает звук мира, пока он включён.
+  useEffect(() => {
+    setTicker((k) => ambienceRef.current?.tick(k));
+    const detach = attachFlipHand();
+    return () => {
+      setTicker(null);
+      detach();
+    };
+  }, []);
   const toggleSound = () => {
     const next = !sound;
     if (next && !ambienceRef.current) {

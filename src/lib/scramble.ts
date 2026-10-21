@@ -49,26 +49,65 @@ const sineOut = (x: number) => Math.sin((clamp01(x) * Math.PI) / 2);
 const running = new WeakMap<HTMLElement, number>();
 const finals = new WeakMap<HTMLElement, string>();
 
+/**
+ * Записать строку в надпись. Надпись, разбитая на буквы (`split` — свет под
+ * рукой), пишется по буквам: разметка и яркость каждой буквы остаются.
+ */
+const write = (el: HTMLElement, str: string) => {
+  if (!el.dataset.split) {
+    el.textContent = str;
+    return;
+  }
+  const chars = Array.from(str);
+  const kids = el.children;
+  if (kids.length !== chars.length) return split(el, chars);
+  chars.forEach((c, i) => {
+    if (kids[i].textContent !== c) kids[i].textContent = c;
+  });
+};
+
+/** Разбить надпись на буквы — по `<span>` на знак. Текст и ширина те же. */
+export const split = (el: HTMLElement, chars = Array.from(el.textContent ?? "")) => {
+  el.dataset.split = "1";
+  el.replaceChildren(
+    ...chars.map((c) => {
+      const s = document.createElement("span");
+      s.textContent = c;
+      return s;
+    })
+  );
+};
+
+/** Щелчок прибора — звук мира (`Ambience.tick`); звук выключен — тишина. */
+let ticker: ((k: number) => void) | null = null;
+export const setTicker = (f: typeof ticker) => {
+  ticker = f;
+};
+/** Щёлкнуть: `k` — сила, 1 — обычный щелчок. */
+export const tick = (k = 1) => ticker?.(k);
+
 const reduced = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Перепечатать надпись: довести до `text` или, без него, заново до той же
- * (появление слоя, наведение). Новый вызов прерывает текущий.
+ * (появление слоя, наведение). Новый вызов прерывает текущий. `sound` —
+ * под рукой: каждая смена знаков щёлкает, строка звучит дробью.
  */
-export function scramble(el: HTMLElement, text?: string, dur = FLIP_SHOW) {
+export function scramble(el: HTMLElement, text?: string, dur = FLIP_SHOW, sound = false) {
   const to = text ?? finals.get(el) ?? el.textContent ?? "";
   const prev = running.get(el);
   if (prev) cancelAnimationFrame(prev);
   finals.set(el, to);
   if (reduced()) {
-    el.textContent = to;
+    write(el, to);
     running.delete(el);
     return;
   }
   const chars = Array.from(to);
   const n = chars.length;
   const start = performance.now();
+  let was = el.textContent;
 
   const step = (now: number) => {
     const t = now - start;
@@ -85,12 +124,51 @@ export function scramble(el: HTMLElement, text?: string, dur = FLIP_SHOW) {
       const tr2 = clamp01(2 * s - x);
       out += ahead(ch, Math.floor((1 - tr2) * 5.753));
     }
-    el.textContent = out;
+    write(el, out);
+    if (sound && out !== was) tick(0.55);
+    was = out;
     if (t < dur) running.set(el, requestAnimationFrame(step));
     else {
-      el.textContent = to;
+      write(el, to);
       running.delete(el);
     }
   };
   running.set(el, requestAnimationFrame(step));
+}
+
+/** Буква или цифра — у них есть «зубчик»: пробел и «·» не щёлкают и не мотаются. */
+export const isSign = (ch: string) => /[\p{L}\p{N}]/u.test(ch);
+
+/* Барабан одной буквы под рукой (вариант ?hand=roll, Илья выбирает, 2026-10-21):
+   буква под курсором проворачивается на три знака своего кольца и встаёт
+   на место — то же движение, что у строки при наведении, но по одной букве.
+   Цифры вместо букв, как у Active Theory, пробовали в тот же день: «как
+   на аналоговом сайте, не наше». */
+const ROLL_STEP = 45; // мс на знак
+const rolls = new WeakMap<HTMLElement, { at: Map<number, number>; raf: number }>();
+
+export function rollAt(el: HTMLElement, i: number) {
+  if (running.has(el) || reduced()) return;
+  let r = rolls.get(el);
+  if (!r) rolls.set(el, (r = { at: new Map(), raf: 0 }));
+  const roll = r;
+  roll.at.set(i, performance.now());
+  if (roll.raf) return;
+  const step = (now: number) => {
+    // Строка перепечатывается целиком — её барабан главнее.
+    if (running.has(el)) {
+      roll.at.clear();
+      roll.raf = 0;
+      return;
+    }
+    const chars = Array.from(finals.get(el) ?? el.textContent ?? "");
+    for (const [j, t0] of roll.at) {
+      const k = 3 - Math.floor((now - t0) / ROLL_STEP);
+      if (k <= 0) roll.at.delete(j);
+      else chars[j] = ahead(chars[j], k);
+    }
+    write(el, chars.join(""));
+    roll.raf = roll.at.size ? requestAnimationFrame(step) : 0;
+  };
+  roll.raf = requestAnimationFrame(step);
 }

@@ -29,6 +29,8 @@
 :root {
   --sand-dim: rgba(232, 223, 205, 0.62);
   --sand-faint: rgba(232, 223, 205, 0.34);
+  /** Свет под рукой на надписях-кнопках — белый, ярче песка. */
+  --light: #ffffff;
   --line: rgba(232, 223, 205, 0.12);
 
   /* Цвета статусов проектов. Живут здесь, а не в инлайн-стилях:
@@ -99,6 +101,16 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
+}
+
+/* Свет под рукой (Илья, 2026-10-21): курсор ведёт по надписи-кнопке — буква
+   под ним вспыхивает белым со своим ореолом и тлеет с хвостом. Свет только
+   у самих букв: пятно поверх надписи выглядело «PNG-шкой». Надпись разбита
+   на буквы, яркость каждой — `--l` (attachFlipHand в Flip.tsx). currentColor
+   здесь — цвет надписи, он же светлеет на наведении. */
+[data-split] > span {
+  color: color-mix(in srgb, var(--light) calc(var(--l, 0) * 100%), currentColor);
+  text-shadow: 0 0 0.7em color-mix(in srgb, var(--light) calc(var(--l, 0) * 75%), transparent);
 }
 
 /* Поля экрана: все приборы стоят на одном расстоянии от краёв. */
