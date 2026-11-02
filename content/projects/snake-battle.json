@@ -1,0 +1,102 @@
+{
+  "title": "Snake Battle",
+  "slug": "snake-battle",
+  "year": "2026",
+  "role": "Сооснователь: концепция, экономика, дизайн, питч",
+  "status": "ищем инвестиции",
+  "summary": "Стартап крипто-игры: «Змейка», где игроки съедают друг друга и забирают ставки в USDT. Готовы концепция, экономика, геймдизайн, маркетинг-план и питч-дек — ищем инвестиции на MVP.",
+  "task": "Превратить идею в проект, который можно показать инвестору: понятная экономика, честная механика ставок, план роста — и подача, которую запоминают.",
+  "solution": "Концепцию и все цифры продумывали вдвоём с братом, бизнес-связи ведёт третий партнёр. Экономика собрана в геймдизайн-документе: лиги от $0,10 до $10, доля игроков, комиссии, защита от мошенничества. Рост — через Telegram. Питч-дек на 16 слайдов в одном неоновом стиле и его анимированная версия.",
+  "result": "Пакет для инвестора готов: питч-дек, геймдизайн на 14 страниц, маркетинг-план на 13. Ищем pre-seed на MVP.",
+  "did": [
+    {
+      "title": "Питч-дек",
+      "detail": "16 слайдов в одном стиле и анимированная видеоверсия в 4K."
+    },
+    {
+      "title": "Экономика и геймдизайн",
+      "detail": "Лиги, доли, комиссии, гемы, бусты, защита от мошенничества."
+    },
+    {
+      "title": "Маркетинг-план",
+      "detail": "Бюджет, три фазы роста через Telegram, KPI, вирусность."
+    },
+    {
+      "title": "Промо-ролик",
+      "detail": "14 вертикальных клипов с героем — заготовка ролика."
+    },
+    {
+      "title": "Поиск инвестиций",
+      "detail": "Питч, переговоры, план от концепта до MVP за два месяца."
+    }
+  ],
+  "stack": [
+    "Canva",
+    "Higgsfield",
+    "генерация изображений",
+    "Markdown"
+  ],
+  "facts": [
+    {
+      "value": "16",
+      "label": "слайдов питч-дека"
+    },
+    {
+      "value": "$20K",
+      "label": "pre-seed на MVP"
+    },
+    {
+      "value": "2 мес.",
+      "label": "от концепта до MVP по плану"
+    }
+  ],
+  "scheme": "",
+  "video": "",
+  "poster": "",
+  "shots": [],
+  "links": [],
+  "accent": "clay",
+  "en": {
+    "role": "Co-founder: concept, economy, design, pitch",
+    "summary": "A crypto game startup: Snake, where players eat each other and take the USDT stakes. Concept, economy, game design, marketing plan and pitch deck are done — we're raising for the MVP.",
+    "task": "Turn an idea into something you can show an investor: a clear economy, fair stake mechanics, a growth plan — and a pitch people remember.",
+    "solution": "My brother and I worked out the concept and all the numbers together; a third partner handles business development. The economy lives in the game design document: leagues from $0.10 to $10, player share, fees, anti-fraud. Growth goes through Telegram. A 16-slide pitch deck in one neon style, plus an animated version.",
+    "result": "The investor package is ready: pitch deck, a 14-page game design document, a 13-page marketing plan. We're raising pre-seed for the MVP.",
+    "did": [
+      {
+        "title": "Pitch deck",
+        "detail": "16 slides in one style and an animated 4K video version."
+      },
+      {
+        "title": "Economy and game design",
+        "detail": "Leagues, shares, fees, gems, boosts, anti-fraud."
+      },
+      {
+        "title": "Marketing plan",
+        "detail": "Budget, three growth phases through Telegram, KPIs, virality."
+      },
+      {
+        "title": "Promo video",
+        "detail": "14 vertical clips with a hero — groundwork for the promo."
+      },
+      {
+        "title": "Raising",
+        "detail": "The pitch, conversations, a plan from concept to MVP in two months."
+      }
+    ],
+    "facts": [
+      {
+        "value": "16",
+        "label": "pitch deck slides"
+      },
+      {
+        "value": "$20K",
+        "label": "pre-seed for the MVP"
+      },
+      {
+        "value": "2 mo.",
+        "label": "from concept to MVP by plan"
+      }
+    ]
+  }
+}

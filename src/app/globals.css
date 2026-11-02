@@ -41,6 +41,9 @@
   --st-personal: #c4907a;
   --st-research: #8fb3cc;
   --st-live: #a8c0a0;
+  /* Концепт — тёплый серый песок, «ищем инвестиции» — пыльная роза. */
+  --st-concept: #c9bea8;
+  --st-raise: #d4a3b4;
 
   /* Акцент проекта — по умолчанию пыльно-голубой. */
   --accent: var(--color-azure);

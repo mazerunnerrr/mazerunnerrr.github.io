@@ -1,0 +1,109 @@
+{
+  "title": "Нейротипология",
+  "slug": "neurotypology",
+  "year": "2026",
+  "role": "Соло: бот, приложение, связка с Claude",
+  "status": "личный проект",
+  "summary": "Приложение с базой признаков, с которой можно работать в разных сценариях: карточки, разметка фото чертежами, приём данных из Telegram-бота. Разбор делает Claude — он работает с этой базой в связке с приложением по строгим правилам.",
+  "task": "Разбор по методике нейротипологии — это 43 признака, сотни вариантов и разметка лица по фото. Держать это в голове и в заметках не получалось, а ИИ, которому дают свободу, начинает додумывать.",
+  "solution": "Сначала был бот, который сам писал описания через языковую модель, — и сам же придумывал лишнее. Я развернул архитектуру: бот теперь только собирает признаки с телефона, а всё остальное живёт в локальном приложении. Разбор делает Claude по спецификации из 11 задач и 10 правил против отсебятины, а приложение даёт ему базу и инструменты.",
+  "result": "Приложение работает: база признаков, разметка фото и разбор Claude связаны в один процесс, бот собирает данные с телефона. На сайте — демо на вымышленных данных.",
+  "did": [
+    {
+      "title": "Бот для сбора признаков",
+      "detail": "Ввод пошагово на кнопках, база PostgreSQL, выгрузка в приложение одним блоком."
+    },
+    {
+      "title": "Редактор разметки фото",
+      "detail": "Отрезки, углы, направляющие, перпендикуляры и зум; разметка сохраняется рядом с фото."
+    },
+    {
+      "title": "База признаков",
+      "detail": "43 признака, 172 варианта, 10 зон лица; карточки в Markdown, без отдельной базы данных."
+    },
+    {
+      "title": "Claude как движок",
+      "detail": "Спецификация на 11 задач и 10 правил против выдумок, 11 промптов под разные сценарии."
+    },
+    {
+      "title": "Слепая проверка методики",
+      "detail": "Бланки трёх видов с ловушками и дублями, статистика: биномиальный тест и точный тест Фишера."
+    }
+  ],
+  "stack": [
+    "Python",
+    "FastAPI",
+    "Jinja2",
+    "Konva.js",
+    "pywebview",
+    "aiogram",
+    "PostgreSQL",
+    "SQLAlchemy",
+    "Docker",
+    "Claude"
+  ],
+  "facts": [
+    {
+      "value": "43",
+      "label": "признака в 10 зонах лица"
+    },
+    {
+      "value": "172",
+      "label": "варианта признаков в базе"
+    },
+    {
+      "value": "11",
+      "label": "задач Claude по спецификации"
+    }
+  ],
+  "scheme": "",
+  "video": "",
+  "poster": "",
+  "shots": [],
+  "links": [],
+  "accent": "amber",
+  "en": {
+    "title": "Neurotypology",
+    "role": "Solo: bot, app, Claude setup",
+    "summary": "An app built around a base of facial features you can work with in different scenarios: profiles, photo markup with drawings, data coming in from a Telegram bot. The analysis is done by Claude, working with that base alongside the app under strict rules.",
+    "task": "An analysis by the neurotypology method means 43 features, hundreds of variants and markup of a face from a photo. Keeping it in my head and in notes didn't work, and an AI left to itself starts making things up.",
+    "solution": "It started as a bot that wrote descriptions through a language model — and invented things along the way. I turned the architecture around: the bot now only collects features from the phone, and everything else lives in a local app. Claude does the analysis under a spec of 11 tasks and 10 rules against guesswork, and the app gives it the base and the tools.",
+    "result": "The app works: the feature base, photo markup and Claude's analysis are one process, and the bot collects data from the phone. The site shows a demo on made-up data.",
+    "did": [
+      {
+        "title": "A bot that collects features",
+        "detail": "Step-by-step input on buttons, PostgreSQL, export to the app in one block."
+      },
+      {
+        "title": "A photo markup editor",
+        "detail": "Segments, angles, guides, perpendiculars and zoom; the markup is saved next to the photo."
+      },
+      {
+        "title": "The feature base",
+        "detail": "43 features, 172 variants, 10 face zones; profiles in Markdown, no separate database."
+      },
+      {
+        "title": "Claude as the engine",
+        "detail": "A spec of 11 tasks and 10 rules against invention, 11 prompts for different scenarios."
+      },
+      {
+        "title": "Blind testing of the method",
+        "detail": "Three kinds of forms with traps and duplicates, statistics: binomial test and Fisher's exact test."
+      }
+    ],
+    "facts": [
+      {
+        "value": "43",
+        "label": "features across 10 face zones"
+      },
+      {
+        "value": "172",
+        "label": "feature variants in the base"
+      },
+      {
+        "value": "11",
+        "label": "tasks for Claude in the spec"
+      }
+    ]
+  }
+}

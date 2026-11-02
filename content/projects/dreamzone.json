@@ -1,0 +1,106 @@
+{
+  "title": "Dreamzone",
+  "slug": "dreamzone",
+  "year": "2026",
+  "role": "Соло: продукт, интерфейс, шейдеры",
+  "status": "в работе",
+  "summary": "Веб-приложение для мечт: кладёшь в мечту фото и строки, и она становится живой сценой — цвет берётся из твоего снимка, поверх лежит жидкое стекло, которое отвечает на руку. Смысл не «создать», а возвращаться к своему «зачем».",
+  "task": "Доски желаний и заметки про цели выглядят как списки: открыл, пролистал, закрыл. Хотелось места, куда хочется возвращаться, — где мечта ощущается, а не читается.",
+  "solution": "Вся сетка мечт и раскрытая сцена — один WebGL-холст: карточка не сменяется страницей, а растягивается в сцену тем же материалом. Палитра каждой мечты считается из её фотографии, своей палитры у интерфейса нет. Плавность проверял замерами на живом GPU, а не на глаз.",
+  "result": "Основа готова и работает в браузере: создание и правка мечт, хранение снимков, установка как приложение. Дальше — выкладка на сервер и вход с телефона.",
+  "did": [
+    {
+      "title": "Один холст на всё",
+      "detail": "Сетка и сцена в одном шейдере, переход между ними без склеек."
+    },
+    {
+      "title": "Жидкое стекло",
+      "detail": "Линза под курсором со следом, расслоение цвета на скорости, переключатель «живая / как есть»."
+    },
+    {
+      "title": "Палитра из фото",
+      "detail": "Пять тонов из снимка (k-means), разнесённых по оттенку."
+    },
+    {
+      "title": "Мечта из фрагментов",
+      "detail": "Фото перетаскиванием, короткая строка становится цитатой, длинная — заметкой."
+    },
+    {
+      "title": "Замеры вместо «на глаз»",
+      "detail": "24 скрипта Playwright: кадры на живом GPU, задержка отклика, сценарии правки."
+    }
+  ],
+  "stack": [
+    "Next.js",
+    "React",
+    "TypeScript",
+    "WebGL / GLSL",
+    "Tailwind",
+    "IndexedDB",
+    "PWA",
+    "Playwright"
+  ],
+  "facts": [
+    {
+      "value": "120 к/с",
+      "label": "в сцене на MacBook M3"
+    },
+    {
+      "value": "211 мс",
+      "label": "отклик на руку, было 498"
+    },
+    {
+      "value": "1",
+      "label": "WebGL-холст на всё приложение"
+    }
+  ],
+  "scheme": "",
+  "video": "",
+  "poster": "",
+  "shots": [],
+  "links": [],
+  "accent": "azure",
+  "en": {
+    "role": "Solo: product, interface, shaders",
+    "summary": "A web app for dreams: put photos and lines into a dream and it becomes a living scene — its colour taken from your photo, with liquid glass on top that answers your hand. The point isn't to create, it's to come back to your why.",
+    "task": "Vision boards and goal notes look like lists: open, scroll, close. I wanted a place you want to come back to — where a dream is felt rather than read.",
+    "solution": "The whole grid of dreams and the open scene are one WebGL canvas: a card doesn't switch to a page, it stretches into the scene in the same material. Each dream's palette is computed from its photo; the interface has no palette of its own. Smoothness was checked with measurements on a real GPU, not by eye.",
+    "result": "The core is done and runs in the browser: creating and editing dreams, storing photos, installing as an app. Next: putting it on a server and signing in from a phone.",
+    "did": [
+      {
+        "title": "One canvas for everything",
+        "detail": "Grid and scene in one shader, with a seamless transition between them."
+      },
+      {
+        "title": "Liquid glass",
+        "detail": "A lens under the cursor with a trail, colour separation at speed, a live / as-is switch."
+      },
+      {
+        "title": "Palette from the photo",
+        "detail": "Five tones from the photo (k-means), spread apart by hue."
+      },
+      {
+        "title": "A dream made of fragments",
+        "detail": "Photos by drag and drop; a short line becomes a quote, a long one a note."
+      },
+      {
+        "title": "Measured, not eyeballed",
+        "detail": "24 Playwright scripts: frames on a real GPU, response latency, editing scenarios."
+      }
+    ],
+    "facts": [
+      {
+        "value": "120 fps",
+        "label": "in the scene on a MacBook M3"
+      },
+      {
+        "value": "211 ms",
+        "label": "hand response, down from 498"
+      },
+      {
+        "value": "1",
+        "label": "WebGL canvas for the whole app"
+      }
+    ]
+  }
+}

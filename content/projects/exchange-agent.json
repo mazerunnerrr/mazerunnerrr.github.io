@@ -1,0 +1,107 @@
+{
+  "title": "AI-агент для обменника",
+  "slug": "exchange-agent",
+  "year": "2026",
+  "role": "Разбор, архитектура, смета",
+  "status": "разбор и архитектура",
+  "summary": "Проект AI-агента для обменника рубль — бат в Telegram: агент сам ведёт диалог, считает курс, торгуется в рамках маржи и выставляет оплату, а операторы видят всё в мини-CRM. Доведён до готового плана и оффера — оставалось начать писать код.",
+  "task": "Владелец обменника хотел, чтобы большую часть сделок вёл бот, а не оператор, — и при этом бот не продешевил бы и не выдал себестоимость клиенту, который попробует его обмануть.",
+  "solution": "Модель только разговаривает и вызывает инструменты, а курс считает и проверяет серверный код: оффер ниже порога сервер отклонит, а себестоимости в промпте нет вовсе — вытянуть её промпт-инъекцией нечем. Сделка идёт по автомату состояний, вебхуки оплаты подписаны и защищены от дублей.",
+  "result": "Готов план на три этапа со сметой и критерием приёмки, вопросы заказчику и разработчику платёжной платформы, мануал для разработки. Проект был готов к старту — заказчик не запустил разработку.",
+  "did": [
+    {
+      "title": "Разбор ТЗ",
+      "detail": "5 критичных вопросов, 44 вопроса по семи блокам, риски."
+    },
+    {
+      "title": "Второй раунд после API платформы",
+      "detail": "38 вопросов, из них 12 к разработчику платёжной платформы."
+    },
+    {
+      "title": "Архитектура «модель говорит, код считает»",
+      "detail": "Автомат состояний сделки, схема данных, проверка оффера на сервере."
+    },
+    {
+      "title": "Мануал разработчика",
+      "detail": "Путь сделки в 12 шагов и 7 железных правил."
+    },
+    {
+      "title": "План и оффер",
+      "detail": "Три этапа, сроки, два варианта цены, гарантии."
+    }
+  ],
+  "stack": [
+    "Python",
+    "aiogram",
+    "FastAPI",
+    "PostgreSQL",
+    "Redis",
+    "LLM с tool calling",
+    "Next.js",
+    "Docker"
+  ],
+  "facts": [
+    {
+      "value": "82",
+      "label": "вопроса заказчику в двух раундах"
+    },
+    {
+      "value": "12",
+      "label": "шагов сделки"
+    },
+    {
+      "value": "3",
+      "label": "этапа в плане"
+    }
+  ],
+  "scheme": "",
+  "video": "",
+  "poster": "",
+  "shots": [],
+  "links": [],
+  "accent": "sage",
+  "en": {
+    "title": "AI agent for a currency exchange",
+    "role": "Analysis, architecture, estimate",
+    "summary": "An AI agent for a rouble-to-baht exchange on Telegram: it runs the conversation, quotes the rate, haggles within the margin and issues payment, while operators see everything in a small CRM. Taken as far as a ready plan and offer — the next step was writing code.",
+    "task": "The exchange owner wanted the bot, not an operator, to handle most deals — without underselling and without giving away the cost price to a customer who tries to trick it.",
+    "solution": "The model only talks and calls tools; server code computes and checks the rate. An offer below the threshold is rejected by the server, and the cost price is never in the prompt — there's nothing for a prompt injection to pull out. A deal runs on a state machine, and payment webhooks are signed and protected against duplicates.",
+    "result": "A three-stage plan with an estimate and acceptance criteria, questions for the client and the payment platform's developer, a development manual. The project was ready to start — the client didn't launch development.",
+    "did": [
+      {
+        "title": "Brief analysis",
+        "detail": "5 critical questions, 44 questions across seven blocks, risks."
+      },
+      {
+        "title": "A second round after the platform API",
+        "detail": "38 questions, 12 of them for the payment platform's developer."
+      },
+      {
+        "title": "\"The model talks, the code counts\"",
+        "detail": "A deal state machine, a data model, server-side offer checks."
+      },
+      {
+        "title": "A developer manual",
+        "detail": "The deal path in 12 steps and 7 hard rules."
+      },
+      {
+        "title": "Plan and offer",
+        "detail": "Three stages, timelines, two price options, guarantees."
+      }
+    ],
+    "facts": [
+      {
+        "value": "82",
+        "label": "questions to the client over two rounds"
+      },
+      {
+        "value": "12",
+        "label": "steps in a deal"
+      },
+      {
+        "value": "3",
+        "label": "stages in the plan"
+      }
+    ]
+  }
+}

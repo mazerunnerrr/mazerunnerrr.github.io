@@ -106,12 +106,16 @@ export const STATUS_LABEL: Record<Lang, Record<ProjectStatus, string>> = {
     "в работе": "in progress",
     "личный проект": "personal project",
     "разбор и архитектура": "analysis & architecture",
+    концепт: "concept",
+    "ищем инвестиции": "seeking investment",
     запущен: "live",
   },
   ru: {
     "в работе": "в работе",
     "личный проект": "личный проект",
     "разбор и архитектура": "разбор и архитектура",
+    концепт: "концепт",
+    "ищем инвестиции": "ищем инвестиции",
     запущен: "запущен",
   },
 };

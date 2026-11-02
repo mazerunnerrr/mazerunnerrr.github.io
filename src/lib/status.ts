@@ -10,6 +10,8 @@ export const STATUS: Record<Project["status"], { dot: string; text: string }> = 
   "личный проект": { dot: "bg-[var(--st-personal)]", text: "text-[var(--st-personal)]" },
   "разбор и архитектура": { dot: "bg-[var(--st-research)]", text: "text-[var(--st-research)]" },
   запущен: { dot: "bg-[var(--st-live)]", text: "text-[var(--st-live)]" },
+  концепт: { dot: "bg-[var(--st-concept)]", text: "text-[var(--st-concept)]" },
+  "ищем инвестиции": { dot: "bg-[var(--st-raise)]", text: "text-[var(--st-raise)]" },
 };
 
 /** Цвет комнаты, когда в админке он не выбран, — цвет статуса. */
@@ -18,6 +20,8 @@ const STATUS_ACCENT: Record<Project["status"], Accent> = {
   "личный проект": "clay",
   "разбор и архитектура": "azure",
   запущен: "sage",
+  концепт: "azure",
+  "ищем инвестиции": "clay",
 };
 export const accentOf = (p: Project): Accent => p.accent ?? STATUS_ACCENT[p.status];
 
