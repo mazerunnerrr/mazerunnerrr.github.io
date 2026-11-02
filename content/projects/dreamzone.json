@@ -55,9 +55,26 @@
     }
   ],
   "scheme": "",
-  "video": "",
-  "poster": "",
-  "shots": [],
+  "video": "/media/dreamzone/video.mp4",
+  "poster": "/media/dreamzone/poster.webp",
+  "shots": [
+    {
+      "image": "/media/dreamzone/01-home.webp",
+      "caption": "Главная на демо-мечтах: цвет каждой карточки взят из её снимка (фото — Unsplash)"
+    },
+    {
+      "image": "/media/dreamzone/02-dream-scene.webp",
+      "caption": "Карточка не открывает страницу, а разворачивается в сцену мечты тем же материалом"
+    },
+    {
+      "image": "/media/dreamzone/03-fragments.webp",
+      "caption": "Внутри мечты — снимки и строки, которые в неё положили"
+    },
+    {
+      "image": "/media/dreamzone/04-second-dream.webp",
+      "caption": "Другая мечта — другой свет: палитру даёт её фотография"
+    }
+  ],
   "links": [],
   "accent": "azure",
   "en": {
@@ -100,6 +117,24 @@
       {
         "value": "1",
         "label": "WebGL canvas for the whole app"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/dreamzone/01-home.webp",
+        "caption": "Home with demo dreams: each card takes its color from its photo (photos from Unsplash)"
+      },
+      {
+        "image": "/media/dreamzone/02-dream-scene.webp",
+        "caption": "A card doesn't open a page; it unfolds into the dream's scene in the same material"
+      },
+      {
+        "image": "/media/dreamzone/03-fragments.webp",
+        "caption": "Inside a dream: the photos and lines that were put into it"
+      },
+      {
+        "image": "/media/dreamzone/04-second-dream.webp",
+        "caption": "Another dream, another light: the palette comes from its photo"
       }
     ]
   }
