@@ -56,7 +56,12 @@
   "scheme": "",
   "video": "",
   "poster": "",
-  "shots": [],
+  "shots": [
+    {
+      "image": "/media/fact-check/01-pipeline.webp",
+      "caption": "Как устроено: бот готовит точный текст с таймкодами, Claude разбирает, что в нём правда"
+    }
+  ],
   "links": [],
   "accent": "sage",
   "en": {
@@ -100,6 +105,12 @@
       {
         "value": "2",
         "label": "halves of one system: the bot and Claude"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/fact-check/01-pipeline.webp",
+        "caption": "How it works: the bot produces an exact transcript with timestamps, Claude works out what in it is true"
       }
     ]
   }

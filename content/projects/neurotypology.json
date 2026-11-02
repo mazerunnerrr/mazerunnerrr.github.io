@@ -59,7 +59,24 @@
   "scheme": "",
   "video": "",
   "poster": "",
-  "shots": [],
+  "shots": [
+    {
+      "image": "/media/neurotypology/01-photo-markup.webp",
+      "caption": "Редактор разметки: средняя линия, отрезки, углы челюсти и перпендикуляр. Лицо сгенерировано, такого человека нет"
+    },
+    {
+      "image": "/media/neurotypology/02-card-features.webp",
+      "caption": "Демо-карточка: фото с разметкой слева, признаки по зонам лица справа"
+    },
+    {
+      "image": "/media/neurotypology/03-blank-entry.webp",
+      "caption": "Ввод бумажного бланка с клавиатуры: ответы, неуверенные отметки, заметка на полях, проверка ловушек"
+    },
+    {
+      "image": "/media/neurotypology/04-validation-results.webp",
+      "caption": "Подсчёт слепой проверки на демо-ответах: доля попаданий, биномиальный тест, тест Фишера на эффект Барнума"
+    }
+  ],
   "links": [],
   "accent": "amber",
   "en": {
@@ -103,6 +120,24 @@
       {
         "value": "11",
         "label": "tasks for Claude in the spec"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/neurotypology/01-photo-markup.webp",
+        "caption": "Markup editor: midline, segments, jaw angles and a perpendicular. The face is generated; this person doesn't exist"
+      },
+      {
+        "image": "/media/neurotypology/02-card-features.webp",
+        "caption": "Demo profile: the marked-up photo on the left, facial features by zone on the right"
+      },
+      {
+        "image": "/media/neurotypology/03-blank-entry.webp",
+        "caption": "Typing in a paper questionnaire: answers, unsure marks, a margin note, a trap check"
+      },
+      {
+        "image": "/media/neurotypology/04-validation-results.webp",
+        "caption": "Blind-test scoring on demo answers: hit rate, binomial test, Fisher's exact test for the Barnum effect"
       }
     ]
   }

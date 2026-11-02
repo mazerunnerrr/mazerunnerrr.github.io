@@ -51,9 +51,34 @@
     }
   ],
   "scheme": "",
-  "video": "",
-  "poster": "",
-  "shots": [],
+  "video": "/media/snake-battle/video.mp4",
+  "poster": "/media/snake-battle/poster.webp",
+  "shots": [
+    {
+      "image": "/media/snake-battle/01-title.webp",
+      "caption": "Титульный слайд питч-дека"
+    },
+    {
+      "image": "/media/snake-battle/02-new-era.webp",
+      "caption": "Четыре обещания игры: без обучения, ставка от $0,10, результат сразу, решает навык"
+    },
+    {
+      "image": "/media/snake-battle/03-how-it-works.webp",
+      "caption": "Цикл игрока: депозит, лига, охота, выигрыш, вывод"
+    },
+    {
+      "image": "/media/snake-battle/04-leagues.webp",
+      "caption": "Лиги от $0,10 до $10: усиления и доход платформы по каждой"
+    },
+    {
+      "image": "/media/snake-battle/05-fund-distribution.webp",
+      "caption": "Куда уходит ставка: 87,5% остаётся игрокам, остальное — комиссия платформы, амбассадоры и рефералы"
+    },
+    {
+      "image": "/media/snake-battle/06-roadmap.webp",
+      "caption": "Дорожная карта: три фазы от MVP до турниров и NFT"
+    }
+  ],
   "links": [],
   "accent": "clay",
   "en": {
@@ -96,6 +121,32 @@
       {
         "value": "2 mo.",
         "label": "from concept to MVP by plan"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/snake-battle/01-title.webp",
+        "caption": "Pitch deck title slide"
+      },
+      {
+        "image": "/media/snake-battle/02-new-era.webp",
+        "caption": "Four promises of the game: no learning curve, stakes from $0.10, instant results, skill wins"
+      },
+      {
+        "image": "/media/snake-battle/03-how-it-works.webp",
+        "caption": "The player loop: deposit, league, hunt, earn, withdraw"
+      },
+      {
+        "image": "/media/snake-battle/04-leagues.webp",
+        "caption": "Leagues from $0.10 to $10: powers and platform revenue for each"
+      },
+      {
+        "image": "/media/snake-battle/05-fund-distribution.webp",
+        "caption": "Where a stake goes: 87.5% stays with players, the rest covers the platform fee, ambassadors and referrals"
+      },
+      {
+        "image": "/media/snake-battle/06-roadmap.webp",
+        "caption": "Roadmap: three phases from the MVP to tournaments and NFTs"
       }
     ]
   }

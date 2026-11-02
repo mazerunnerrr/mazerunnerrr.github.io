@@ -54,9 +54,34 @@
     }
   ],
   "scheme": "",
-  "video": "",
-  "poster": "",
-  "shots": [],
+  "video": "/media/ingvar-katsarian/video.mp4",
+  "poster": "/media/ingvar-katsarian/poster.webp",
+  "shots": [
+    {
+      "image": "/media/ingvar-katsarian/01-home.webp",
+      "caption": "Главная: перформансы художника на первом экране"
+    },
+    {
+      "image": "/media/ingvar-katsarian/02-collage.webp",
+      "caption": "Коллажи по сериям, у каждой работы кнопка запроса цены"
+    },
+    {
+      "image": "/media/ingvar-katsarian/03-work-page.webp",
+      "caption": "Страница работы: год, размер, серия и запрос на покупку"
+    },
+    {
+      "image": "/media/ingvar-katsarian/04-performance.webp",
+      "caption": "Перформанс «Нефертити»: текст и документация"
+    },
+    {
+      "image": "/media/ingvar-katsarian/05-shop.webp",
+      "caption": "Магазин по запросу: четыре шага от выбора работы до оплаты"
+    },
+    {
+      "image": "/media/ingvar-katsarian/06-ukrainian.webp",
+      "caption": "Тот же раздел на украинском — сайт на трёх языках"
+    }
+  ],
   "links": [],
   "accent": "clay",
   "en": {
@@ -99,6 +124,32 @@
       {
         "value": "54",
         "label": "photos imported by script"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/ingvar-katsarian/01-home.webp",
+        "caption": "Home page: the artist's performances on the first screen"
+      },
+      {
+        "image": "/media/ingvar-katsarian/02-collage.webp",
+        "caption": "Collages by series, each work with a price inquiry button"
+      },
+      {
+        "image": "/media/ingvar-katsarian/03-work-page.webp",
+        "caption": "Work page: year, size, series and a purchase inquiry"
+      },
+      {
+        "image": "/media/ingvar-katsarian/04-performance.webp",
+        "caption": "The Nefertiti performance: text and documentation"
+      },
+      {
+        "image": "/media/ingvar-katsarian/05-shop.webp",
+        "caption": "Shop by inquiry: four steps from choosing a work to payment"
+      },
+      {
+        "image": "/media/ingvar-katsarian/06-ukrainian.webp",
+        "caption": "The same section in Ukrainian; the site runs in three languages"
       }
     ]
   }

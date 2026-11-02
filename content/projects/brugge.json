@@ -58,7 +58,32 @@
   "scheme": "",
   "video": "",
   "poster": "",
-  "shots": [],
+  "shots": [
+    {
+      "image": "/media/brugge/01-cover-gable.webp",
+      "caption": "Обложка варианта «Щипець»: фронтон из логотипа срезает небо над крышами"
+    },
+    {
+      "image": "/media/brugge/02-plans-intro.webp",
+      "caption": "Разворот планировок: рендер с вырезом по небу и чертёж этажа"
+    },
+    {
+      "image": "/media/brugge/03-plans-1a-1v.webp",
+      "caption": "Однокомнатные квартиры: площади взяты из рабочих чертежей архитектора"
+    },
+    {
+      "image": "/media/brugge/04-book-overview.webp",
+      "caption": "Вся книга «Щипець» — 12 полос"
+    },
+    {
+      "image": "/media/brugge/05-cover-dark.webp",
+      "caption": "Тёмный вариант, обложка"
+    },
+    {
+      "image": "/media/brugge/06-cover-light.webp",
+      "caption": "Светлый вариант, обложка"
+    }
+  ],
   "links": [],
   "accent": "amber",
   "en": {
@@ -102,6 +127,32 @@
       {
         "value": "12",
         "label": "apartment types checked against drawings"
+      }
+    ],
+    "shots": [
+      {
+        "image": "/media/brugge/01-cover-gable.webp",
+        "caption": "Gable variant cover: the gable from the logo cuts the sky above the roofs"
+      },
+      {
+        "image": "/media/brugge/02-plans-intro.webp",
+        "caption": "Floor plans spread: a render cut along the sky and the floor drawing"
+      },
+      {
+        "image": "/media/brugge/03-plans-1a-1v.webp",
+        "caption": "One-room apartments: areas taken from the architect's working drawings"
+      },
+      {
+        "image": "/media/brugge/04-book-overview.webp",
+        "caption": "The whole Gable book, 12 pages"
+      },
+      {
+        "image": "/media/brugge/05-cover-dark.webp",
+        "caption": "Dark variant, cover"
+      },
+      {
+        "image": "/media/brugge/06-cover-light.webp",
+        "caption": "Light variant, cover"
       }
     ]
   }
