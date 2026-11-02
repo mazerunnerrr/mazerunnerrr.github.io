@@ -224,6 +224,13 @@ collections:
         format: json
         i18n: true
         fields:
+          - name: show
+            label: Показывать на сайте
+            widget: boolean
+            i18n: duplicate
+            required: false
+            default: false
+            hint: "Выключено — точки «Другой опыт» на сайте нет; работы здесь сохраняются"
           - name: intro
             label: Абзац над списком
             widget: text

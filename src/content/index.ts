@@ -77,6 +77,9 @@ export type Job = {
 };
 
 export type Experience = {
+  /** Показывать точку на сайте. Выключено — её нет, работы и форма в админке
+      остаются (Илья, 2026-11-02: «пока не нужно, наработки оставляем»). */
+  show: boolean;
   /** Необязательный абзац над списком. */
   intro?: string;
   items: Job[];
@@ -186,7 +189,11 @@ export const getContacts = (lang: Lang = "en"): Contacts => {
 
 export const getExperience = (lang: Lang = "en"): Experience => {
   const x = readIn<Experience>("experience.json", lang);
-  return { intro: opt(x.intro), items: (x.items ?? []).map((j) => ({ ...j, lesson: opt(j.lesson) })) };
+  return {
+    show: x.show === true,
+    intro: opt(x.intro),
+    items: (x.items ?? []).map((j) => ({ ...j, lesson: opt(j.lesson) })),
+  };
 };
 
 export const getSkills = (lang: Lang = "en") => readIn<{ items: Skill[] }>("skills.json", lang).items;

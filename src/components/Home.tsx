@@ -72,8 +72,8 @@ export function Home({
   const lang = useLang();
   const t = UI[lang];
   const { site, skills, projects, experience, contacts } = content[lang];
-  /** Сколько огоньков у точки «Опыт»; нет работ — нет и точки. */
-  const jobs = experience.items.length;
+  /** Сколько огоньков у точки «Опыт»; нет работ или выключена в админке — нет и точки. */
+  const jobs = experience.show ? experience.items.length : 0;
   const stops = useMemo<Stop[]>(
     () => [
       { kind: "name", label: t.stopName },
