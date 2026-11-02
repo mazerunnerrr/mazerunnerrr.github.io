@@ -204,7 +204,13 @@ export function sphereShape(r: number, cz: number, h: number, n: number): Shape 
   // Шаг по дуге — из бюджета точек на все рёбра разом.
   const arcs = e.map(([a, b]) => Math.acos(Math.min(1, v[a][0] * v[b][0] + v[a][1] * v[b][1] + v[a][2] * v[b][2])));
   const total = arcs.reduce((s, x) => s + x, 0);
-  const step = total / Math.max(1, n - i + e.length);
+  /* Округление точек на ребре может перебрать бюджет: при имени заглавными
+     (точек больше) не хватало на последние ~20 рёбер, и на сфере зияли
+     треугольные дыры (Илья, 2026-11-02). Шаг растим, пока всё не влезет. */
+  const budget = n - i;
+  const need = (st: number) => arcs.reduce((s, th) => s + Math.max(1, Math.round(th / st)) - 1, 0);
+  let step = total / Math.max(1, budget + e.length);
+  while (need(step) > budget) step *= 1.002;
   e.forEach(([a, b], j) => {
     const th = arcs[j];
     const m = Math.max(1, Math.round(th / step)) - 1;
