@@ -250,7 +250,7 @@ export function burstShape(a: Shape): Shape {
 }
 
 /** Край огонька и мягкость его ядра, пиксели. */
-export const STAR_R = 110;
+const STAR_R = 110;
 const STAR_CORE = 30;
 
 /**
@@ -305,16 +305,18 @@ function starsShape(count: number, w: number, h: number, n: number): Shape {
 }
 
 /**
- * Комната одного огонька: нажатый раскрывается вокруг зрителя большим
- * облаком, остальные расходятся за края кадра (Илья, 2026-11-02:
- * «открывается только один experience, а не все точки разлетаются»).
+ * Комната одного огонька: нажатый раскрывается вокруг зрителя облаком,
+ * остальные рассеиваются и уходят в глубину и в стороны — каждая точка
+ * своим путём, а не всем огоньком разом (Илья, 2026-11-02: «как PNG-шку
+ * кто-то драгает»). Облако раскрыто в 4,5 раза, а не в 7: в разреженном
+ * рука двигала точки, но этого не было видно.
  */
 export function focusShape(a: Shape, star: number, w: number, h: number): Shape {
   const n = a.points.length / 2;
   const out = new Float32Array(n * 2);
   const z = new Float32Array(n);
   const hubs = a.hubs ?? new Float32Array(2);
-  const away = Math.hypot(w, h) * 0.75;
+  const away = Math.hypot(w, h) * 0.6;
   for (let i = 0; i < n; i++) {
     const g = a.group?.[i] ?? 0;
     const hx = hubs[g * 2];
@@ -323,14 +325,18 @@ export function focusShape(a: Shape, star: number, w: number, h: number): Shape 
     const oy = a.points[i * 2 + 1] - hy;
     if (g === star) {
       // Огонёк растёт к центру экрана и в глубину — светится вокруг текста.
-      out[i * 2] = hx * 0.2 + ox * 7;
-      out[i * 2 + 1] = hy * 0.2 + oy * 7;
-      z[i] = (hash(i * 3 + 7) - 0.5) * 700;
+      out[i * 2] = hx * 0.2 + ox * 4.5;
+      out[i * 2 + 1] = hy * 0.2 + oy * 4.5;
+      z[i] = (hash(i * 3 + 7) - 0.5) * 900;
     } else {
-      // Чужие уходят от центра экрана за края, каждый огонёк целиком.
+      // Чужой огонёк рассеивается: каждая точка — от центра экрана в свою
+      // сторону с разбросом, на свою дальность и в глубину.
       const l = Math.hypot(hx, hy) || 1;
-      out[i * 2] = a.points[i * 2] + (hx / l) * away;
-      out[i * 2 + 1] = a.points[i * 2 + 1] + (hy / l) * away;
+      const th = Math.atan2(hy / l, hx / l) + (hash(i * 5 + 1) - 0.5) * 1.6;
+      const far = away * (0.7 + hash(i * 5 + 2) * 0.9);
+      out[i * 2] = a.points[i * 2] + ox * 2.5 + Math.cos(th) * far;
+      out[i * 2 + 1] = a.points[i * 2 + 1] + oy * 2.5 + Math.sin(th) * far;
+      z[i] = -(300 + hash(i * 5 + 3) * 1500);
     }
   }
   return { points: out, z, halfW: a.halfW, halfH: a.halfH };

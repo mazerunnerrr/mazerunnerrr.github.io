@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { STAR_R, buildShape, burstShape, focusShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
+import { buildShape, burstShape, focusShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
 import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG, REFORM_END } from "@/lib/shaders";
 import { Journey } from "@/lib/journey";
 import { RoomSurfaces, sphereGlow, type RoomLayout } from "@/lib/roomSurface";
@@ -76,14 +76,14 @@ export type StationSpec = {
   /** Как объект прилетает на аллею и как уходит с неё (`uFlow` в шейдере).
       Нет — разворот очередью и дождь в камеру, как у всех. "condense" —
       сгущение из ничего, как обратный "scatter", но закручиваясь в другую сторону. */
-  arrive?: "implode" | "condense";
+  arrive?: "implode" | "condense" | "vortex";
   leave?: "streak" | "scatter";
   /** Пересобирается на месте с соседней надписью, у которой тоже стоит этот
       флаг, — как две сферы подряд. */
   reform?: boolean;
 };
 
-const FLOW = { streak: 1, implode: 2, scatter: 3, condense: 4 } as const;
+const FLOW = { streak: 1, implode: 2, scatter: 3, condense: 4, vortex: 5 } as const;
 /* Свой путь у некоторых переходов вместо общего PASS (Илья, 2026-10-21).
    Имя уходит вслед за воротами, а не через полпути после них: ворота
    уже за краями кадра, а буквы всё висели. Первая сфера начинает сгущаться,
@@ -102,7 +102,11 @@ const TWIST_PER_PX = 0.0055;
    потом стартовали с полной скорости — «резко» (Илья, 2026-10-20). Синус
    за 2,1 с вышел «очень медленно» (2026-10-21): теперь экспонента в обе
    стороны за BURST — долгий мягкий разгон, быстрый пролёт, долгая посадка. */
-const burstAt = (t: number) => inOutExpo(t);
+/* У экспоненты на концах остаётся ~11% средней скорости: на облаке огонька
+   (700 px пути) раскрытие не садилось, а обрывалось (Илья, 2026-11-02).
+   Кубическая поправка гасит скорость на обоих концах, середину не трогает. */
+const BURST_EDGE = (5 * Math.LN2 * Math.pow(2, -5)) / (1 - Math.pow(2, -5));
+const burstAt = (t: number) => inOutExpo(t) - BURST_EDGE * (t - 3 * t * t + 2 * t * t * t);
 /** Секунды на вход в «обо мне» и обратную сборку имени. */
 const BURST = 1.4;
 /** Экспонента в обе стороны: 0 → 1 с плавным разгоном и плавной посадкой.
@@ -213,6 +217,7 @@ type Body = {
     uLift: { value: number };
     uSolid: { value: number };
     uStretch: { value: number };
+    uSwirl: { value: number };
     uSwap: { value: number };
     uFlow: { value: number };
     uTex0: { value: THREE.Texture | null };
@@ -690,6 +695,18 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Дом у соседа по пересборке; пока соседа нет — свой же.
       geo.setAttribute("aOther", new THREE.BufferAttribute(homes(a), 3));
       geo.setAttribute("aFrom", new THREE.BufferAttribute(from, 2));
+      // Центр огонька и его черёд — для вихря, которым огоньки прилетают.
+      const hub = new Float32Array(n * 3);
+      if (a.group && a.hubs) {
+        const count = a.hubs.length / 2;
+        for (let i = 0; i < n; i++) {
+          const g = a.group[i];
+          hub[i * 3] = a.hubs[g * 2];
+          hub[i * 3 + 1] = a.hubs[g * 2 + 1];
+          hub[i * 3 + 2] = count > 1 ? g / (count - 1) : 0;
+        }
+      }
+      geo.setAttribute("aHub", new THREE.BufferAttribute(hub, 3));
       geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
       // Какие точки остаются видны внутри раскрытой сферы; у плоских форм — все.
       geo.setAttribute("aKeep", new THREE.BufferAttribute(a.keep ?? new Float32Array(n).fill(1), 1));
@@ -706,7 +723,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         uThick: { value: solid ? 0 : 130 },
         uDepth: { value: solid ? 1 : 0.42 },
         // Все сферы — один общий поворот: при пересборке их сетки совпадают.
-        uRot: { value: solid ? sphereRot : spec.grip === "spray" ? nameRot : noRot },
+        // Огоньки в своей комнате крутятся рукой, как имя в «обо мне».
+        uRot: { value: solid ? sphereRot : spec.grip === "spray" || spec.grip === "magnet" ? nameRot : noRot },
         uCzA: { value: a.cz ?? 0 },
         uCzB: { value: b.cz ?? 0 },
         // Надпись раскрывается волной, с отрывом от плоскости; сетка сферы —
@@ -717,6 +735,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         uLift: { value: solid || spec.room === "burst" ? 0 : 1 },
         uSolid: { value: solid ? 1 : 0 },
         uStretch: { value: 1 },
+        uSwirl: { value: a.group ? 1 : 0 },
         uSwap: { value: 0 },
         uFlow: { value: 0 },
         uTex0: { value: null as THREE.Texture | null },
@@ -1061,27 +1080,37 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let pressT = 0;
 
     /* Магнит «Другого опыта» (Илья, 2026-11-02): зажал — огоньки тянутся
-       к руке и встают за ней цепочкой, как вагоны: каждый на своём
-       расстоянии по пути руки, а не по времени — рука встала, и цепочка
-       лежит вдоль пройденного пути, а не сбивается в комок. Каждую точку
-       ведёт пружина с критическим затуханием: середина огонька жёсткая,
-       край мягкий — на ходу край отстаёт хвостом и собирается, когда рука
-       стоит. Отпустил — те же пружины ведут точки домой, без рывка и отскока.
-       Первая версия — отставание по времени и сжатие огоньков — вышла
-       «криво-косо»: точки слипались в белые комки, на остановке цепочка
-       налезала сама на себя. Включается не сразу: короткое нажатие —
-       это вход в комнату огонька. */
+       к руке и сплетаются за ней в волшебную ленту. Каждый огонёк — свой
+       отрезок пути руки (ближний к руке первым, шаг CAR_GAP), его точки
+       теряют форму огонька и расходятся по трём прядям, которые волной
+       перевиваются вдоль пути и текут, даже когда рука стоит. Путь хранится
+       по расстоянию, а не по времени: рука встала — лента лежит вдоль
+       пройденного, не сбиваясь в комок. Точку ведёт пружина с критическим
+       затуханием — резко, но без отскока; отпустил — она же, мягче, домой.
+       Отвергнуто: отставание по времени со сжатием огоньков (белые комки,
+       «криво-косо») и огоньки, хранившие форму на ходу («статично»).
+       Включается не сразу: короткое нажатие — это вход в комнату огонька. */
     let magnetArmed = false;
     let magnetic = false;
-    /** Путь руки от головы назад, пиксели сцены; длиннее хвоста цепочки не хранится. */
+    /** Путь руки от головы назад, пиксели сцены; длиннее ленты не хранится. */
     let pathX: number[] = [];
     let pathY: number[] = [];
-    /** Место огонька в цепочке и точка пути под каждым местом — раз за кадр. */
+    /** Место огонька в ленте. */
     let magnetRank: number[] = [];
-    let carX = new Float32Array(0);
-    let carY = new Float32Array(0);
-    /** Шаг между огоньками в цепочке, пиксели. */
+    /** Шаг между огоньками в ленте, пиксели; длина волны прядей и выборка пути. */
     const CAR_GAP = 170;
+    const WAVE = 230;
+    const SAMPLE = 4;
+    /** Путь, выбранный через SAMPLE пикселей от руки, и нормаль к нему в каждой точке. */
+    let smpX = new Float32Array(0);
+    let smpY = new Float32Array(0);
+    let smpNX = new Float32Array(0);
+    let smpNY = new Float32Array(0);
+    let smpN = 0;
+    /** У каждой точки: место на своём отрезке 0..1, размах пряди и её фаза. */
+    let magU = new Float32Array(0);
+    let magAmp = new Float32Array(0);
+    let magPh = new Float32Array(0);
 
     /* Распыление рукой копится ходом, а не выстреливает сразу.
 
@@ -1117,7 +1146,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       spinning = settledNow && stations[nearNow]?.grip === "spin" && (room === null || room === nearNow);
       spinSign = room === nearNow ? -1 : 1;
       // Перед камерой имя (или его комната) — рука его крутит.
-      twisting = settledNow && stations[nearNow]?.grip === "spray" && (room === null || room === nearNow);
+      twisting =
+        settledNow &&
+        ((stations[nearNow]?.grip === "spray" && (room === null || room === nearNow)) ||
+          (stations[nearNow]?.grip === "magnet" && room === nearNow));
       const sb = bodies[nearNow];
       if (spinning && sb) {
         // Снаружи под рукой ближняя к зрителю поверхность, изнутри — дальняя.
@@ -1132,22 +1164,40 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       magnetArmed = settledNow && stations[nearNow]?.grip === "magnet" && room === null;
     };
     const startMagnet = () => {
+      const body = bodies[nearNow];
+      const hubs = body?.a.hubs;
+      if (!body || !hubs) return;
       magnetic = true;
       // Первым к руке идёт ближний огонёк. Путь начинается от руки и тянется
-      // через огоньки по порядку: цепочка собирается с их мест, а не из точки.
-      const hubs = bodies[nearNow]?.a.hubs;
-      const count = hubs ? hubs.length / 2 : 0;
+      // через огоньки по порядку: лента собирается с их мест, а не из точки.
+      const count = hubs.length / 2;
       const order = Array.from({ length: count }, (_, j) => j).sort(
         (p, q) =>
-          Math.hypot(hubs![p * 2] - rawMouse.x, hubs![p * 2 + 1] - rawMouse.y) -
-          Math.hypot(hubs![q * 2] - rawMouse.x, hubs![q * 2 + 1] - rawMouse.y)
+          Math.hypot(hubs[p * 2] - rawMouse.x, hubs[p * 2 + 1] - rawMouse.y) -
+          Math.hypot(hubs[q * 2] - rawMouse.x, hubs[q * 2 + 1] - rawMouse.y)
       );
       magnetRank = new Array(count);
       order.forEach((j, r) => (magnetRank[j] = r));
-      pathX = [rawMouse.x, ...order.map((j) => hubs![j * 2])];
-      pathY = [rawMouse.y, ...order.map((j) => hubs![j * 2 + 1])];
-      carX = new Float32Array(count);
-      carY = new Float32Array(count);
+      pathX = [rawMouse.x, ...order.map((j) => hubs[j * 2])];
+      pathY = [rawMouse.y, ...order.map((j) => hubs[j * 2 + 1])];
+      const n = body.n;
+      if (magU.length !== n) {
+        const rnd = (x: number) => {
+          const v = Math.sin(x * 12.9898 + 78.233) * 43758.5453;
+          return v - Math.floor(v);
+        };
+        magU = new Float32Array(n);
+        magAmp = new Float32Array(n);
+        magPh = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          magU[i] = rnd(i * 3 + 1);
+          // Три пряди со сдвигом в треть волны. Размах у прядей почти один
+          // и фаза разбросана чуть-чуть: со случайным размахом пряди сливались
+          // в сплошную полосу и не было видно, как они перевиваются.
+          magAmp[i] = 38 + 10 * rnd(i * 3 + 2);
+          magPh[i] = (Math.floor(rnd(i * 3 + 3) * 3) * Math.PI * 2) / 3 + (rnd(i * 7 + 5) - 0.5) * 0.3;
+        }
+      }
     };
     const onUp = (e: PointerEvent) => {
       dragging = false;
@@ -1369,11 +1419,18 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           pathX.unshift(rawMouse.x);
           pathY.unshift(rawMouse.y);
         }
-        // Место r в цепочке — точка пути в r·CAR_GAP от руки.
+        // Путь от руки через каждые SAMPLE пикселей — на длину всей ленты.
+        const need = Math.ceil(((magnetRank.length + 0.7) * CAR_GAP) / SAMPLE) + 1;
+        if (smpX.length < need) {
+          smpX = new Float32Array(need);
+          smpY = new Float32Array(need);
+          smpNX = new Float32Array(need);
+          smpNY = new Float32Array(need);
+        }
         let walked = 0;
         let k = 0;
-        for (let r = 0; r < carX.length; r++) {
-          const want = r * CAR_GAP;
+        for (let j = 0; j < need; j++) {
+          const want = j * SAMPLE;
           let sl = 0;
           while (k < pathX.length - 1) {
             sl = Math.hypot(pathX[k + 1] - pathX[k], pathY[k + 1] - pathY[k]);
@@ -1382,15 +1439,34 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             k++;
           }
           if (k >= pathX.length - 1) {
-            carX[r] = pathX[pathX.length - 1];
-            carY[r] = pathY[pathY.length - 1];
-            continue;
+            smpX[j] = pathX[pathX.length - 1];
+            smpY[j] = pathY[pathY.length - 1];
+          } else {
+            const f = sl > 1e-6 ? (want - walked) / sl : 0;
+            smpX[j] = pathX[k] + (pathX[k + 1] - pathX[k]) * f;
+            smpY[j] = pathY[k] + (pathY[k + 1] - pathY[k]) * f;
           }
-          const f = sl > 1e-6 ? (want - walked) / sl : 0;
-          carX[r] = pathX[k] + (pathX[k + 1] - pathX[k]) * f;
-          carY[r] = pathY[k] + (pathY[k + 1] - pathY[k]) * f;
         }
-        // Путь дальше последнего вагона не нужен.
+        smpN = need;
+        // Нормаль — по соседям через две выборки: на коротком шаге она дрожала бы.
+        for (let j = 0; j < need; j++) {
+          const p = Math.max(0, j - 2);
+          const q = Math.min(need - 1, j + 2);
+          const tx = smpX[p] - smpX[q];
+          const ty = smpY[p] - smpY[q];
+          const l = Math.hypot(tx, ty);
+          if (l > 1e-3) {
+            smpNX[j] = -ty / l;
+            smpNY[j] = tx / l;
+          } else if (j > 0) {
+            smpNX[j] = smpNX[j - 1];
+            smpNY[j] = smpNY[j - 1];
+          } else {
+            smpNX[j] = 0;
+            smpNY[j] = 1;
+          }
+        }
+        // Путь дальше конца ленты не нужен.
         if (k + 2 < pathX.length) {
           pathX.length = k + 2;
           pathY.length = k + 2;
@@ -1427,25 +1503,29 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         if (spread) body.calm = roomy;
         let restless = false;
         let homeLeft = false;
-        /* Пружина магнита — радиан за кадр по 60 к/с: середина огонька 0.16,
-           край 0.09, и у каждой точки свой разброс ±30%. Жёсткость строго
-           по радиусу давала кольца, отстающие ровными дугами, — белый серп
-           на голове огонька. Шаг не длиннее двух кадров — так она устойчива. */
+        /* Пружина магнита — радиан за кадр по 60 к/с: 0.3 в ленте (резко),
+           0.13 на пути домой (мягко), у каждой точки свой разброс ±25%.
+           Шаг не длиннее двух кадров — так она устойчива. Пряди дышат
+           ходом руки: на скорости размах больше. */
         const ms = Math.min(step, 2);
+        const swing = 0.55 + 0.65 * Math.min(1, speed / 25);
+        const flowT = physT * 3;
 
         for (let i = 0; i < n; i++) {
           const i3 = i * 3;
           if (magnet || homing) {
-            const g = body.a.group![i];
-            const hubs = body.a.hubs!;
-            const ox = base2[i * 2] - hubs[g * 2];
-            const oy = base2[i * 2 + 1] - hubs[g * 2 + 1];
-            // Цель — вагон огонька на пути руки; отпустили — дом (сдвиг ноль).
-            const r = magnetRank[g] ?? g;
-            const wx = magnet ? carX[r] - hubs[g * 2] : 0;
-            const wy = magnet ? carY[r] - hubs[g * 2 + 1] : 0;
-            const edge = Math.min(1, Math.hypot(ox, oy) / STAR_R);
-            const w0 = (0.16 - 0.07 * edge) * (0.7 + 0.6 * ((give[i] - 0.35) / 1.5));
+            const own = (give[i] - 0.35) / 1.5;
+            let wx = 0;
+            let wy = 0;
+            if (magnet && smpN > 0) {
+              const r = magnetRank[body.a.group![i]] ?? 0;
+              const along = Math.max(0, (r + (magU[i] - 0.5) * 1.3) * CAR_GAP);
+              const j = Math.min(smpN - 1, Math.round(along / SAMPLE));
+              const lat = magAmp[i] * swing * Math.sin((along / WAVE) * Math.PI * 2 - flowT + magPh[i]);
+              wx = smpX[j] + smpNX[j] * lat - base2[i * 2];
+              wy = smpY[j] + smpNY[j] * lat - base2[i * 2 + 1];
+            }
+            const w0 = (magnet ? 0.3 : 0.13) * (0.75 + 0.5 * own);
             let mvx = vel[i3];
             let mvy = vel[i3 + 1];
             mvx += ((wx - disp[i3]) * w0 * w0 - 2 * w0 * mvx) * ms;
@@ -1645,8 +1725,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        отодвинуть, разом прыгало на место: крутишь назад с имени, курсор
        над словом, и в первый же кадр перехода слово «перескакивало»
        (Илья, 2026-10-20). Точка №i у обеих одна и та же (seedOf). */
-    const reformFrom = stations.findIndex((s, k) => s.reform && stations[(k + 1) % N]?.reform);
-    let reformHolder = -1;
+    /* Пар пересборки может быть несколько: огоньки «Другого опыта» → «@»
+       и «@» → имя (Илья, 2026-11-02). У каждой пары своя держательница. */
+    const reformPairs = stations.flatMap((s, k) => (s.reform && stations[(k + 1) % N]?.reform ? [k] : []));
+    const reformHolder = new Map<number, number>();
     const handOver = (from: Body, to: Body) => {
       to.vel.set(from.vel);
       to.disp.set(from.disp);
@@ -1661,23 +1743,25 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       to.velAttr.needsUpdate = true;
     };
     const keepReform = (progress: number) => {
-      if (reformFrom < 0) return;
-      const a = bodies[reformFrom];
-      const b = bodies[(reformFrom + 1) % N];
-      if (!a || !b || a.n !== b.n) return;
-      const d = ringOffset(progress, reformFrom, N);
-      if (d <= 0 || d >= 1) {
-        reformHolder = -1;
-        return;
+      for (const pair of reformPairs) {
+        const a = bodies[pair];
+        const b = bodies[(pair + 1) % N];
+        if (!a || !b || a.n !== b.n) continue;
+        const d = ringOffset(progress, pair, N);
+        if (d <= 0 || d >= 1) {
+          reformHolder.delete(pair);
+          continue;
+        }
+        // Та же граница, что прячет уходящую и показывает приходящую.
+        const holder = d < REFORM_END ? pair : (pair + 1) % N;
+        const prev = reformHolder.get(pair);
+        if (prev !== undefined && holder !== prev) {
+          const from = bodies[prev];
+          const to = bodies[holder];
+          if (from && to) handOver(from, to);
+        }
+        reformHolder.set(pair, holder);
       }
-      // Та же граница, что прячет уходящую и показывает приходящую.
-      const holder = d < REFORM_END ? reformFrom : (reformFrom + 1) % N;
-      if (reformHolder >= 0 && holder !== reformHolder) {
-        const from = bodies[reformHolder];
-        const to = bodies[holder];
-        if (from && to) handOver(from, to);
-      }
-      reformHolder = holder;
     };
 
     /** Ставит объекты по местам на аллее и ведёт раскрытие комнат. Отдаёт
@@ -1761,7 +1845,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           const ta = b.u.uTexAspect.value;
           g.u.uScale.value.set(ta > 1 ? 1 / ta : 1, ta > 1 ? 1 : ta);
         }
-        b.u.uDim.value = (stations[k].dim ?? 0) * b.morph;
+        // Притушить — по той же кривой, что раскрытие: по прямой тень замирала рывком.
+        b.u.uDim.value = (stations[k].dim ?? 0) * (b.solid ? unfoldAt(b.morph) : burstAt(b.morph));
         stepShots(b, t);
         // Видео на сфере крутится, только пока она рядом: дальние стоят.
         if (b.video) {
