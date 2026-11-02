@@ -164,6 +164,13 @@ collections:
           - { label: "Пыльно-голубой", value: azure }
           - { label: "Шалфей", value: sage }
         hint: "Им тонируется комната проекта. Пусто — цвет статуса"
+      - name: order
+        label: Порядок на аллее
+        widget: number
+        value_type: int
+        i18n: duplicate
+        required: false
+        hint: "1 — первым. Пусто — после пронумерованных, по статусу и году"
 
   - name: settings
     label: Тексты сайта

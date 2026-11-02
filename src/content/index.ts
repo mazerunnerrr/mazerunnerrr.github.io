@@ -131,6 +131,8 @@ export type Project = {
   shots: Shot[];
   links: Link[];
   accent?: Accent;
+  /** Место на аллее: меньше — раньше. Пусто — после пронумерованных, по статусу и году. */
+  order?: number;
 };
 
 const read = <T>(file: string): T => {
@@ -241,6 +243,7 @@ export const getProjects = (lang: Lang = "en"): Project[] =>
     })
     .sort(
       ({ ru: a }, { ru: b }) =>
+        (a.order ?? Infinity) - (b.order ?? Infinity) ||
         STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
         lastYear(b.year) - lastYear(a.year) ||
         a.title.localeCompare(b.title, "ru")

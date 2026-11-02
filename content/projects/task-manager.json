@@ -95,6 +95,7 @@
   ],
   "links": [],
   "accent": "azure",
+  "order": 1,
   "en": {
     "role": "Solo developer: product, backend, web, Android and server",
     "summary": "A task manager I use daily: desktop kanban, a phone app, an Android widget and full-screen alarms. It also turns study material into a review schedule along the forgetting curve.",
