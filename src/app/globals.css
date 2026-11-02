@@ -143,6 +143,57 @@ body {
   pointer-events: none;
 }
 
+/* Полоска проектов справа: черты еле видны, ближайшая к камере горит
+   и подписана (`aria-current`), под рукой черта тянется и подписывается. */
+.strip {
+  transition: opacity 0.6s var(--ease-out-deep);
+}
+.strip[data-faded] {
+  opacity: 0;
+}
+.strip-line {
+  width: 10px;
+  height: 1px;
+  background: var(--sand-faint);
+  transition:
+    width 0.5s var(--ease-out-deep),
+    background-color 0.5s var(--ease-out-deep);
+}
+.strip-label {
+  opacity: 0;
+  color: var(--sand-dim);
+  transition:
+    opacity 0.5s var(--ease-out-deep),
+    color 0.5s var(--ease-out-deep);
+}
+.strip a:hover .strip-line,
+.strip a:focus-visible .strip-line {
+  width: 16px;
+  background: var(--sand-dim);
+}
+.strip a:hover .strip-label,
+.strip a:focus-visible .strip-label {
+  opacity: 1;
+}
+.strip a[aria-current] .strip-line {
+  width: 24px;
+  background: var(--color-sand);
+}
+.strip a[aria-current] .strip-label {
+  opacity: 1;
+  color: var(--color-sand);
+}
+
+/* Подпись огонька «Опыта» — под огоньком, проявляется под рукой и с клавиатуры. */
+.star-label {
+  opacity: 0;
+  transition: opacity 0.5s var(--ease-out-deep);
+}
+.star-label[data-on],
+.star-label:focus-visible {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

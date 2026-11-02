@@ -63,6 +63,25 @@ export type Contacts = {
   formUrl?: string;
 };
 
+/* Опыт вне кода: работа и подработки, которые не проекты, но опыт —
+   ресторан, доставка и всё такое (Илья, 2026-10-26). Точка «Опыт» на
+   аллее — россыпь огоньков, по огоньку на работу. */
+export type Job = {
+  /** Где: заведение, компания или просто «подработки». */
+  place: string;
+  role: string;
+  /** Год или диапазон. */
+  years: string;
+  /** Что это дало: одна-две строки. */
+  lesson?: string;
+};
+
+export type Experience = {
+  /** Необязательный абзац над списком. */
+  intro?: string;
+  items: Job[];
+};
+
 export type Skill = {
   title: string;
   /** Одна строка о том, что это даёт заказчику. */
@@ -163,6 +182,11 @@ export const getSite = (lang: Lang = "en"): Site => {
 export const getContacts = (lang: Lang = "en"): Contacts => {
   const c = readIn<Contacts>("contacts.json", lang);
   return { ...c, note: opt(c.note), formUrl: opt(c.formUrl) };
+};
+
+export const getExperience = (lang: Lang = "en"): Experience => {
+  const x = readIn<Experience>("experience.json", lang);
+  return { intro: opt(x.intro), items: (x.items ?? []).map((j) => ({ ...j, lesson: opt(j.lesson) })) };
 };
 
 export const getSkills = (lang: Lang = "en") => readIn<{ items: Skill[] }>("skills.json", lang).items;

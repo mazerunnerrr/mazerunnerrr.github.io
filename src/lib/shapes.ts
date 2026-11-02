@@ -17,7 +17,9 @@ export type ShapeSpec =
   /** Сфера-сетка — объект проекта. На аллее r — радиус в долях высоты
       экрана; в комнате та же сетка раскрыта вокруг камеры: r больше экрана,
       а центр сдвинут к зрителю на cz (тоже в долях высоты). */
-  | { kind: "sphere"; r: number; cz?: number };
+  | { kind: "sphere"; r: number; cz?: number }
+  /** Россыпь огоньков — точка «Опыт»: по сгустку точек на работу. */
+  | { kind: "stars"; count: number };
 
 export type Shape = {
   points: Float32Array;
@@ -28,6 +30,9 @@ export type Shape = {
   cz?: number;
   /** 1 — точка видна и внутри раскрытой сферы, 0.5 — внутри гаснет. */
   keep?: Float32Array;
+  /** Чей огонёк точка — у россыпи «Опыта»; центры огоньков — парами x, y. */
+  group?: Uint16Array;
+  hubs?: Float32Array;
   /** Полуширина формы: по ней шейдер ведёт очередь на оборот слева направо. */
   halfW: number;
   /** Полувысота — для попадания кликом по объекту на аллее. */
@@ -40,7 +45,9 @@ const FAMILY = "var(--font-cormorant), Georgia, serif";
  * Текст из частиц. Кегль подбирается под ширину: название проекта длиннее
  * имени, и на кегле имени оно вылезало бы за края.
  */
-export async function textShape(text: string, w: number, h: number, first: boolean) {
+export async function textShape(word: string, w: number, h: number, first: boolean) {
+  // Имя — заглавными, как у Didot и Bodoni на обложках (Илья, 2026-10-26).
+  const text = word.toUpperCase();
   const narrow = w < 720;
   // Первая форма держит прежний кегль имени — его физику Илья уже принял.
   let size = first
@@ -236,9 +243,97 @@ export function burstShape(a: Shape): Shape {
   return { points: out, z, halfW: a.halfW, halfH: a.halfH };
 }
 
+/** Край огонька и мягкость его ядра, пиксели. */
+export const STAR_R = 110;
+const STAR_CORE = 30;
+
+/**
+ * Где огоньки россыпи — в долях полуширины и полувысоты формы, Y вверх.
+ * Подсолнух в эллипсе с дрожью по номеру: огоньки не на сетке и не в ряд,
+ * и одни и те же при каждой сборке. Вёрстка ставит по ним подписи.
+ */
+export function starSpots(count: number) {
+  const spots = Array.from({ length: count }, (_, i) => {
+    const a = i * 2.39996 + 0.7 + (hash(i * 11 + 5) - 0.5) * 0.7;
+    const r = count > 1 ? Math.sqrt((i + 0.6) / count) : 0;
+    return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+  });
+  // Россыпь занимает форму целиком, сколько бы огоньков ни было; поля — под ореолы.
+  const sx = Math.max(1e-6, ...spots.map((s) => Math.abs(s.x)));
+  const sy = Math.max(1e-6, ...spots.map((s) => Math.abs(s.y)));
+  // r — край огонька в пикселях; все огоньки одинаковые (Илья, 2026-11-02).
+  return spots.map((s) => ({ x: (s.x / sx) * 0.8, y: (s.y / sy) * 0.8, r: STAR_R }));
+}
+
+/**
+ * Россыпь огоньков: у каждой работы одинаковый круглый огонёк, и плотность
+ * точек в нём ровно тает от центра к краю — без ядра, ореола и границы
+ * (Илья, 2026-11-02: «бесшовно, плавно перетекает, рассеянный градиент»).
+ * Профиль Пламмера: ровное мягкое ядро шириной STAR_CORE и долгий хвост,
+ * обрезанный на STAR_R. Ни рукавов, ни сплющивания, ни поворотов — пробовали
+ * галактики со спиралью, «чёткий вортекс внутри» Илье не подошёл.
+ */
+function starsShape(count: number, w: number, h: number, n: number): Shape {
+  const halfW = Math.min(w * 0.3, 430);
+  const halfH = Math.min(h * 0.24, 210);
+  const spots = starSpots(count);
+  const out = new Float32Array(n * 2);
+  const group = new Uint16Array(n);
+  const hubs = new Float32Array(count * 2);
+  spots.forEach((s, j) => {
+    hubs[j * 2] = s.x * halfW;
+    hubs[j * 2 + 1] = s.y * halfH;
+  });
+  // Доля массы Пламмера внутри STAR_R — до неё и тянем равномерную случайную.
+  const top = Math.pow(STAR_R * STAR_R / (STAR_R * STAR_R + STAR_CORE * STAR_CORE), 1.5);
+  for (let i = 0; i < n; i++) {
+    const j = Math.min(count - 1, Math.floor((i * count) / n));
+    const m = Math.max(1e-6, hash(i * 3 + 2) * top);
+    const r = STAR_CORE / Math.sqrt(Math.pow(m, -2 / 3) - 1);
+    const th = hash(i * 3 + 1) * Math.PI * 2;
+    out[i * 2] = hubs[j * 2] + Math.cos(th) * r;
+    out[i * 2 + 1] = hubs[j * 2 + 1] + Math.sin(th) * r;
+    group[i] = j;
+  }
+  return { points: out, halfW, halfH, group, hubs };
+}
+
+/**
+ * Комната одного огонька: нажатый раскрывается вокруг зрителя большим
+ * облаком, остальные расходятся за края кадра (Илья, 2026-11-02:
+ * «открывается только один experience, а не все точки разлетаются»).
+ */
+export function focusShape(a: Shape, star: number, w: number, h: number): Shape {
+  const n = a.points.length / 2;
+  const out = new Float32Array(n * 2);
+  const z = new Float32Array(n);
+  const hubs = a.hubs ?? new Float32Array(2);
+  const away = Math.hypot(w, h) * 0.75;
+  for (let i = 0; i < n; i++) {
+    const g = a.group?.[i] ?? 0;
+    const hx = hubs[g * 2];
+    const hy = hubs[g * 2 + 1];
+    const ox = a.points[i * 2] - hx;
+    const oy = a.points[i * 2 + 1] - hy;
+    if (g === star) {
+      // Огонёк растёт к центру экрана и в глубину — светится вокруг текста.
+      out[i * 2] = hx * 0.2 + ox * 7;
+      out[i * 2 + 1] = hy * 0.2 + oy * 7;
+      z[i] = (hash(i * 3 + 7) - 0.5) * 700;
+    } else {
+      // Чужие уходят от центра экрана за края, каждый огонёк целиком.
+      const l = Math.hypot(hx, hy) || 1;
+      out[i * 2] = a.points[i * 2] + (hx / l) * away;
+      out[i * 2 + 1] = a.points[i * 2 + 1] + (hy / l) * away;
+    }
+  }
+  return { points: out, z, halfW: a.halfW, halfH: a.halfH };
+}
+
 /** Любая форма, кроме первой, — уже подогнанная под n точек. */
 export async function buildShape(spec: ShapeSpec, w: number, h: number, n: number): Promise<Shape> {
   if (spec.kind === "sphere") return sphereShape(spec.r, spec.cz ?? 0, h, n);
+  if (spec.kind === "stars") return starsShape(spec.count, w, h, n);
   const s = await textShape(spec.text, w, h, false);
   return { points: resample(s.points, n), halfW: s.width / 2, halfH: s.height / 2 };
 }

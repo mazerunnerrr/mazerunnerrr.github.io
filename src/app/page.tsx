@@ -1,5 +1,5 @@
 import { Home } from "@/components/Home";
-import { getContacts, getProjects, getSite, getSkills } from "@/content";
+import { getContacts, getExperience, getProjects, getSite, getSkills } from "@/content";
 import { LANGS } from "@/lib/i18n";
 
 /* Контент читается с диска при сборке и уходит в страницу готовыми данными:
@@ -9,7 +9,13 @@ export default function Page() {
   const content = Object.fromEntries(
     LANGS.map((lang) => [
       lang,
-      { site: getSite(lang), skills: getSkills(lang), projects: getProjects(lang), contacts: getContacts(lang) },
+      {
+        site: getSite(lang),
+        skills: getSkills(lang),
+        projects: getProjects(lang),
+        experience: getExperience(lang),
+        contacts: getContacts(lang),
+      },
     ])
   ) as React.ComponentProps<typeof Home>["content"];
   return <Home content={content} />;

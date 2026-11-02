@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scene, type FrameInfo, type SceneApi, type StationSpec } from "@/components/Scene";
 import type { RoomLayout } from "@/lib/roomSurface";
 import type { ChapterLight, Landmark } from "@/lib/environment";
-import type { Contacts, Project, Site, Skill } from "@/content";
+import type { Contacts, Experience, Project, Site, Skill } from "@/content";
+import { starSpots } from "@/lib/shapes";
 import { ContactForm } from "@/components/ContactForm";
 import { Loader } from "@/components/Loader";
 import { Ambience } from "@/lib/ambience";
@@ -23,6 +24,7 @@ import { setLang, useLang } from "@/lib/useLang";
 type Stop =
   | { kind: "name"; label: string }
   | { kind: "project"; label: string; project: Project }
+  | { kind: "experience"; label: string }
   | { kind: "contacts"; label: string };
 
 /* Свет глав. Каждая точка подсвечена по-своему внутри полночного синего:
@@ -63,24 +65,30 @@ const plain = (url: string) => url.replace(/^mailto:/, "").replace(/^https?:\/\/
 export function Home({
   content,
 }: {
-  content: Record<Lang, { site: Site; skills: Skill[]; projects: Project[]; contacts: Contacts }>;
+  content: Record<Lang, { site: Site; skills: Skill[]; projects: Project[]; experience: Experience; contacts: Contacts }>;
 }) {
   /* Язык меняет только текст: сцена и маршрут от него не зависят, поэтому
      всё, что уходит в сцену, мемоизировано по значениям, общим для обоих. */
   const lang = useLang();
   const t = UI[lang];
-  const { site, skills, projects, contacts } = content[lang];
+  const { site, skills, projects, experience, contacts } = content[lang];
+  /** Сколько огоньков у точки «Опыт»; нет работ — нет и точки. */
+  const jobs = experience.items.length;
   const stops = useMemo<Stop[]>(
     () => [
       { kind: "name", label: t.stopName },
       ...projects.map((p): Stop => ({ kind: "project", label: `${t.stopProject} · ${p.title}`, project: p })),
+      ...(jobs > 0 ? [{ kind: "experience", label: t.stopExperience } as const] : []),
       { kind: "contacts", label: t.stopContacts },
     ],
-    [projects, t]
+    [projects, jobs, t]
   );
   const N = stops.length;
   const FIRST_PROJECT = 1;
   const CONTACTS = N - 1;
+  const EXPERIENCE = jobs > 0 ? N - 2 : -1;
+  /** Огоньки россыпи в долях её полуразмеров — для подписей под рукой. */
+  const spots = useMemo(() => starSpots(jobs), [jobs]);
 
   /** Номер точки на круге для прибора слева сверху. Нумерация честная:
       это последовательность маршрута, а не украшение. */
@@ -91,13 +99,14 @@ export function Home({
   const slugs = projects.map((p) => p.slug).join(" ");
   const hashStops = useMemo(() => {
     const list = slugs ? slugs.split(" ") : [];
-    const map: Record<string, number> = { "#about": 0, "#skills": 0, "#contacts": list.length + 1 };
+    const map: Record<string, number> = { "#about": 0, "#skills": 0, "#contacts": list.length + (jobs > 0 ? 2 : 1) };
+    if (jobs > 0) map["#experience"] = list.length + 1;
     list.forEach((slug, i) => {
       map[`#${slug}`] = i + 1;
       map["#projects"] ??= i + 1;
     });
     return map;
-  }, [slugs]);
+  }, [slugs, jobs]);
 
   /* Объекты точек. Массив мемоизирован по значениям, а не по ссылкам
      на пропсы: новый на каждый рендер пересобирал бы сцену. */
@@ -148,11 +157,16 @@ export function Home({
           roomLight: { color: tint, amount: 0.24, dir: [0.2, -1] },
         })
       ),
+      /* Другой опыт — россыпь огоньков-галактик, по огоньку на работу.
+         Нажатие на огонёк раскрывает только его — комната одной работы;
+         зажатая рука ведёт огоньки за собой паровозиком (Илья, 2026-10-26
+         и 2026-11-02). */
+      ...(jobs > 0 ? [{ shape: { kind: "stars", count: jobs }, room: "burst", grip: "magnet", dim: 0.6 } satisfies StationSpec] : []),
       /* «@» приходит стяжкой из-за краёв экрана, уходит пересборкой в имя;
          зажатая рука распыляет и крутит его, как имя (Илья, 2026-10-20). */
       { shape: { kind: "text", text: "@" }, grip: "spray", light: LIGHT.contacts, arrive: "implode", reform: true },
     ],
-    [site.alias, spheres]
+    [site.alias, spheres, jobs]
   );
 
   /* Ориентир на переходах один — ворота раздела перед первым проектом.
@@ -160,12 +174,17 @@ export function Home({
      рваным ореолом (Илья, 2026-10-20). */
   const count = projects.length;
   const landmarks = useMemo<Landmark[]>(() => {
-    const kinds: Stop["kind"][] = ["name", ...Array<Stop["kind"]>(count).fill("project"), "contacts"];
+    const kinds: Stop["kind"][] = [
+      "name",
+      ...Array<Stop["kind"]>(count).fill("project"),
+      ...(jobs > 0 ? (["experience"] as const) : []),
+      "contacts",
+    ];
     return kinds.flatMap((s, k): Landmark[] => {
       const next = kinds[(k + 1) % kinds.length];
       return next === "project" && s !== "project" ? [{ at: k + 0.5, kind: "gate" }] : [];
     });
-  }, [count]);
+  }, [count, jobs]);
   const GATE = landmarks.findIndex((m) => m.kind === "gate");
 
   const layers = useRef<(HTMLDivElement | null)[]>([]);
@@ -179,6 +198,17 @@ export function Home({
   const contactsTitleRef = useRef<HTMLHeadingElement>(null);
   const routeRef = useRef<HTMLSpanElement>(null);
   const lastLabel = useRef("");
+  /** Подписи огоньков «Опыта» по номеру работы и огонёк под рукой (−1 — нет). */
+  const starLabels = useRef<(HTMLButtonElement | null)[]>([]);
+  const hoverStar = useRef(-1);
+  /** Чья работа открыта в комнате «Опыта». */
+  const [star, setStar] = useState(0);
+  /** Насколько раскрыта комната — из последнего кадра. */
+  const roomOpen = useRef(0);
+  /** Полоска справа, её черты по номеру точки и чья горит сейчас. */
+  const stripRef = useRef<HTMLElement>(null);
+  const stripRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const lastNear = useRef(-1);
   const gateRef = useRef<HTMLSpanElement>(null);
   const waveRefs = useRef<(SVGPathElement | null)[]>([]);
   const wavePhase = useRef(new Float32Array(LINES.length));
@@ -278,13 +308,18 @@ export function Home({
   /** Вошли с клавиатуры — фокус встаёт на «закрыть». Мышью — не трогаем:
       рамка фокуса вокруг кнопки при клике по сфере только мешала. */
   const keyboardEntry = useRef(false);
-  const openRoom = (k: number, keyboard = false) => {
+  const openRoom = (k: number, keyboard = false, job = hoverStar.current) => {
     keyboardEntry.current = keyboard;
     const kind = stops[k]?.kind;
-    if (kind !== "name" && kind !== "project") return;
+    if (kind !== "name" && kind !== "project" && kind !== "experience") return;
+    // У «Опыта» открывается огонёк под рукой; нажали мимо огоньков — ничего.
+    if (kind === "experience" && job < 0) return;
+    // Другой огонёк — только когда прежний собрался: его комната строится заново.
+    if (kind === "experience" && job !== star && roomOpen.current > 0.01) return;
     lastRoom.current = k;
+    if (kind === "experience") setStar(job);
     setRoom(k);
-    apiRef.current?.setRoom(k);
+    apiRef.current?.setRoom(k, kind === "experience" ? job : -1);
   };
 
   /** Куда вернуть фокус после выхода из комнаты. */
@@ -345,6 +380,7 @@ export function Home({
     /** Пока открыта комната, аллея гаснет целиком. */
     const corridor = 1 - amount;
     const free = room === null;
+    roomOpen.current = amount;
 
     for (let k = 0; k < N; k++) {
       const el = layers.current[k];
@@ -405,6 +441,47 @@ export function Home({
     }
 
     const now = performance.now();
+
+    /* Подписи огоньков «Опыта» стоят под своими огоньками и проявляются
+       под рукой — так видно, что огонёк это работа, ещё до входа в комнату.
+       Огонёк под рукой и откроется по нажатию. */
+    const ex = EXPERIENCE >= 0 ? at[EXPERIENCE] : undefined;
+    if (ex && ex.vis > 0.01 && Math.abs(ex.d) < 0.6) {
+      const hx = ((pointer.current.x + 1) / 2) * window.innerWidth;
+      const hy = ((pointer.current.y + 1) / 2) * window.innerHeight;
+      let best = -1;
+      let gap = 72;
+      spots.forEach((s, i) => {
+        const d = Math.hypot(hx - (ex.x + s.x * ex.hw), hy - (ex.y - s.y * ex.hh));
+        if (d < gap) [best, gap] = [i, d];
+      });
+      hoverStar.current = free && near === EXPERIENCE ? best : -1;
+      spots.forEach((s, i) => {
+        const el = starLabels.current[i];
+        if (!el) return;
+        // Под галактикой, ниже её края.
+        el.style.transform = `translate3d(${ex.x + s.x * ex.hw}px, ${ex.y - s.y * ex.hh + s.r * 0.8 + 10}px, 0) translateX(-50%)`;
+        const on = hoverStar.current === i;
+        if (el.hasAttribute("data-on") === on) return;
+        el.toggleAttribute("data-on", on);
+        if (on) flipIn(el, undefined, true);
+      });
+    } else hoverStar.current = -1;
+
+    // Черта ближайшей сферы на полоске горит и подписана — тоже только при смене.
+    if (near !== lastNear.current) {
+      stripRefs.current[lastNear.current]?.removeAttribute("aria-current");
+      const tick = stripRefs.current[near];
+      if (tick) {
+        tick.setAttribute("aria-current", "location");
+        flipIn(tick);
+      }
+      lastNear.current = near;
+    }
+    // Полоска видна только у сфер: на имени и контактах её нет (Илья, 2026-10-26).
+    const strip = stripRef.current;
+    const hideStrip = !free || stops[near]?.kind !== "project";
+    if (strip && strip.hasAttribute("data-faded") !== hideStrip) strip.toggleAttribute("data-faded", hideStrip);
 
     // Номер точки на круге — только при смене, а не каждый кадр.
     const label = room !== null ? `${route[room]} · ${t.inside}` : route[near];
@@ -659,11 +736,29 @@ export function Home({
                 </div>
               </div>
             ) : null}
-            <div ref={tag.bottom} className="absolute left-0 top-0">
-              <div className="-translate-x-full whitespace-nowrap pt-4 text-right">
-                {enterButton(k, s.kind === "project" ? t.openProject : t.aboutEnter)}
+            {s.kind === "experience" ? (
+              /* У «Опыта» вход — сами огоньки: подпись под огоньком и есть
+                 его кнопка, с клавиатуры тоже. */
+              experience.items.map((j, i) => (
+                <button
+                  key={i}
+                  ref={(el) => {
+                    starLabels.current[i] = el;
+                  }}
+                  type="button"
+                  onClick={(e) => openRoom(k, e.detail === 0, i)}
+                  className="star-label instrument pointer-events-auto absolute left-0 top-0 whitespace-nowrap text-[var(--color-sand)]"
+                >
+                  <Flip text={j.place} />
+                </button>
+              ))
+            ) : (
+              <div ref={tag.bottom} className="absolute left-0 top-0">
+                <div className="-translate-x-full whitespace-nowrap pt-4 text-right">
+                  {enterButton(k, s.kind === "project" ? t.openProject : t.aboutEnter)}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
       })}
@@ -707,6 +802,36 @@ export function Home({
                 </ul>
               </div>
             </div>
+          );
+        }
+        if (s.kind === "experience") {
+          /* Комната одного огонька: где, кем, когда и что это дало.
+             Один экран — закрывает прокрутка в любую сторону. */
+          const j = experience.items[star] ?? experience.items[0];
+          return roomShell(
+            k,
+            t.experience,
+            <>
+              <span className="instrument pointer-events-none absolute left-1/2 top-[calc(var(--gutter)+40px)] -translate-x-1/2 whitespace-nowrap text-[var(--sand-faint)]">
+                <Flip text={t.scrollClose} />
+              </span>
+              <div className="absolute bottom-[calc(var(--gutter)+24px)] left-[var(--gutter)] flex max-w-[min(560px,46vw)] flex-col gap-3">
+                <p className="instrument text-[var(--sand-dim)]">
+                  <Flip text={`${t.experience} · ${pad(star + 1)} / ${pad(jobs)}`} />
+                </p>
+                <h2 className="font-display text-[clamp(38px,4.2vw,62px)] font-light leading-[1.02] tracking-[-0.02em]">
+                  {j.place}
+                </h2>
+                <p className="instrument text-[var(--color-sand)]">
+                  <Flip text={`${j.role} · ${j.years}`} />
+                </p>
+                {j.lesson ? (
+                  <p className="max-w-[52ch] text-[14.5px] font-extralight leading-[1.75] text-[var(--sand-dim)]">{j.lesson}</p>
+                ) : null}
+              </div>
+            </>,
+            undefined,
+            true
           );
         }
         if (s.kind !== "project") return null;
@@ -834,6 +959,38 @@ export function Home({
             ))}
           </span>
         </nav>
+
+        {/* Полоска проектов справа (Илья, 2026-10-26): по черте на сферу, еле
+            видны — сразу ясно, сколько их и где ты. Черта ближайшей горит
+            и подписана, остальные подписываются под рукой. Нажатие везёт
+            к сфере, как «работы» вверху. Видна только у сфер: на имени,
+            у контактов и в комнатах гаснет. */}
+        {projects.length > 0 ? (
+          <nav
+            ref={stripRef}
+            aria-label={t.projects}
+            data-faded
+            className="strip absolute right-[var(--gutter)] top-1/2 flex -translate-y-1/2 flex-col items-end"
+          >
+            {projects.map((p, i) => (
+              <a
+                key={p.slug}
+                ref={(el) => {
+                  stripRefs.current[i + FIRST_PROJECT] = el;
+                }}
+                href={`#${p.slug}`}
+                onClick={(e) => jump(i + FIRST_PROJECT, e)}
+                onPointerEnter={flipHover}
+                className="pointer-events-auto flex h-[14px] items-center gap-3"
+              >
+                <span className="strip-label instrument whitespace-nowrap">
+                  <Flip text={p.title} />
+                </span>
+                <span aria-hidden className="strip-line" />
+              </a>
+            ))}
+          </nav>
+        ) : null}
       </div>
 
       <Loader title={site.alias} ready={loaded} onDone={onRevealed} />

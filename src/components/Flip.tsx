@@ -32,8 +32,9 @@ export const flipIn = (root: Element | null, dur = FLIP_SHOW, sound = false) => 
  * Надписи под рукой (Илья, 2026-10-21). Курсор ведёт по кнопке или ссылке —
  * буква под ним вспыхивает белым со своим ореолом и тлеет с хвостом: ведёшь —
  * буквы загораются по одной и гаснут позади. Каждая пройденная буква — зубчик
- * колеса: щелчок, как у колеса выбора времени в iPhone. С `?hand=roll` буква
- * под курсором ещё и проворачивается барабаном (`rollAt`).
+ * колеса: щелчок, как у колеса выбора времени в iPhone. Буква под курсором
+ * ещё и проворачивается барабаном (`rollAt`, Илья включил 2026-10-26);
+ * `?hand=plain` — без барабана, для сравнения.
  *
  * Пробовали в тот же день: цифры вместо букв, как у Active Theory, — «как
  * на аналоговом сайте, не наше»; пятно света поверх надписи — «PNG-шка».
@@ -44,7 +45,7 @@ export const flipIn = (root: Element | null, dur = FLIP_SHOW, sound = false) => 
  * на каждом движении: чтение геометрии в pointermove — рывки.
  */
 export function attachFlipHand() {
-  const roll = new URLSearchParams(location.search).get("hand") === "roll";
+  const roll = new URLSearchParams(location.search).get("hand") !== "plain";
   type Span = { el: HTMLElement; left: number; right: number; text: string[] };
   let host: Element | null = null;
   let spans: Span[] = [];

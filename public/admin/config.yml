@@ -218,6 +218,29 @@ collections:
               - { name: title, label: Название, widget: string, i18n: true }
               - { name: lead, label: Одна строка о пользе, widget: text, i18n: true }
 
+      - name: experience
+        label: Другой опыт
+        file: content/experience.json
+        format: json
+        i18n: true
+        fields:
+          - name: intro
+            label: Абзац над списком
+            widget: text
+            i18n: true
+            required: false
+          - name: items
+            label: Работы
+            widget: list
+            i18n: true
+            required: false
+            hint: "Каждая работа — огонёк в точке «Опыт» на аллее. Пустой список — точки нет"
+            fields:
+              - { name: place, label: Где, widget: string, i18n: true, required: [ru], hint: "Заведение, компания или «подработки»" }
+              - { name: role, label: Кем, widget: string, i18n: true, required: [ru] }
+              - { name: years, label: Когда, widget: string, i18n: duplicate, hint: "Год или диапазон: 2021 или 2019–2021" }
+              - { name: lesson, label: Что это дало, widget: text, i18n: true, required: false, hint: "Одна-две строки" }
+
       - name: contacts
         label: Контакты
         file: content/contacts.json
