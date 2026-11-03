@@ -37,6 +37,9 @@ export type Shape = {
   halfW: number;
   /** Полувысота — для попадания кликом по объекту на аллее. */
   halfH: number;
+  /** Нижний край самих точек под центром, пиксели: у надписи он ближе
+      полувысоты холста — под «@» по нему встают контакты. */
+  inkBottom?: number;
 };
 
 const FAMILY = "var(--font-cormorant), Georgia, serif";
@@ -347,5 +350,7 @@ export async function buildShape(spec: ShapeSpec, w: number, h: number, n: numbe
   if (spec.kind === "sphere") return sphereShape(spec.r, spec.cz ?? 0, h, n);
   if (spec.kind === "stars") return starsShape(spec.count, w, h, n);
   const s = await textShape(spec.text, w, h, false);
-  return { points: resample(s.points, n), halfW: s.width / 2, halfH: s.height / 2 };
+  let low = 0;
+  for (let i = 1; i < s.points.length; i += 2) low = Math.min(low, s.points[i]);
+  return { points: resample(s.points, n), halfW: s.width / 2, halfH: s.height / 2, inkBottom: -low };
 }

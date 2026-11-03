@@ -323,11 +323,14 @@ void main(){
   float rim = pow(1.0 - abs(homeZ / R), 3.0);
   // Сетка видна всегда — пол держит её и на тёмной заглушке, —
   // а светлое в кадре горит на ней ярче.
-  /* Цвет — в основном песок сайта, кадр лишь тонирует; яркость к среднему
-     уровню приведена через uTexGain, светлое место кадра горит чуть ярче.
-     Иначе светлый скриншот давал белую сферу ярче заголовка, тёмный —
-     почти чёрную (Илья, 2026-10-18). */
-  vec3 lit = mix(uSand, tex, 0.2) * (1.0 + pow(lum, 1.4) * 0.45);
+  /* Цвет: яркость к среднему уровню приведена через uTexGain — светлый
+     скриншот не даёт белую сферу ярче заголовка, тёмный не гасит её
+     (Илья, 2026-10-18). Оттенок кадра — почти наполовину и чуть насыщеннее,
+     с яркостью песка: сфера играет цветом своего проекта (Илья, 2026-11-03),
+     а светлое место кадра горит ярче. */
+  float sandL = dot(uSand, vec3(0.299, 0.587, 0.114));
+  vec3 hue = min(max(mix(vec3(lum), tex, 1.4), 0.0) * (sandL / max(lum, 0.08)), vec3(1.0));
+  vec3 lit = mix(uSand, hue, 0.45) * (0.9 + pow(lum, 1.4) * 0.5);
   vBase = mix(uSand, mix(lit, uSand, rim * 0.6), shown);
   vMask = mix(1.0, max((0.9 + 0.1 * smoothstep(0.05, 0.8, lum)) * face, rim), shown);
 
@@ -652,11 +655,13 @@ void main(){
 /* ── Комната проекта и кадр в сфере (Илья, 2026-10-21) ─────────────────
 
    Экран проекта рисуется в сцене, а не вёрсткой поверх неё: по нему, как
-   у Active Theory (разобрано по записи 2026-10-21), идёт след руки —
-   картинка преломляется, рассыпается на зёрна и чуть темнеет, потом
-   собирается. След — та же вода, что мешает рука на фоне (uWaterTex: сдвиг
-   в пикселях экрана и скорость течения). Каплю-линзу с кромкой и искры
-   в следе пробовали в тот же день — Илья: «уёбищный кружок», убраны. */
+   у Active Theory (разобрано по записи 2026-10-21), идёт след руки. След —
+   та же вода, что мешает рука на фоне (uWaterTex: сдвиг в пикселях экрана
+   и скорость течения). Каплю-линзу с кромкой и искры в следе пробовали
+   2026-10-21 — Илья: «уёбищный кружок», убраны. Зерно в следе (картинка
+   рассыпалась на соседей) заменено 2026-11-03 сплошным размытием с жидким
+   стеклом, как в Dreamzone: преломление по склону воды, красный и синий
+   расходятся на склоне, в толще стекло мутнеет. */
 
 export const SURFACE_VERT = `
 varying vec2 vUv;
@@ -665,53 +670,115 @@ void main(){
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
-/** Случайное число пикселя — для зерна и искр. */
-const HASH = `
-float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }`;
-
 /** След руки: 0 — вода спокойна, 1 — течёт быстро. */
 const FLOW = `
 float flowAt(vec4 wt){ return smoothstep(1.2, 7.0, wt.w); }`;
 
-
-/** Экран проекта: преломление и рассыпание в следе руки, скруглённые углы. */
+/** Экран проекта: размытие и стекло в следе руки, углы сквирклом. */
 export const SURFACE_FRAG = `
 precision highp float;
 uniform sampler2D uTex0;
 uniform sampler2D uTex1;
 uniform float uTexMix;
-/** Обрезка картинки по плоскости, как object-fit: cover. */
+/** Обрезка картинки по кадру, как object-fit: cover. */
 uniform vec2 uScale;
-/** Размер плоскости, CSS-пиксели. */
+/** Размер кадра, CSS-пиксели. */
 uniform vec2 uSize;
+/** Плоскость шире кадра на столько с каждой стороны, CSS-пиксели: край,
+    который гнётся с картинкой, не упирается в неё и не срезает углы. */
+uniform float uMargin;
 uniform sampler2D uWaterTex;
 uniform vec4 uWaterMap;
 /** Размер экрана в пикселях устройства — для gl_FragCoord. */
 uniform vec2 uScreen;
 uniform float uRipple;
 uniform float uAlpha;
-/** Радиус скругления углов, CSS-пиксели. */
+/** Радиус угла сквиркла, CSS-пиксели. */
 uniform float uRadius;
+/** 1 — край гнётся вместе с картинкой (как до 2026-11-03), 0 — стоит на месте. */
+uniform float uWave;
+/** Радиус размытия в самом быстром месте следа, CSS-пиксели. */
+uniform float uBlur;
 varying vec2 vUv;
-${HASH}
 ${FLOW}
+
+vec4 waterAt(vec2 px){ return texture2D(uWaterTex, px / uScreen * uWaterMap.xy + uWaterMap.zw); }
+
+vec3 frameAt(vec2 uv){
+  vec2 c = (uv - 0.5) * uScale + 0.5;
+  vec3 a = texture2D(uTex0, c).rgb;
+  if (uTexMix > 0.001) a = mix(a, texture2D(uTex1, c).rgb, uTexMix);
+  return a;
+}
+/** То же с уровня помельче: у кадров есть мип-уровни. */
+vec3 frameSoft(vec2 uv, float bias){
+  vec2 c = (uv - 0.5) * uScale + 0.5;
+  vec3 a = texture2D(uTex0, c, bias).rgb;
+  if (uTexMix > 0.001) a = mix(a, texture2D(uTex1, c, bias).rgb, uTexMix);
+  return a;
+}
+
+/* Сквиркл, как углы у Apple: угол не дуга окружности, а четверть
+   суперэллипса — кривизна нарастает от прямой плавно, без излома
+   (Илья, 2026-11-03). Минус внутри, плюс снаружи, в пикселях. */
+float squircle(vec2 p, vec2 hs, float r){
+  vec2 q = abs(p) - (hs - r);
+  vec2 m = max(q, 0.0);
+  float corner = pow(pow(m.x, 4.0) + pow(m.y, 4.0), 0.25);
+  return corner + min(max(q.x, q.y), 0.0) - r;
+}
+
 void main(){
+  // Точка в пикселях кадра от его левого нижнего угла.
+  vec2 P = vUv * (uSize + 2.0 * uMargin) - uMargin;
   vec2 px = gl_FragCoord.xy;
-  vec4 wt = texture2D(uWaterTex, px / uScreen * uWaterMap.xy + uWaterMap.zw);
-  float flow = flowAt(wt) * 0.6;
-  // Зерно: каждый пиксель берёт цвет у случайного соседа — картинка в следе
-  // рассыпается, а не размывается.
-  vec2 grain = (vec2(hash(px), hash(px + 31.7)) - 0.5) * flow * 14.0;
-  vec2 uv = vUv - (wt.xy * uRipple + grain) / uSize;
-  // Скруглённый край идёт рябью вместе с картинкой: за краем пусто
-  // (Илья, 2026-10-21: острые углы «не вписываются»).
+  vec4 wt = waterAt(px);
+  float flow = flowAt(wt);
+
+  /* Склон стекла — разность течения по обе стороны точки, шаг около
+     клетки воды. Симметричная разность: односторонняя кренила бы отклик
+     в одну сторону (так было в Dreamzone). Крутизна поджата сверху —
+     склон мягкий, кольца-кромки нет. */
+  float e = uScreen.y * 0.012;
+  vec2 slope = vec2(
+    flowAt(waterAt(px + vec2(e, 0.0))) - flowAt(waterAt(px - vec2(e, 0.0))),
+    flowAt(waterAt(px + vec2(0.0, e))) - flowAt(waterAt(px - vec2(0.0, e))));
+  slope /= 1.0 + length(slope) * 0.8;
+  vec2 shift = wt.xy * uRipple + slope * 18.0;
+
+  /* Край. Стоит — гнётся только то, что внутри. Гнётся — не дальше запаса
+     плоскости: раньше сдвинутый наружу угол срезался краем плоскости
+     и становился острым, пока вода не успокоится. */
+  vec2 es = shift * uWave;
+  float el = length(es);
+  if (el > uMargin - 2.0) es *= (uMargin - 2.0) / el;
   vec2 hs = uSize * 0.5;
-  vec2 q = abs((uv - 0.5) * uSize) - (hs - uRadius);
-  float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uRadius;
-  float edge = clamp(0.5 - sd, 0.0, 1.0);
-  vec2 cuv = (uv - 0.5) * uScale + 0.5;
-  vec3 c = mix(texture2D(uTex0, cuv).rgb, texture2D(uTex1, cuv).rgb, uTexMix);
-  c *= 1.0 - flow * 0.45;
+  float edge = clamp(0.5 - squircle(P - es - hs, hs, uRadius), 0.0, 1.0);
+  if (edge <= 0.0) discard;
+
+  vec2 uv = (P - shift) / uSize;
+  // Дисперсия на склоне: ровное стекло цвет не разлагает.
+  vec2 fr = slope * 3.0 / uSize;
+  vec3 c = vec3(frameAt(uv + fr).r, frameAt(uv).g, frameAt(uv - fr).b);
+
+  /* Размытие — сплошное, без зерна: диск выборок по спирали подсолнуха,
+     радиус растёт с течением. Шума в выборке нет — край следа мягкий.
+     Выборки берутся с мип-уровня под шаг между ними: с полного кадра
+     контрастный текст двоился лесенкой копий. */
+  float blur = smoothstep(0.0, 0.7, flow);
+  if (blur > 0.002) {
+    float r = uBlur * blur;
+    float lod = log2(1.0 + r * 0.6);
+    vec3 acc = vec3(0.0);
+    for (int i = 0; i < 24; i++) {
+      float fi = float(i);
+      float a = fi * 2.39996;
+      acc += frameSoft(uv + vec2(cos(a), sin(a)) * sqrt((fi + 0.5) / 24.0) * r / uSize, lod);
+    }
+    c = mix(c, acc / 24.0, blur);
+    // Толща стекла мутнеет: тёмное чуть светлеет, светлое чуть гаснет.
+    c = mix(c, c * 0.86 + vec3(0.1), blur * 0.45);
+  }
   gl_FragColor = vec4(c, edge * uAlpha);
 }`;
 
@@ -725,6 +792,8 @@ uniform sampler2D uTex1;
 uniform float uTexMix;
 uniform vec2 uScale;
 uniform float uAmt;
+/** Кадр к общему уровню яркости, как на точках сферы. */
+uniform float uGain;
 varying vec2 vUv;
 void main(){
   vec2 p = vUv * 2.0 - 1.0;
@@ -732,9 +801,10 @@ void main(){
   if (r2 >= 1.0) discard;
   vec2 q = p * (0.8 + 0.2 * r2);
   vec2 uv = q * 0.5 * uScale + 0.5;
-  vec3 c = mix(texture2D(uTex0, uv).rgb, texture2D(uTex1, uv).rgb, uTexMix) * 1.6;
+  vec3 c = mix(texture2D(uTex0, uv).rgb, texture2D(uTex1, uv).rgb, uTexMix) * uGain * 1.7;
   // Светлое сжато: экран будильника на весь кадр слепил, тёмный интерфейс
-  // при этом едва проступал.
+  // при этом едва проступал. С uGain тёмный терминал светится наравне с белым
+  // сайтом (2026-11-03).
   c = c / (1.0 + c * 0.6);
   gl_FragColor = vec4(c * pow(1.0 - r2, 1.4) * uAmt, 1.0);
 }`;
@@ -742,13 +812,23 @@ void main(){
 /** Глубина комнаты: фон под стенкой сферы уходит в тёмную синеву —
     мы погрузились в проект (Илья, 2026-10-21: с оттенком проекта фон выходил
     серо-синим, и точки сферы на нём терялись). Стены освещает сам экран — его
-    цвета, размазанные вдоль, тлеют вокруг него, как у Active Theory. Цвет
-    с предумножением: глубина темнит, свет добавляет. */
+    цвета, размазанные вдоль, тлеют вокруг него полосами, как у Active Theory.
+    Цвет с предумножением: глубина темнит, свет добавляет.
+    2026-11-03 (Илья): комната тёмная, как у Active Theory, — экран собирает
+    взгляд. Светлый кадр (белый сайт, бумага буклета) заливал стены серым
+    и гасил подпись в углу: яркость света теперь почти не зависит от яркости
+    кадра, свет держится у экрана, к углам комнаты темнее. Полосы берут
+    смесь двух кадров, как экран, — раньше на смене скриншотов они ещё
+    1,2 с показывали прежний и потом прыгали. */
 export const SHADE_FRAG = `
 precision highp float;
 uniform vec3 uColor;
 uniform float uAmt;
 uniform sampler2D uTex0;
+uniform sampler2D uTex1;
+uniform float uTexMix;
+/** Обрезка кадра, как у экрана: полосы берут то, что на нём видно. */
+uniform vec2 uScale;
 /** Есть ли кадр, 0..1. */
 uniform float uLit;
 /** Экран в долях окна: левый нижний и правый верхний угол. */
@@ -757,9 +837,16 @@ uniform sampler2D uWaterTex;
 uniform vec4 uWaterMap;
 uniform vec2 uScreen;
 varying vec2 vUv;
+vec3 frameAt(vec2 uv){
+  vec2 c = (uv - 0.5) * uScale + 0.5;
+  vec3 a = texture2D(uTex0, c).rgb;
+  if (uTexMix > 0.001) a = mix(a, texture2D(uTex1, c).rgb, uTexMix);
+  return a;
+}
 void main(){
   vec2 p = (vUv - vec2(0.5, 0.5)) * vec2(1.0, 1.15);
-  float a = uAmt * mix(0.9, 0.72, smoothstep(0.0, 1.0, length(p) / 0.82));
+  // Темнота гуще к краям: подписи по углам стоят в самой глубине.
+  float a = uAmt * mix(0.93, 0.985, smoothstep(0.25, 0.8, length(p)));
 
   // Свет экрана: точка стены берёт цвет ближнего к ней края кадра,
   // размазанный вдоль, и гаснет с расстоянием от экрана.
@@ -768,10 +855,12 @@ void main(){
   vec2 q = (vUv - mid) / ext;
   vec2 tuv = clamp(q, -1.0, 1.0) * 0.5 + 0.5;
   vec3 amb = vec3(0.0);
-  for (int i = -3; i <= 3; i++) amb += texture2D(uTex0, clamp(tuv + vec2(float(i) * 0.06, 0.0), 0.0, 1.0)).rgb;
+  for (int i = -3; i <= 3; i++) amb += frameAt(clamp(tuv + vec2(float(i) * 0.06, 0.0), 0.0, 1.0));
   amb /= 7.0;
-  vec2 out2 = max(abs(q) - 1.0, 0.0) * ext / 0.35;
+  // Яркость света поджата: белый кадр светит вдвое ярче тёмного, а не вдесятеро.
+  amb *= 0.3 / (0.12 + dot(amb, vec3(0.299, 0.587, 0.114)));
+  vec2 out2 = max(abs(q) - 1.0, 0.0) * ext / 0.22;
   float spill = exp(-dot(out2, out2) * 3.0) * (0.9 + 0.1 * sin(vUv.y * uScreen.y * 0.35));
-  vec3 light = amb * spill * 0.42 * uLit * uAmt;
+  vec3 light = amb * spill * 0.45 * uLit * uAmt;
   gl_FragColor = vec4(uColor * a + light, a);
 }`;

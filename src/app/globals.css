@@ -229,9 +229,10 @@ body {
   display: none;
 }
 /* Кадр на стенке сферы — просто картинка, без рамки: срезанные углы
-   и контур Илья снял 2026-10-21 («нахрена они нужны»). */
+   и контур Илья снял 2026-10-21 («нахрена они нужны»). Скругление — по
+   сквирклу сцены (RADIUS в roomSurface.ts), здесь дугой на глаз. */
 .room-frame {
-  border-radius: 18px;
+  border-radius: 26px;
   overflow: hidden;
   background: color-mix(in srgb, var(--color-surface) 85%, var(--accent));
   will-change: transform, opacity;

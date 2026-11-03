@@ -405,6 +405,8 @@ export function Home({
         const leave = f.d > 0 ? clamp01((f.d - 0.1) / 0.6) : 0;
         fade(el, appear * (1 - leave) * corridor, near === k && free);
         el.style.transform = `scale(${0.94 + appear * 0.06 + leave * 0.4})`;
+        const under = tagBottom.current[k];
+        if (under) under.style.transform = `translate3d(${f.x}px, ${f.y + f.ink}px, 0)`;
       } else {
         // Выноска у объекта: видна, пока он стоит перед камерой, и едет
         // вместе с ним — подпись сверху слева, вход снизу справа.
@@ -674,33 +676,38 @@ export function Home({
               onFocus={() => follow(k)}
               className="pointer-events-none absolute inset-0 opacity-0"
             >
-              <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] flex w-[min(460px,40vw)] flex-col items-start gap-3">
-                <h2 ref={contactsTitleRef} id="contacts" tabIndex={-1} className="instrument text-[var(--sand-dim)]">
-                  <Flip text={`${t.contacts} · ${contacts.name}`} />
-                </h2>
-                {contacts.note ? (
-                  <p className="max-w-[40ch] text-[14px] font-extralight leading-[1.7] text-[var(--sand-dim)]">
-                    {contacts.note}
-                  </p>
-                ) : null}
-                <ul className="mt-1 w-full">
-                  {contacts.links.map((l) => (
-                    <li key={l.url} className="border-t border-[var(--line)]">
-                      {/* pointer-events включает сама ссылка: слой сквозной всегда. */}
-                      <a
-                        href={l.url}
-                        {...(l.url.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer noopener" })}
-                        onPointerEnter={flipHover}
-                        className="group pointer-events-auto flex items-baseline justify-between gap-6 py-3 transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-azure)]"
-                      >
-                        <span className="font-display text-[26px] font-light leading-none">{l.label}</span>
-                        <span className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] group-hover:text-[var(--color-azure)]">
-                          <Flip text={plain(l.url)} />
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+              {/* Контакты строкой под «@», по оси экрана (Илья, 2026-11-03): угол
+                  слева снизу при знаке по центру смотрелся неказисто. Слой едет
+                  за низом знака — его ставит кадровый обработчик. */}
+              <div ref={tags(k).bottom} className="absolute left-0 top-0">
+                <div className="flex w-max max-w-[calc(100vw-2*var(--gutter))] -translate-x-1/2 flex-col items-center pt-[clamp(28px,5vh,52px)] text-center">
+                  <h2 ref={contactsTitleRef} id="contacts" tabIndex={-1} className="instrument text-[var(--sand-dim)]">
+                    <Flip text={`${t.contacts} · ${contacts.name}`} />
+                  </h2>
+                  {contacts.note ? (
+                    <p className="mt-3 max-w-[44ch] text-[14px] font-extralight leading-[1.7] text-[var(--sand-dim)]">
+                      {contacts.note}
+                    </p>
+                  ) : null}
+                  <ul className="mt-[18px] flex flex-wrap justify-center gap-x-[clamp(40px,6vw,88px)] gap-y-5">
+                    {contacts.links.map((l) => (
+                      <li key={l.url}>
+                        {/* pointer-events включает сама ссылка: слой сквозной всегда. */}
+                        <a
+                          href={l.url}
+                          {...(l.url.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer noopener" })}
+                          onPointerEnter={flipHover}
+                          className="group pointer-events-auto flex flex-col items-center transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-azure)]"
+                        >
+                          <span className="font-display text-[clamp(30px,2.8vw,40px)] font-light leading-none">{l.label}</span>
+                          <span className="instrument mt-2.5 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] group-hover:text-[var(--color-azure)]">
+                            <Flip text={plain(l.url)} />
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
               {/* Форма появляется, только когда в админке указан адрес приёмника.
@@ -780,40 +787,35 @@ export function Home({
       {stops.map((s, k) => {
         if (s.kind === "name") {
           /* «Обо мне»: кто я и что делаю — то, что раньше было текстом
-             первого экрана и отдельной точкой с кольцами. */
+             первого экрана и отдельной точкой с кольцами. Колонкой по центру,
+             направления строкой внизу; имени крупно нет — оно и так облаком
+             вокруг (Илья, 2026-11-03: две колонки «плохо читаются»). */
           return roomShell(
             k,
             t.about,
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-[clamp(32px,6vw,110px)]">
-              <div className="flex flex-col gap-[clamp(16px,2.6vh,26px)]">
-                <p className="eyebrow text-[var(--sand-faint)]">
+            <div className="mx-auto flex min-h-full max-w-[1160px] flex-col">
+              <div className="my-auto flex flex-col items-center py-[clamp(24px,5vh,56px)] text-center">
+                <p className="instrument text-[var(--sand-dim)]">
                   <Flip text={site.status} />
                 </p>
-                <h2 className="font-display text-[clamp(38px,4.2vw,62px)] font-light leading-[1.02] tracking-[-0.02em]">
-                  {site.alias}
-                </h2>
-                <p className="font-display max-w-[24ch] text-[clamp(22px,2.1vw,30px)] font-light leading-[1.2]">
+                <h2 className="font-display mt-[clamp(18px,3vh,30px)] max-w-[22ch] text-[clamp(28px,2.4vw,40px)] font-light leading-[1.18]">
                   {site.thesis}
-                </p>
-                <p className="max-w-[52ch] text-[14.5px] font-extralight leading-[1.75] text-[var(--sand-dim)]">
+                </h2>
+                <p className="mt-[clamp(18px,3vh,26px)] max-w-[54ch] text-[16px] font-extralight leading-[1.75] text-[var(--sand-dim)]">
                   {site.intro}
                 </p>
               </div>
-              <div>
-                <h3 className="font-display text-[clamp(20px,1.8vw,26px)] font-light leading-tight">{t.whatIDo}</h3>
-                <ul className="mt-5 space-y-5">
-                  {skills.map((x) => (
-                    <li key={x.title}>
-                      <h4 className="instrument text-[var(--color-sand)]">
-                        <Flip text={x.title} />
-                      </h4>
-                      <p className="mt-1.5 max-w-[56ch] text-[13.5px] font-extralight leading-[1.65] text-[var(--sand-dim)]">
-                        {x.lead}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <h3 className="sr-only">{t.whatIDo}</h3>
+              <ul className="grid grid-cols-4 gap-x-[clamp(24px,2.8vw,40px)] border-t border-[var(--line)] pt-[22px]">
+                {skills.map((x) => (
+                  <li key={x.title}>
+                    <h4 className="instrument text-[var(--color-sand)]">
+                      <Flip text={x.title} />
+                    </h4>
+                    <p className="mt-2 text-[13.5px] font-extralight leading-[1.6] text-[var(--sand-dim)]">{x.lead}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
           );
         }

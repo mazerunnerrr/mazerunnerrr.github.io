@@ -128,6 +128,8 @@ const SPIN_DRY = 0.4;
 /** Каждые сколько секунд на сфере сменяется скриншот и за сколько. */
 const SHOT_HOLD = 4.5;
 const SHOT_FADE = 1.2;
+/** Как часто мерить яркость кадра видео на сфере, секунды. */
+const LUM_EVERY = 0.25;
 
 /** Где объект точки сейчас на экране — по этому вёрстка ставит выноски. */
 export type StationFrame = {
@@ -139,6 +141,8 @@ export type StationFrame = {
   /** Полуширина и полувысота на экране с учётом глубины. */
   hw: number;
   hh: number;
+  /** Нижний край точек под центром (`Shape.inkBottom`), иначе полувысота. */
+  ink: number;
   /** Видимость объекта, 0..1. */
   vis: number;
 };
@@ -240,6 +244,10 @@ type Body = {
   video: HTMLVideoElement | null;
   shot: number;
   shotAt: number;
+  /** Средняя яркость кадра видео, замер раз в `LUM_EVERY`; у скриншотов
+      она лежит в `userData.lum` текстуры. По ней кадр приводится к общему уровню. */
+  lum: number;
+  lumAt: number;
   vel: Float32Array;
   disp: Float32Array;
   /** Податливость каждой точки: без разброса облако летит ровным строем. */
@@ -361,7 +369,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
     /** Положение объектов для вёрстки. Заводится однажды и переписывается
         на месте: новый массив каждый кадр — лишняя работа сборщику мусора. */
-    const frames: StationFrame[] = stations.map(() => ({ d: 0, x: 0, y: 0, hw: 0, hh: 0, vis: 0 }));
+    const frames: StationFrame[] = stations.map(() => ({ d: 0, x: 0, y: 0, hw: 0, hh: 0, ink: 0, vis: 0 }));
     let raf = 0;
 
     /* При «уменьшить движение» камера не едет, а переставляется: положение
@@ -398,6 +406,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           f.y = h / 2;
           f.hw = Math.min(w * 0.3, 320);
           f.hh = 70;
+          f.ink = 70;
           f.vis = Math.max(0, 1 - Math.abs(f.d) * 2);
         }
         const fb = fallbackRef.current;
@@ -765,6 +774,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         points, geo, mat, u, a, b, n, vel, disp, give, sprayed, back, trip, pace, stir, spray, dispAttr, velAttr,
         glow: solid && spec.media ? sphereGlow(scene, u) : null,
         calm: false, morph: 0, restless: false, homing: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
+        lum: 0.35, lumAt: 0,
       };
       if (spec.media) loadMedia(body, spec.media);
       return body;
@@ -774,27 +784,36 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        само, без звука и по кругу. Иначе скриншоты сменяют друг друга.
        Пока кадр не пришёл, сфера просто песочная. */
     const loader = new THREE.TextureLoader();
+    /* Средняя яркость кадра — по уменьшенной копии. По ней все сферы
+       приводятся к одному уровню: светлый скриншот не выжигает сферу
+       в белое, тёмный не гасит её до черноты. Считается у каждого
+       скриншота и у видео по ходу: прежде брался один первый кадр, и сфера
+       с роликом из темноты или с тёмным первым экраном горела не так, как
+       соседняя (Илья, 2026-11-03: «первая ярче, вторая тусклее»). */
+    const lumCanvas = document.createElement("canvas");
+    lumCanvas.width = lumCanvas.height = 24;
+    const lumCtx = lumCanvas.getContext("2d", { willReadFrequently: true });
+    const meanLum = (src: CanvasImageSource) => {
+      if (!lumCtx) return 0.35;
+      lumCtx.drawImage(src, 0, 0, 24, 24);
+      const d = lumCtx.getImageData(0, 0, 24, 24).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+      return sum / (d.length / 4);
+    };
+    const gainOf = (lum: number) => Math.max(0.35, Math.min(3, 0.35 / Math.max(0.02, lum)));
     const loadMedia = (body: Body, media: NonNullable<StationSpec["media"]>) => {
-      /* Средняя яркость кадра — по уменьшенной копии. По ней все сферы
-         приводятся к одному уровню: светлый скриншот не выжигает сферу
-         в белое, тёмный не гасит её до черноты. */
-      const meanLum = (src: CanvasImageSource) => {
-        const c = document.createElement("canvas");
-        c.width = c.height = 24;
-        const g = c.getContext("2d", { willReadFrequently: true });
-        if (!g) return 0.35;
-        g.drawImage(src, 0, 0, 24, 24);
-        const d = g.getImageData(0, 0, 24, 24).data;
-        let sum = 0;
-        for (let i = 0; i < d.length; i += 4) sum += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
-        return sum / (d.length / 4);
-      };
       const ready = (tex: THREE.Texture, w: number, h: number, src: CanvasImageSource) => {
         if (!alive || !bodies.includes(body)) return;
-        tex.minFilter = THREE.LinearFilter;
-        tex.generateMipmaps = false;
+        /* Мип-уровни нужны экрану комнаты: размытие в следе руки берёт
+           выборки с уровня помельче (SURFACE_FRAG). У видео three пересобирает
+           их на каждом новом кадре. */
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.generateMipmaps = true;
+        tex.needsUpdate = true;
         body.u.uTexAspect.value = w / Math.max(h, 1);
-        body.u.uTexGain.value = Math.max(0.35, Math.min(3, 0.35 / Math.max(0.02, meanLum(src))));
+        body.lum = meanLum(src);
+        body.u.uTexGain.value = gainOf(body.lum);
         body.u.uTexAmt.value = 1;
         dirty = true;
       };
@@ -817,6 +836,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           if (!alive) return tex.dispose();
           body.shots[i] = tex;
           const img = tex.image as HTMLImageElement;
+          tex.userData.lum = meanLum(img);
           if (i === 0) {
             body.u.uTex0.value = body.u.uTex1.value = tex;
             ready(tex, img.width, img.height, img);
@@ -826,8 +846,20 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     };
 
     /** Смена скриншотов на сфере: держим кадр, затем плавно переливаем
-        в следующий. Видео меняется само. */
-    const stepShots = (b: Body, t: number) => {
+        в следующий. Видео меняется само. Заодно яркость сферы идёт за
+        кадром — плавно, без мигания на смене. */
+    const stepShots = (b: Body, t: number, dt: number) => {
+      if (b.u.uTexAmt.value > 0) {
+        const v = b.video;
+        if (v && !v.paused && v.readyState >= 2 && t - b.lumAt > LUM_EVERY) {
+          b.lumAt = t;
+          b.lum = meanLum(v);
+        }
+        const l0 = b.u.uTex0.value?.userData.lum as number | undefined;
+        const l1 = b.u.uTex1.value?.userData.lum as number | undefined;
+        const lum = v || l0 === undefined ? b.lum : l0 + ((l1 ?? l0) - l0) * b.u.uTexMix.value;
+        b.u.uTexGain.value += (gainOf(lum) - b.u.uTexGain.value) * (1 - Math.pow(0.05, dt));
+      }
       const list = b.shots.filter(Boolean);
       if (b.video || list.length < 2) return;
       if (!b.shotAt) b.shotAt = t;
@@ -1809,6 +1841,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         f.y = h / 2;
         f.hw = b?.a.halfW ?? 0;
         f.hh = b?.a.halfH ?? 0;
+        f.ink = b?.a.inkBottom ?? f.hh;
         f.vis = b ? vis * (1 - away) : 0;
         if (!b) continue;
 
@@ -1847,7 +1880,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         }
         // Притушить — по той же кривой, что раскрытие: по прямой тень замирала рывком.
         b.u.uDim.value = (stations[k].dim ?? 0) * (b.solid ? unfoldAt(b.morph) : burstAt(b.morph));
-        stepShots(b, t);
+        stepShots(b, t, dt);
         // Видео на сфере крутится, только пока она рядом: дальние стоят.
         if (b.video) {
           const play = Math.abs(d) < 1 && vis > 0.01;
