@@ -54,12 +54,16 @@
     }
   ],
   "scheme": "",
-  "video": "",
-  "poster": "",
+  "video": "/media/fact-check/video.mp4",
+  "poster": "/media/fact-check/poster.webp",
   "shots": [
     {
       "image": "/media/fact-check/01-pipeline.webp",
       "caption": "Как устроено: бот готовит точный текст с таймкодами, Claude разбирает, что в нём правда"
+    },
+    {
+      "image": "/media/fact-check/02-terminal.webp",
+      "caption": "Тот же конвейер из терминала: ссылка на ролик — через 5 секунд текст с источником, датой и таймкодами"
     }
   ],
   "links": [],
@@ -111,6 +115,10 @@
       {
         "image": "/media/fact-check/01-pipeline.webp",
         "caption": "How it works: the bot produces an exact transcript with timestamps, Claude works out what in it is true"
+      },
+      {
+        "image": "/media/fact-check/02-terminal.webp",
+        "caption": "The same pipeline from the terminal: a video link becomes text with source, date and timestamps in 5 seconds"
       }
     ]
   }
