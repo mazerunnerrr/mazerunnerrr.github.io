@@ -81,6 +81,11 @@ export type StationSpec = {
   /** Пересобирается на месте с соседней надписью, у которой тоже стоит этот
       флаг, — как две сферы подряд. */
   reform?: boolean;
+  /** Насколько поднять объект над серединой окна, доля высоты: под «@» стоят
+      контакты, и вместе они должны стоять по центру. Поднимается камера —
+      плавно, по мере подлёта к точке, — поэтому формы, рука и пересборка
+      в соседа не знают о сдвиге. */
+  rise?: number;
 };
 
 const FLOW = { streak: 1, implode: 2, scatter: 3, condense: 4, vortex: 5 } as const;
@@ -974,6 +979,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let w = 0;
     let h = 0;
     let baseZ = 1000;
+    /** Насколько поднята камера сейчас (`StationSpec.rise`), пиксели. */
+    let lift = 0;
     let water = new Water(1, 1);
     let waterData = new Float32Array(4);
     /* Линейная выборка из float-текстуры — расширение; без него вода
@@ -1423,8 +1430,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         probe.rawSpeed = Math.max(probe.rawSpeed, Math.hypot(raw.x, raw.y));
         probe.speed = Math.max(probe.speed, speed);
       }
+      // Рука — в координатах мира: камера у точки с `rise` поднята.
       const hx = rawMouse.x;
-      const hy = rawMouse.y;
+      const hy = rawMouse.y - lift;
       const vhx = handVel.x;
       const vhy = handVel.y;
 
@@ -1889,6 +1897,16 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         }
       }
 
+      // Подъём камеры у точек с `rise`: объект встаёт выше середины окна.
+      lift = 0;
+      for (let k = 0; k < N; k++) {
+        const r = stations[k].rise;
+        if (!r) continue;
+        const a = Math.max(0, 1 - Math.abs(frames[k].d));
+        lift += r * h * a * a * (3 - 2 * a);
+      }
+      if (lift) for (const f of frames) f.y -= lift;
+
       const active = bodies[near] ?? null;
       const settled =
         !!active && Math.abs(ringOffset(progress, near, N)) < 0.12 && (active.morph < 0.01 || active.morph > 0.99);
@@ -1981,7 +1999,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Крен сцены за рукой — маленький, иначе вёрстка поверх канваса
       // разъезжается с картинкой под ней.
       camera.position.x = -dragVec.x * 0.05 * drag;
-      camera.position.y = -dragVec.y * 0.05 * drag;
+      camera.position.y = -dragVec.y * 0.05 * drag - lift;
 
       renderer.render(scene, camera);
       loaded();

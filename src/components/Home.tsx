@@ -177,7 +177,16 @@ export function Home({
         : []),
       /* «@» приходит стяжкой из-за краёв экрана, уходит пересборкой в имя;
          зажатая рука распыляет и крутит его, как имя (Илья, 2026-10-20). */
-      { shape: { kind: "text", text: "@" }, grip: "spray", light: LIGHT.contacts, arrive: "implode", reform: true },
+      /* «@» выше середины: под ним строка контактов, и знак с ней вместе
+         стоят по центру кадра (Илья, 2026-11-03: «слишком низко, дисбаланс»). */
+      {
+        shape: { kind: "text", text: "@" },
+        grip: "spray",
+        light: LIGHT.contacts,
+        arrive: "implode",
+        reform: true,
+        rise: 0.12,
+      },
     ],
     [site.alias, spheres, jobs]
   );
