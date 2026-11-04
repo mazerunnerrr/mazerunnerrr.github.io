@@ -67,9 +67,9 @@ export class RoomSurfaces {
       uRadius: { value: RADIUS },
       uMargin: { value: MARGIN },
       uBlur: { value: BLUR },
-      /* Край экрана стоит, гнётся только картинка внутри (Илья, 2026-11-03).
-         Прежний край, гнущийся вместе с ней, — ?frame=wave в адресе. */
-      uWave: { value: new URLSearchParams(location.search).get("frame") === "wave" ? 1 : 0 },
+      /* Край экрана гнётся вместе с картинкой (Илья, 2026-11-04).
+         Стоящий край, где гнётся только картинка внутри, — ?frame=still в адресе. */
+      uWave: { value: new URLSearchParams(location.search).get("frame") === "still" ? 0 : 1 },
       uScreen: this.px,
       ...water,
     };
