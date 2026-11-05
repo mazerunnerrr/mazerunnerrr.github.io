@@ -112,6 +112,11 @@ export class RoomSurfaces {
     this.shade.scale.set(w, h, 1);
   }
 
+  /** Где экран комнаты `k` на экране — палец по нему принадлежит экрану. */
+  frameOf(k: number) {
+    return this.layouts.get(k)?.frame;
+  }
+
   /** Вёрстка комнаты измерилась (открыли, сменился размер). */
   layout(k: number, l: RoomLayout | null) {
     if (l) this.layouts.set(k, l);

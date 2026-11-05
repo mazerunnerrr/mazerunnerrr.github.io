@@ -579,7 +579,7 @@ export function Home({
         type="button"
         onClick={closeRoom}
         onPointerEnter={flipHover}
-        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
+        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:left-[var(--gutter)] max-md:right-auto max-md:top-[calc(var(--gutter)+28px)]"
       >
         {/* Esc на тач-экране нет — там подпись без него. */}
         <span className="pointer-coarse:hidden">
@@ -902,10 +902,12 @@ export function Home({
           <span className="instrument text-[var(--color-sand)]">
             <Flip text={site.alias} />
           </span>
-          <span className="instrument text-[var(--sand-dim)]">
+          {/* На телефоне — только псевдоним: статус есть в «обо мне», проект —
+              в выноске над сферой (Илья, 2026-11-05: «лишний текст»). */}
+          <span className="instrument text-[var(--sand-dim)] max-md:hidden">
             <Flip text={site.status} />
           </span>
-          <span ref={routeRef} className="instrument max-w-[calc(100vw-2*var(--gutter)-64px)] truncate text-[var(--sand-dim)] md:max-w-none">
+          <span ref={routeRef} className="instrument text-[var(--sand-dim)] max-md:hidden">
             {route[0]}
           </span>
         </div>
@@ -916,7 +918,7 @@ export function Home({
             играет. Работает и из комнаты: сначала выводит на аллею. */}
         <nav
           aria-label={t.nav}
-          className="pointer-events-auto absolute right-[var(--gutter)] top-[var(--gutter)] flex items-center gap-4"
+          className="pointer-events-auto absolute right-[var(--gutter)] top-[var(--gutter)] flex flex-col items-end gap-1.5 md:flex-row md:items-center md:gap-4"
         >
           {projects.length > 0 ? (
             <a
@@ -960,11 +962,12 @@ export function Home({
               ))}
             </svg>
           </button>
+          {/* На телефоне строка не влезала — там столбиком, «контакт» первым (Илья, 2026-11-05). */}
           <a
             href="#contacts"
             onClick={(e) => jump(CONTACTS, e)}
             onPointerEnter={flipHover}
-            className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
+            className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:-order-1"
           >
             <Flip text={t.contact} />
           </a>

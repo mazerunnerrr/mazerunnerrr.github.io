@@ -83,6 +83,8 @@ export class Journey {
   private touching = false;
   /** Кнопка зажата: сцена держится, пока её не отпустят. */
   private pressed = false;
+  /** Палец лёг на объект (`claimTouch`): этот жест — его, не маршрута. */
+  private claimed = false;
   /** Где была цель в начале жеста: дальше соседней от неё точки жест не везёт. */
   private anchor = 0;
   /** Открыта комната: сцена в ней статична, колесо маршрут не двигает. */
@@ -241,6 +243,7 @@ export class Journey {
     const onTouchEnd = (e: TouchEvent) => {
       this.touching = e.touches.length > 0;
       this.lastInput = performance.now();
+      if (!this.touching) this.claimed = false;
       if (this.touching || this.locked || touchPath === 0) return;
       // Скорость пальца в конце жеста, px/мс; знак — как у `push`.
       const now = performance.now();
@@ -260,7 +263,7 @@ export class Journey {
       this.glideTo(to);
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (!mine(e)) return;
+      if (!mine(e) || this.claimed) return;
       const y = e.touches[0]?.clientY ?? ty;
       if (this.locked) {
         this.roomScroll((ty - y) * TOUCH_GAIN, e.target, touchFresh);
@@ -331,6 +334,14 @@ export class Journey {
   dispose() {
     this.detach.forEach((f) => f());
     this.detach = [];
+  }
+
+  /** Касание забрал объект под пальцем — имя, сфера, экран комнаты (Илья,
+      2026-11-05: жесты перебивали друг друга и смотрелись багом). Этим жестом
+      маршрут не листается и комната не закрывается. Зовётся из `pointerdown`,
+      он приходит раньше `touchstart`; снимается, когда поднят последний палец. */
+  claimTouch() {
+    this.claimed = true;
   }
 
   /** Замок на время комнаты. Кнопки и якоря (`goTo`) работают и под ним.

@@ -1080,7 +1080,26 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     /** Курсор над объектом с комнатой — системная «рука». Пишется только при смене. */
     let cursor = "";
 
+    /* Палец — только тому, чего коснулся (Илья, 2026-11-05). Лёг на имя, сферу
+       или «@» — жест их: тап открывает, ведение распыляет или вертит, маршрут
+       стоит (`journey.claimTouch`). В комнате проекта своё у экрана. Лёг мимо —
+       жест маршрута или комнаты, а сцена его не видит вовсе: ни кисти по точкам,
+       ни света, ни зажатия. У мыши всё как было. */
+    let fingerFree = false;
+    const touchesObject = (x: number, y: number) => {
+      if (room !== null) {
+        const fr = surfaces?.frameOf(room);
+        return !!fr && x >= fr.x && x <= fr.x + fr.w && y >= fr.y && y <= fr.y + fr.h;
+      }
+      const f = frames[nearNow];
+      const st = stations[nearNow];
+      if (!settledNow || !f || f.vis < 0.3 || !(st?.grip || st?.room)) return false;
+      if (bodies[nearNow]?.solid) return Math.hypot(x - f.x, y - f.y) <= f.hw + 12;
+      return Math.abs(x - f.x) <= f.hw && Math.abs(y - f.y) <= f.hh;
+    };
+
     const onMove = (e: PointerEvent) => {
+      if (fingerFree && e.pointerType === "touch") return;
       hoverTarget = 1;
       const r = rect;
       rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
@@ -1198,8 +1217,24 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       const el = e.target as Element | null;
-      if (el?.closest?.("a, button, input, textarea, select, label, video, [contenteditable], nextjs-portal")) return;
+      if (el?.closest?.("a, button, input, textarea, select, label, video, [contenteditable], nextjs-portal")) {
+        // Палец на кнопке — её дело; кисть за ним по точкам не идёт.
+        if (e.pointerType === "touch") fingerFree = true;
+        return;
+      }
       const r = rect;
+      if (e.pointerType === "touch") {
+        fingerFree = !touchesObject(e.clientX - r.left, e.clientY - r.top);
+        if (fingerFree) {
+          hoverTarget = 0;
+          return;
+        }
+        journey.claimTouch();
+        hoverTarget = 1;
+        rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
+        // Экран комнаты: рука по нему, сфера изнутри пальцем не вертится.
+        if (room !== null) return;
+      }
       dragging = true;
       dragLast.set(e.clientX, e.clientY);
       dragFrom.set(e.clientX - r.left, e.clientY - r.top);
@@ -1266,6 +1301,14 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       }
     };
     const onUp = (e: PointerEvent) => {
+      // Палец поднят — руки над сценой больше нет; ничей палец сцену не трогал.
+      if (e.pointerType === "touch") {
+        hoverTarget = 0;
+        if (fingerFree) {
+          fingerFree = false;
+          return;
+        }
+      }
       dragging = false;
       // Отпустили — цель сбрасывается, и точки идут домой напрямую,
       // из того положения, в котором их застали.
