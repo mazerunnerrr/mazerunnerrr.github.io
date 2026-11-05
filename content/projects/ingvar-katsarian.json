@@ -1,10 +1,10 @@
 {
-  "title": "Ingvar Katsarian",
+  "title": "Веб-сайты",
   "slug": "ingvar-katsarian",
   "year": "2026",
-  "role": "Под ключ: сайт, админка, выкладка",
+  "role": "премиальный сайт под ключ",
   "status": "в работе",
-  "summary": "Сайт-портфолио художника перформанса и коллажа на трёх языках: работы по сериям, перформансы, магазин по запросу. Работы и цены художник меняет сам в админке, и сайт пересобирается после каждой публикации.",
+  "summary": "Сайт-портфолио художника Ингвара Кацаряна на трёх языках: работы по сериям, перформансы, магазин по запросу. Работы и цены художник меняет сам в админке, и сайт обновляется после каждой публикации.",
   "task": "Работы художника были разбросаны по Telegram-каналу. Нужен был сайт на украинском, английском и русском, который художник ведёт сам, без разработчика под рукой.",
   "solution": "Статический сайт на Astro: быстрый, дешёвый в содержании, ломаться в нём нечему. Содержимое живёт в Sanity — художник правит его в админке на своём языке, а публикация через вебхук запускает пересборку на Cloudflare. Без украинского текста публикация не пройдёт: сайт не останется наполовину переведённым.",
   "result": "Сайт работает на временном адресе: 89 страниц на трёх языках, админка подключена, публикация доходит до сайта сама. Осталось подключить домен и сдать заказчику.",
@@ -85,8 +85,8 @@
   "links": [],
   "accent": "clay",
   "en": {
-    "role": "End to end: site, admin, deployment",
-    "summary": "A three-language portfolio site for a performance and collage artist: works by series, performances, a shop on request. The artist edits works and prices himself in the admin, and the site rebuilds after every publish.",
+    "role": "premium turnkey website",
+    "summary": "A three-language portfolio site for artist Ingvar Katsarian: works by series, performances, a shop on request. The artist edits works and prices himself in the admin panel, and the site updates after every publish.",
     "task": "The artist's work was scattered across a Telegram channel. He needed a site in Ukrainian, English and Russian that he could run himself, without a developer on call.",
     "solution": "A static Astro site: fast, cheap to keep, nothing to break. Content lives in Sanity, where the artist edits it in his own language, and publishing triggers a rebuild on Cloudflare through a webhook. A page can't be published without its Ukrainian text, so the site never ends up half-translated.",
     "result": "The site runs on a temporary address: 89 pages in three languages, the admin connected, publishing reaches the site on its own. What's left is the domain and the handover.",
@@ -151,6 +151,8 @@
         "image": "/media/ingvar-katsarian/06-ukrainian.webp",
         "caption": "The same section in Ukrainian; the site runs in three languages"
       }
-    ]
-  }
+    ],
+    "title": "Websites"
+  },
+  "order": 4
 }

@@ -41,9 +41,11 @@
   --st-personal: #c4907a;
   --st-research: #8fb3cc;
   --st-live: #a8c0a0;
-  /* Концепт — тёплый серый песок, «ищем инвестиции» — пыльная роза. */
+  /* Концепт — тёплый серый песок, «ищем инвестиции» — пыльная роза,
+     «заморожен» — холодный иней. */
   --st-concept: #c9bea8;
   --st-raise: #d4a3b4;
+  --st-frozen: #a9c3d6;
 
   /* Акцент проекта — по умолчанию пыльно-голубой. */
   --accent: var(--color-azure);
@@ -353,4 +355,28 @@ body {
 .hint[data-on] {
   opacity: 1;
   transition-delay: 1.8s;
+}
+
+/* Звук, который ещё ни разу не включали (Home.tsx, `data-hint`): линия раз в
+   несколько секунд мягко вспыхивает — видно, что это кнопка, а не черта
+   интерьера. После первого нажатия — больше никогда (Илья, 2026-11-05). */
+.sound-toggle[data-hint] svg {
+  animation: sound-hint 4.2s var(--ease-out-deep) 2.5s infinite;
+}
+@keyframes sound-hint {
+  0%,
+  62%,
+  100% {
+    color: inherit;
+    filter: none;
+  }
+  72% {
+    color: var(--color-sand);
+    filter: drop-shadow(0 0 4px var(--color-sand));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sound-toggle[data-hint] svg {
+    animation: none;
+  }
 }

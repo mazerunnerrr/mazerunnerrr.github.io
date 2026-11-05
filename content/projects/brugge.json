@@ -1,10 +1,10 @@
 {
-  "title": "ЖК BRUGGE",
+  "title": "Дизайн",
   "slug": "brugge",
   "year": "2026",
-  "role": "Дизайнер: вёрстка, знак, препресс",
-  "status": "концепт",
-  "summary": "Буклет продаж на 12 полос для жилого квартала BRUGGE застройщика Optimus: три варианта оформления и свой знак — фламандский фронтон, срезанный по крышам на каждом рендере. Собирается кодом в два файла: для экрана и для типографии.",
+  "role": "дизайн и полиграфия на заказ",
+  "status": "заморожен",
+  "summary": "Книга продаж на 12 полос для ЖК BRUGGE застройщика Optimus: три варианта оформления и свой знак в виде фламандского фронтона. Собирается кодом в два файла: для экрана и для типографии. Работа сделана, заказчик остановил проект на финише.",
   "task": "Прежний вариант буклета заказчик отклонил. Нужна была книга продаж уровня премиального квартала: свой образ, точные планировки и файлы, которые примет типография.",
   "solution": "Образ взял из самого здания: ступенчатый фламандский фронтон, снятый с логотипа, срезает верх каждого рендера — скрипт находит небо в кадре и подбирает глубину выреза, чтобы не задеть крыши. Вёрстка в HTML, сборка в PDF скриптами: версия для экрана в RGB и для печати в CMYK с вылетами и метками реза.",
   "result": "Три законченных варианта — тёмный, светлый и «Щипець» — и тизеры для заказчика. Площади всех 12 типов квартир сверены с рабочими чертежами архитектора: в прежнем буклете у двух они были перепутаны.",
@@ -87,9 +87,9 @@
   "links": [],
   "accent": "amber",
   "en": {
-    "title": "BRUGGE residential",
-    "role": "Designer: layout, mark, prepress",
-    "summary": "A 12-page sales book for the BRUGGE residential quarter by developer Optimus: three design variants and a mark of its own — a Flemish gable that crops the roofline of every render. Built by code into two files: one for screens, one for print.",
+    "title": "Design",
+    "role": "design and print to order",
+    "summary": "A 12-page sales book for the BRUGGE residential quarter by developer Optimus: three design variants and a mark of its own, a Flemish gable. Built by code into two files: one for screens, one for print. The work is done; the client put the project on hold at the finish line.",
     "task": "The client had turned down the previous version of the book. They needed a sales book on the level of a premium development: an identity of its own, accurate floor plans and files a print shop would accept.",
     "solution": "The identity came from the building itself: the stepped Flemish gable from the logo crops the top of every render — a script finds the sky in the frame and picks the depth of the cut so it never touches a roof. Layout in HTML, PDFs built by scripts: RGB for screens and CMYK for print with bleed and crop marks.",
     "result": "Three finished variants — dark, light and Gable — plus teasers for the client. The areas of all 12 apartment types were checked against the architect's working drawings: the previous book had two of them mixed up.",
@@ -155,5 +155,6 @@
         "caption": "Light variant, cover"
       }
     ]
-  }
+  },
+  "order": 6
 }

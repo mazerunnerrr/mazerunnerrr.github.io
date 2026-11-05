@@ -2,9 +2,9 @@
   "title": "Нейротипология",
   "slug": "neurotypology",
   "year": "2026",
-  "role": "Соло: бот, приложение, связка с Claude",
+  "role": "личный инструмент с ИИ",
   "status": "личный проект",
-  "summary": "Приложение с базой признаков, с которой можно работать в разных сценариях: карточки, разметка фото чертежами, приём данных из Telegram-бота. Разбор делает Claude — он работает с этой базой в связке с приложением по строгим правилам.",
+  "summary": "Инструмент для предмета, который я изучаю: база из 43 признаков, разметка лица по фото и приём данных из Telegram-бота. Claude разбирает строго по этой базе и ничего не додумывает.",
   "task": "Разбор по методике нейротипологии — это 43 признака, сотни вариантов и разметка лица по фото. Держать это в голове и в заметках не получалось, а ИИ, которому дают свободу, начинает додумывать.",
   "solution": "Сначала был бот, который сам писал описания через языковую модель, — и сам же придумывал лишнее. Я развернул архитектуру: бот теперь только собирает признаки с телефона, а всё остальное живёт в локальном приложении. Разбор делает Claude по спецификации из 11 задач и 10 правил против отсебятины, а приложение даёт ему базу и инструменты.",
   "result": "Приложение работает: база признаков, разметка фото и разбор Claude связаны в один процесс, бот собирает данные с телефона. На сайте — демо на вымышленных данных.",
@@ -81,8 +81,8 @@
   "accent": "amber",
   "en": {
     "title": "Neurotypology",
-    "role": "Solo: bot, app, Claude setup",
-    "summary": "An app built around a base of facial features you can work with in different scenarios: profiles, photo markup with drawings, data coming in from a Telegram bot. The analysis is done by Claude, working with that base alongside the app under strict rules.",
+    "role": "personal AI tool",
+    "summary": "A tool for a subject I study: a base of 43 features, face markup on photos and data coming in from a Telegram bot. Claude does the analysis strictly by that base and doesn't make things up.",
     "task": "An analysis by the neurotypology method means 43 features, hundreds of variants and markup of a face from a photo. Keeping it in my head and in notes didn't work, and an AI left to itself starts making things up.",
     "solution": "It started as a bot that wrote descriptions through a language model — and invented things along the way. I turned the architecture around: the bot now only collects features from the phone, and everything else lives in a local app. Claude does the analysis under a spec of 11 tasks and 10 rules against guesswork, and the app gives it the base and the tools.",
     "result": "The app works: the feature base, photo markup and Claude's analysis are one process, and the bot collects data from the phone. The site shows a demo on made-up data.",
@@ -140,5 +140,6 @@
         "caption": "Blind-test scoring on demo answers: hit rate, binomial test, Fisher's exact test for the Barnum effect"
       }
     ]
-  }
+  },
+  "order": 5
 }

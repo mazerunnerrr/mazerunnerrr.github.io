@@ -351,6 +351,7 @@ export function Home({
     };
   }, []);
   const toggleSound = () => {
+    hintDone("sound");
     const next = !sound;
     if (next && !ambienceRef.current) {
       ambienceRef.current = new Ambience(site.music);
@@ -735,14 +736,17 @@ export function Home({
   /** Звук — линия, которая оживает волной того, что играет. Кнопок две: в строке
       приборов на десктопе и под псевдонимом на телефоне (Илья, 2026-11-05) —
       волну кадровый обработчик пишет в обе. На телефоне линия во всю ширину
-      псевдонима: `w-0 min-w-full` не даёт ей самой раздвинуть колонку. */
+      псевдонима: `w-0 min-w-full` не даёт ей самой раздвинуть колонку.
+      Пока её ни разу не нажимали, она изредка мягко вспыхивает: без этого
+      линию принимали за деталь интерьера (Илья, 2026-11-05). */
   const soundButton = (set: number, className: string) => (
     <button
       type="button"
       onClick={toggleSound}
       aria-pressed={sound}
       aria-label={sound ? t.soundOff : t.soundOn}
-      className={`flex h-6 items-center transition-colors duration-500 ease-[var(--ease-out-deep)] ${
+      data-hint={hintsDone && !hintsDone.has("sound") ? "" : undefined}
+      className={`sound-toggle flex h-6 items-center transition-colors duration-500 ease-[var(--ease-out-deep)] ${
         sound ? "text-[var(--color-azure)]" : "text-[var(--sand-faint)] hover:text-[var(--color-sand)]"
       } ${className}`}
     >

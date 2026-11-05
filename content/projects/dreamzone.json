@@ -2,7 +2,7 @@
   "title": "Dreamzone",
   "slug": "dreamzone",
   "year": "2026",
-  "role": "Соло: продукт, интерфейс, шейдеры",
+  "role": "приложение",
   "status": "в работе",
   "summary": "Веб-приложение для мечт: кладёшь в мечту фото и строки, и она становится живой сценой — цвет берётся из твоего снимка, поверх лежит жидкое стекло, которое отвечает на руку. Смысл не «создать», а возвращаться к своему «зачем».",
   "task": "Доски желаний и заметки про цели выглядят как списки: открыл, пролистал, закрыл. Хотелось места, куда хочется возвращаться, — где мечта ощущается, а не читается.",
@@ -78,7 +78,7 @@
   "links": [],
   "accent": "azure",
   "en": {
-    "role": "Solo: product, interface, shaders",
+    "role": "app",
     "summary": "A web app for dreams: put photos and lines into a dream and it becomes a living scene — its colour taken from your photo, with liquid glass on top that answers your hand. The point isn't to create, it's to come back to your why.",
     "task": "Vision boards and goal notes look like lists: open, scroll, close. I wanted a place you want to come back to — where a dream is felt rather than read.",
     "solution": "The whole grid of dreams and the open scene are one WebGL canvas: a card doesn't switch to a page, it stretches into the scene in the same material. Each dream's palette is computed from its photo; the interface has no palette of its own. Smoothness was checked with measurements on a real GPU, not by eye.",
@@ -137,5 +137,6 @@
         "caption": "Another dream, another light: the palette comes from its photo"
       }
     ]
-  }
+  },
+  "order": 2
 }

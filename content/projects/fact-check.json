@@ -1,8 +1,8 @@
 {
-  "title": "Проверка фактов по видео",
+  "title": "Telegram-боты с ИИ",
   "slug": "fact-check",
   "year": "2026",
-  "role": "Соло: бот, связка с Claude",
+  "role": "бот для проверки фактов по видео",
   "status": "запущен",
   "summary": "Одна система из двух половин: Telegram-бот расшифровывает пост или видео из X, YouTube и Telegram с таймкодами, а Claude в настроенных под это проектах разбирает текст и проверяет факты. Друг без друга они не работают.",
   "task": "Проверять, что сказано в ролике, долго: смотреть, перематывать, переписывать. Готовые расшифровки теряют куски речи и придумывают фразы, которых не было, а без таймкодов не найти, где что сказано. И даже точный текст нужно ещё разобрать.",
@@ -69,8 +69,8 @@
   "links": [],
   "accent": "sage",
   "en": {
-    "title": "Video fact-check",
-    "role": "Solo: bot and Claude setup",
+    "title": "AI Telegram bots",
+    "role": "a bot that fact-checks videos",
     "summary": "One system in two halves: a Telegram bot transcribes a post or video from X, YouTube or Telegram with timestamps, and Claude, in projects set up for it, takes the text apart and checks the facts. Neither half works without the other.",
     "task": "Checking what a video actually says takes time: watch, rewind, write it down. Ready-made transcripts drop parts of the speech and invent lines nobody said, and without timestamps you can't find where something was said. Even an exact text still has to be analysed.",
     "solution": "I split the work in two. The bot is responsible for an exact text: it downloads the audio, cuts it at pauses, sends it to Whisper and checks the result — removing phantom lines, flagging uncertain spots, re-transcribing gaps. The analysis is Claude's: I have dedicated projects and chats set up for fact-checking, and the text goes there with its source, author and date.",
@@ -121,5 +121,6 @@
         "caption": "The same pipeline from the terminal: a video link becomes text with source, date and timestamps in 5 seconds"
       }
     ]
-  }
+  },
+  "order": 7
 }

@@ -2,7 +2,7 @@
   "title": "Task Manager",
   "slug": "task-manager",
   "year": "2026",
-  "role": "Соло-разработчик: продукт, бэкенд, веб, Android и сервер",
+  "role": "приложение",
   "status": "запущен",
   "summary": "Таск-менеджер, которым я пользуюсь каждый день: канбан на компьютере, приложение на телефоне, Android-виджет и будильники на весь экран. Учебный материал он сам раскладывает на повторения по кривой забывания.",
   "task": "Задачи жили в системных напоминаниях Samsung, и открыть их можно было только с телефона. На ноутбуке их не было вовсе. Я хотел один список на всех устройствах и при этом не терять то, что в Samsung работало хорошо: громкое напоминание на весь экран, которое звучит даже в беззвучном режиме. Вторая потребность появилась из учёбы. Материал нужно повторять по кривой забывания, это десять дат на каждую тему, и считать их вручную я бы не стал.",
@@ -97,7 +97,7 @@
   "accent": "azure",
   "order": 1,
   "en": {
-    "role": "Solo developer: product, backend, web, Android and server",
+    "role": "app",
     "summary": "A task manager I use daily: desktop kanban, a phone app, an Android widget and full-screen alarms. It also turns study material into a review schedule along the forgetting curve.",
     "task": "My tasks lived in Samsung's built-in reminders, and I could only reach them from the phone. On the laptop they didn't exist at all. I wanted one list on every device without losing what Samsung did well: a loud full-screen reminder that rings even in silent mode. The second need came from studying. Material has to be reviewed along the forgetting curve, which means ten dates per topic, and I wasn't going to calculate those by hand.",
     "solution": "One FastAPI and SQLite backend serves both the desktop and the mobile UI, and the widget and alarms talk to the same API. The frontend is plain JavaScript with no build step: one person maintains the project, and it has to stay easy to fix a year from now. The phone UI is a PWA, so it updates with every server deploy. I wrote native Android code only where the web falls short. Web Push can't show a screen over the lock screen or play an alarm sound, so the server publishes a ready schedule and the phone sets its own alarms a week ahead. When a reminder fires, the phone doesn't need the network.",

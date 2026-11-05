@@ -2,7 +2,7 @@
   "title": "Snake Battle",
   "slug": "snake-battle",
   "year": "2026",
-  "role": "Сооснователь: концепция, экономика, дизайн, питч",
+  "role": "стартап",
   "status": "ищем инвестиции",
   "summary": "Стартап крипто-игры: «Змейка», где игроки съедают друг друга и забирают ставки в USDT. Готовы концепция, экономика, геймдизайн, маркетинг-план и питч-дек — ищем инвестиции на MVP.",
   "task": "Превратить идею в проект, который можно показать инвестору: понятная экономика, честная механика ставок, план роста — и подача, которую запоминают.",
@@ -82,7 +82,7 @@
   "links": [],
   "accent": "clay",
   "en": {
-    "role": "Co-founder: concept, economy, design, pitch",
+    "role": "startup",
     "summary": "A crypto game startup: Snake, where players eat each other and take the USDT stakes. Concept, economy, game design, marketing plan and pitch deck are done — we're raising for the MVP.",
     "task": "Turn an idea into something you can show an investor: a clear economy, fair stake mechanics, a growth plan — and a pitch people remember.",
     "solution": "My brother and I worked out the concept and all the numbers together; a third partner handles business development. The economy lives in the game design document: leagues from $0.10 to $10, player share, fees, anti-fraud. Growth goes through Telegram. A 16-slide pitch deck in one neon style, plus an animated version.",
@@ -149,5 +149,6 @@
         "caption": "Roadmap: three phases from the MVP to tournaments and NFTs"
       }
     ]
-  }
+  },
+  "order": 3
 }

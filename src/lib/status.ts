@@ -12,6 +12,7 @@ export const STATUS: Record<Project["status"], { dot: string; text: string }> = 
   запущен: { dot: "bg-[var(--st-live)]", text: "text-[var(--st-live)]" },
   концепт: { dot: "bg-[var(--st-concept)]", text: "text-[var(--st-concept)]" },
   "ищем инвестиции": { dot: "bg-[var(--st-raise)]", text: "text-[var(--st-raise)]" },
+  заморожен: { dot: "bg-[var(--st-frozen)]", text: "text-[var(--st-frozen)]" },
 };
 
 /** Цвет комнаты, когда в админке он не выбран, — цвет статуса. */
@@ -22,6 +23,7 @@ const STATUS_ACCENT: Record<Project["status"], Accent> = {
   запущен: "sage",
   концепт: "azure",
   "ищем инвестиции": "clay",
+  заморожен: "azure",
 };
 export const accentOf = (p: Project): Accent => p.accent ?? STATUS_ACCENT[p.status];
 
