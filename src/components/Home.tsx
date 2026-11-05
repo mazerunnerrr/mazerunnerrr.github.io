@@ -624,8 +624,7 @@ export function Home({
       amb.bands(dtw, bands);
       LINES.forEach((ln, li) => {
         const path = paths[li];
-        const twin = paths[LINES.length + li];
-        if (!path && !twin) return;
+        if (!path) return;
         const a = bands[li] * ln.amp * (WAVE_H / 2 - 1.5);
         phase[li] += dtw * ln.speed * (1 + bands[li]);
         let d = "";
@@ -634,8 +633,7 @@ export function Home({
           const y = WAVE_H / 2 - Math.sin(u * Math.PI * ln.crests - phase[li] + li * 1.3) * a * Math.sin(Math.PI * u);
           d += `${i ? "L" : "M"}${(u * WAVE_W).toFixed(1)} ${y.toFixed(2)}`;
         }
-        path?.setAttribute("d", d);
-        twin?.setAttribute("d", d);
+        path.setAttribute("d", d);
       });
       waveFlat.current = false;
     } else if (!waveFlat.current) {
@@ -671,11 +669,11 @@ export function Home({
         type="button"
         onClick={closeRoom}
         onPointerEnter={flipHover}
-        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:bottom-[var(--gutter)] max-md:top-auto"
+        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+56px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:bottom-[var(--gutter)] max-md:top-auto"
       >
         {/* Esc на тач-экране нет — там подпись без него. На телефоне кнопка справа
-            внизу, на одной строке с «полный кейс» и на том же поле от края
-            (Илья, 2026-11-05). */}
+            внизу, на одной строке с «полный кейс» и на том же поле от края; на
+            десктопе — справа сверху под языком (Илья, 2026-11-05). */}
         <span className="pointer-coarse:hidden">
           <Flip text={t.close} />
         </span>
@@ -733,13 +731,12 @@ export function Home({
     </span>
   );
 
-  /** Звук — линия, которая оживает волной того, что играет. Кнопок две: в строке
-      приборов на десктопе и под псевдонимом на телефоне (Илья, 2026-11-05) —
-      волну кадровый обработчик пишет в обе. На телефоне линия во всю ширину
-      псевдонима: `w-0 min-w-full` не даёт ей самой раздвинуть колонку.
+  /** Звук — линия, которая оживает волной того, что играет. Стоит под
+      псевдонимом (Илья, 2026-11-05) во всю его ширину: `w-0 min-w-full` не даёт
+      ей самой раздвинуть колонку.
       Пока её ни разу не нажимали, она изредка мягко вспыхивает: без этого
       линию принимали за деталь интерьера (Илья, 2026-11-05). */
-  const soundButton = (set: number, className: string) => (
+  const soundButton = (className: string) => (
     <button
       type="button"
       onClick={toggleSound}
@@ -756,13 +753,13 @@ export function Home({
         viewBox={`0 0 ${WAVE_W} ${WAVE_H}`}
         preserveAspectRatio="none"
         aria-hidden
-        className={`overflow-visible ${set ? "w-full" : ""} ${sound ? "wave-glow" : ""}`}
+        className={`w-full overflow-visible ${sound ? "wave-glow" : ""}`}
       >
         {LINES.map((ln, i) => (
           <path
             key={i}
             ref={(el) => {
-              waveRefs.current[set * LINES.length + i] = el;
+              waveRefs.current[i] = el;
             }}
             d={FLAT}
             fill="none"
@@ -1074,41 +1071,39 @@ export function Home({
           <span className="instrument text-[var(--color-sand)]">
             <Flip text={site.alias} />
           </span>
-          {/* На телефоне — только псевдоним: статус есть в «обо мне», проект —
-              в выноске над сферой (Илья, 2026-11-05: «лишний текст»). Под ним
-              там звук — дорожкой во всю ширину псевдонима. */}
-          <span className="instrument text-[var(--sand-dim)] max-md:hidden">
-            <Flip text={site.status} />
-          </span>
-          <span ref={routeRef} className="instrument text-[var(--sand-dim)] max-md:hidden">
+          {/* Только псевдоним: статус есть в «обо мне», проект — в выноске над
+              сферой (Илья, 2026-11-05: «лишний текст», сперва на телефоне, потом
+              и на десктопе). Номер точки остаётся скринридеру. Под псевдонимом —
+              звук, дорожкой во всю его ширину. */}
+          <span ref={routeRef} className="sr-only">
             {route[0]}
           </span>
-          {soundButton(1, "pointer-events-auto mt-1 w-0 min-w-full md:hidden")}
+          {soundButton("pointer-events-auto mt-1 w-0 min-w-full")}
         </div>
 
         {/* Переключатель: к работам, звук, к контактам. Мысль подсмотрена
             у Active Theory, вид свой: без капсулы и свечения — строка
             приборов, а звук — линия, которая оживает волной того, что
             играет. Работает и из комнаты: сначала выводит на аллею.
-            На телефоне (Илья, 2026-11-05): «работы | контакт» строкой, язык
-            под ними, звук — слева под псевдонимом. */}
+            С 2026-11-05 (Илья) — «работы | контакт» строкой, язык под ними,
+            звук — слева под псевдонимом; сперва на телефоне, потом везде. */}
         <nav
           aria-label={t.nav}
-          className="pointer-events-auto absolute right-[var(--gutter)] top-[var(--gutter)] flex flex-col items-end gap-2 md:flex-row md:items-center md:gap-4"
+          className="pointer-events-auto absolute right-[var(--gutter)] top-[var(--gutter)] flex flex-col items-end gap-2"
         >
-          <span className="flex items-center gap-2.5 md:contents">
+          <span className="flex items-center gap-2.5">
             {projects.length > 0 ? (
               <a
                 href="#projects"
                 onClick={(e) => jump(FIRST_PROJECT, e)}
                 onPointerEnter={flipHover}
-                className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] md:order-1"
+                className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
               >
                 <Flip text={t.work} />
               </a>
             ) : null}
             {projects.length > 0 ? (
-              <span aria-hidden className="instrument text-[var(--sand-faint)] md:hidden">
+              <span aria-hidden className="instrument text-[var(--sand-faint)]">
                 |
               </span>
             ) : null}
@@ -1116,15 +1111,14 @@ export function Home({
               href="#contacts"
               onClick={(e) => jump(CONTACTS, e)}
               onPointerEnter={flipHover}
-              className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] md:order-3"
+              className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
             >
               <Flip text={t.contact} />
             </a>
           </span>
-          {soundButton(0, "max-md:hidden md:order-2")}
           {/* Язык: английский по умолчанию, русский — по выбору. Мир при смене
               не перезагружается, меняются только надписи. */}
-          <span role="group" aria-label={t.language} className="flex items-center gap-1.5 md:order-4">
+          <span role="group" aria-label={t.language} className="flex items-center gap-1.5">
             {LANGS.map((l, i) => (
               <span key={l} className="flex items-center gap-1.5">
                 {i > 0 ? (
