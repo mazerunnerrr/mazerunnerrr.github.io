@@ -644,7 +644,7 @@ export function Home({
       ) : (
         <div
           data-room-scroll
-          className="no-scrollbar pointer-events-auto absolute inset-0 overflow-y-auto overscroll-contain px-[var(--gutter)] pb-[calc(var(--gutter)+40px)] pt-[calc(var(--gutter)+150px)]"
+          className="no-scrollbar pointer-events-auto absolute inset-0 touch-pan-y overflow-y-auto overscroll-contain px-[var(--gutter)] pb-[calc(var(--gutter)+40px)] pt-[calc(var(--gutter)+150px)]"
         >
           {children}
         </div>
@@ -655,8 +655,11 @@ export function Home({
   return (
     /* Текст мира не выделяется: синяя заливка выделения поверх сцены
        читалась багом и ломала погружение (Илья, 2026-10-18). Заодно
-       жест кистью больше не протаскивает выделение по слоям. */
-    <main className="relative h-screen w-full select-none overflow-hidden">
+       жест кистью больше не протаскивает выделение по слоям. Палец — маршруту,
+       не браузеру (`touch-none`): без этого Chrome не давал отменить свайп,
+       и на Android он грозил перезагрузкой страницы. Колонка комнаты свою
+       прокрутку возвращает (`touch-pan-y`). */
+    <main className="relative h-screen w-full touch-none select-none overflow-hidden">
       <Scene
         stations={stations}
         landmarks={landmarks}

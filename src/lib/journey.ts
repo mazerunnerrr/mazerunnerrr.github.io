@@ -42,6 +42,17 @@ const GESTURE_GAP = 250;
    медленнее: точка — 1400 px колеса вместо 900, обычный круток проходит
    около половины пути, на соседнюю сцену нужно полтора-два. */
 const PX_PER_STOP = 1400;
+/* Палец. Ведёт сцену за собой (× `TOUCH_GAIN`), но отпущенный жест не ждёт
+   доводки к ближайшей: инерции у касания нет, и свайп в пол-экрана откатывался
+   назад — с телефона маршрут не листался вовсе (2026-11-05). Теперь, как
+   карусель: провёл дальше `TOUCH_COMMIT` точки или смахнул быстрее
+   `TOUCH_FLICK` — едем к соседней; иначе обратно. */
+const TOUCH_GAIN = 2.2;
+/** Доля точки, после которой отпущенный палец доводит до соседней (~65 px). */
+const TOUCH_COMMIT = 0.1;
+/** Взмах, px/мс за последние `FLICK_MS`, — тоже переход, даже короткий. */
+const TOUCH_FLICK = 0.35;
+const FLICK_MS = 90;
 /* Рука держит сцену между точками (Илья, 2026-10-20): зажатая кнопка мыши
    или продавленный тачпад — сцена стоит, сколько держишь; нажатие посреди
    отката его останавливает; отпустил — откат сразу. Пальцы, просто лежащие
@@ -217,27 +228,53 @@ export class Journey {
     let ty = 0;
     /** Первое движение пальца после касания — начало нового жеста. */
     let touchFresh = false;
+    /** Путь пальца за жест и его последние точки — для взмаха. */
+    let touchPath = 0;
+    let trail: Array<[number, number]> = [];
     const onTouchStart = (e: TouchEvent) => {
       ty = e.touches[0]?.clientY ?? 0;
       this.touching = true;
       touchFresh = true;
+      touchPath = 0;
+      trail = [[performance.now(), ty]];
     };
     const onTouchEnd = (e: TouchEvent) => {
       this.touching = e.touches.length > 0;
       this.lastInput = performance.now();
+      if (this.touching || this.locked || touchPath === 0) return;
+      // Скорость пальца в конце жеста, px/мс; знак — как у `push`.
+      const now = performance.now();
+      const recent = trail.filter(([t]) => now - t <= FLICK_MS);
+      const [t0, y0] = recent[0] ?? trail[trail.length - 1];
+      const [t1, y1] = trail[trail.length - 1];
+      const v = t1 > t0 ? (y0 - y1) / (t1 - t0) : 0;
+      const p = this.target;
+      const base = Math.round(this.anchor);
+      let to: number;
+      if (Math.abs(v) >= TOUCH_FLICK) to = v > 0 ? Math.floor(p + 1e-3) + 1 : Math.ceil(p - 1e-3) - 1;
+      else if (Math.abs(p - base) >= TOUCH_COMMIT) to = base + Math.sign(p - base);
+      else to = base;
+      // Не дальше соседней от начала жеста — как у колеса.
+      to = Math.max(Math.ceil(this.anchor - 1e-3) - 1, Math.min(Math.floor(this.anchor + 1e-3) + 1, to));
+      this.target = to;
+      this.glideTo(to);
     };
     const onTouchMove = (e: TouchEvent) => {
       if (!mine(e)) return;
       const y = e.touches[0]?.clientY ?? ty;
       if (this.locked) {
-        this.roomScroll((ty - y) * 2.2, e.target, touchFresh);
+        this.roomScroll((ty - y) * TOUCH_GAIN, e.target, touchFresh);
         touchFresh = false;
         ty = y;
         return;
       }
       e.preventDefault();
-      push((ty - y) * 2.2, touchFresh);
+      push((ty - y) * TOUCH_GAIN, touchFresh);
       touchFresh = false;
+      touchPath += Math.abs(ty - y);
+      const now = performance.now();
+      trail.push([now, y]);
+      if (trail.length > 12) trail.shift();
       ty = y;
     };
 
@@ -361,11 +398,15 @@ export class Journey {
     if (now - this.restAt < DWELL * 1000) return;
     const to = Math.round(this.target);
     this.target = to;
-    /* Откат — с разгоном и торможением, а не по экспоненте, которая
-       стартует на полной скорости и читается рывком. Длительность растёт
-       с расстоянием: полшага — около 1,7 с, чуть-чуть — около секунды. */
+    this.glideTo(to);
+  }
+
+  /** Откат — с разгоном и торможением, а не по экспоненте, которая
+      стартует на полной скорости и читается рывком. Длительность растёт
+      с расстоянием: полшага — около 1,7 с, чуть-чуть — около секунды. */
+  private glideTo(to: number) {
     const dist = Math.abs(to - this.current);
-    if (dist > 0.001) this.glide = { from: this.current, to, t0: now, dur: 1000 + dist * 1400 };
+    this.glide = dist > 0.001 ? { from: this.current, to, t0: performance.now(), dur: 1000 + dist * 1400 } : null;
   }
 
   /** Режим без движения: камера сразу на цели. */
