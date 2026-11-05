@@ -207,16 +207,18 @@ export class Environment {
   }
 
   /** @param room насколько раскрыта комната: в ней среда притихает. */
-  update(progress: number, speed: number, room: number, baseZ: number, camZ: number) {
+  /** @param dustAt где по пыли стоит камера: обычно там же, где на маршруте; после
+      шага полоски через несколько сфер — на шаг дальше прежнего (Scene, `hop`). */
+  update(progress: number, speed: number, room: number, baseZ: number, camZ: number, dustAt = progress) {
     if (this.dustU) {
-      this.dustU.uShift.value = progress * DUST_STEP * baseZ;
+      this.dustU.uShift.value = dustAt * DUST_STEP * baseZ;
       this.dustU.uSpeed.value = speed * 0.6;
       // В комнате пыль гаснет почти совсем: внутри сферы её случайный
       // разброс мешал увидеть ровную сетку.
       this.dustU.uAlpha.value = 0.55 * (1 - room * 0.95);
     }
     if (this.siltU) {
-      this.siltU.uShift.value = progress * DUST_STEP * baseZ;
+      this.siltU.uShift.value = dustAt * DUST_STEP * baseZ;
       this.siltU.uSpeed.value = speed * 0.6;
       this.siltU.uAlpha.value = 0.4 * (1 - room * 0.95);
     }

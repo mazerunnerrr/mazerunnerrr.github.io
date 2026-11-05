@@ -372,10 +372,39 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let surfaces: RoomSurfaces | null = null;
     /** Что о комнате сказала вёрстка в этом кадре. */
     const view = { k: null as number | null, alpha: 0, tx: 0, ty: 0 };
+
+    /* Шаг полоски (Илья, 2026-11-05): с одной сферы на любую другую — одной
+       пересборкой, как к соседней, без пролёта через все сферы между ними.
+       Камера сразу встаёт у нужной сферы, а уходящая и приходящая рисуются
+       так, будто стоят рядом (`place`): у них расстояния соседей, свет главы
+       перетекает от одной к другой, пыль проходит путь в один шаг. Темп — тот
+       же, каким камера догоняет цель на обычном переходе. */
+    let hop: { from: number; to: number; dir: 1 | -1; t: number; v: number } | null = null;
+    /** Насколько пыль отстала от камеры после шагов: она прошла по шагу, а камера — дальше. */
+    let dustShift = 0;
+    const hopTo = (stop: number) => {
+      const from = ((Math.round(journey.current) % N) + N) % N;
+      const sphere = (k: number) => stations[k]?.shape.kind === "sphere";
+      const still = Math.abs(journey.target - journey.current) < 0.02 && bodies.every((b) => !b || b.morph < 0.001);
+      if (reduced || hop || room !== null || !still || from === stop || Math.abs(stop - from) === 1 || !sphere(from) || !sphere(stop)) {
+        journey.goTo(stop, true);
+        return;
+      }
+      hop = { from, to: stop, dir: stop > from ? 1 : -1, t: 0, v: 0 };
+      journey.jumpTo(stop);
+    };
+    const endHop = () => {
+      if (!hop) return;
+      dustShift += hop.from + hop.dir - hop.to;
+      hop = null;
+    };
+    /** Где точка на кольце относительно камеры — с поправкой на шаг полоски. */
+    const ringD = (progress: number, k: number) =>
+      hop && k === hop.from ? hop.dir * hop.t : hop && k === hop.to ? hop.dir * (hop.t - 1) : ringOffset(progress, k, N);
     // Якоря вида href="#projects" при перехваченном скролле не работают:
     // прокручивать нечего. Кнопки должны двигать камеру.
     onReady?.({
-      goTo: (stop: number, along?: boolean) => journey.goTo(stop, along),
+      goTo: (stop: number, along?: boolean) => (along ? hopTo(stop) : journey.goTo(stop)),
       jumpTo: (stop: number) => journey.jumpTo(stop),
       setRoom,
       roomLayout: (stop, layout) => {
@@ -652,7 +681,19 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         В комнате проекта фон уходит в её цвет — как у Active Theory, где цвет
         проекта красит всю комнату (Илья, 2026-10-19). */
     const lightUp = (progress: number) => {
-      const l = chapterLight(lights, progress);
+      const l = chapterLight(lights, hop ? hop.from : progress);
+      if (hop) {
+        // Как между соседями: свет переходит на средних трёх пятых пути.
+        const lb = chapterLight(lights, hop.to);
+        const u = Math.min(1, Math.max(0, (hop.t - 0.2) / 0.6));
+        const e = u * u * (3 - 2 * u);
+        l.color.lerp(lb.color, e);
+        l.amount += (lb.amount - l.amount) * e;
+        const dx = l.dir[0] + (lb.dir[0] - l.dir[0]) * e;
+        const dy = l.dir[1] + (lb.dir[1] - l.dir[1]) * e;
+        const len = Math.hypot(dx, dy) || 1;
+        l.dir = [dx / len, dy / len];
+      }
       const r = litRoom === null ? undefined : stations[litRoom]?.roomLight;
       if (r && roomAmount > 0) {
         const into = roomAmount;
@@ -2045,12 +2086,18 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       }
 
       for (let k = 0; k < N; k++) {
-        const d = ringOffset(progress, k, N);
+        const d = ringD(progress, k);
         const b = bodies[k];
         /* Две сферы подряд не улетают в камеру, а пересобираются одна
            в другую на месте: сетка та же, волна снизу вверх переплетает
-           точки, и на шаре уже другой проект (Илья, 2026-10-18). */
-        const other = (((k + (d > 0 ? 1 : -1)) % N) + N) % N;
+           точки, и на шаре уже другой проект (Илья, 2026-10-18). На шаге
+           полоски соседи — уходящая и приходящая. */
+        const other =
+          hop && (k === hop.from || k === hop.to)
+            ? k === hop.from
+              ? hop.to
+              : hop.from
+            : (((k + (d > 0 ? 1 : -1)) % N) + N) % N;
         const swap =
           other !== k &&
           ((!!b?.solid && !!bodies[other]?.solid) || (!!stations[k].reform && !!stations[other].reform));
@@ -2129,7 +2176,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
       const active = bodies[near] ?? null;
       const settled =
-        !!active && Math.abs(ringOffset(progress, near, N)) < 0.12 && (active.morph < 0.01 || active.morph > 0.99);
+        !hop && !!active && Math.abs(ringOffset(progress, near, N)) < 0.12 && (active.morph < 0.01 || active.morph > 0.99);
       nearNow = near;
       settledNow = settled;
       return { active, settled };
@@ -2170,13 +2217,26 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
       // Маршрут ведёт объекты.
       const progress = journey.update(dt);
-      const speed = Math.min(1, Math.abs(journey.velocity) * 1.4);
+      if (hop) {
+        // Колесо или палец повели камеру — шаг кончен, дальше обычный маршрут.
+        const off = Math.abs(progress - hop.to);
+        if (off > 0.02 && off < N - 0.02) endHop();
+        else {
+          const prev = hop.t;
+          hop.t += (1 - hop.t) * Math.min(1, k * 0.62);
+          if (1 - hop.t < 0.001) hop.t = 1;
+          hop.v = dt > 0 ? ((hop.t - prev) * hop.dir) / dt : 0;
+          if (hop.t >= 1) endHop();
+        }
+      }
+      const velocity = hop ? hop.v : journey.velocity;
+      const speed = Math.min(1, Math.abs(velocity) * 1.4);
       camera.position.z = baseZ;
       stepSphereRot(dt);
       const { active, settled } = place(progress, dt, t);
       keepReform(progress);
       stepPhysics(dt, active, settled);
-      env.update(progress, speed, roomAmount, baseZ, camera.position.z);
+      env.update(progress, speed, roomAmount, baseZ, camera.position.z, (hop ? hop.from + hop.dir * hop.t : progress) + dustShift);
       lightUp(progress);
 
       if (startRef.current) enter = Math.min(1, enter + dt / 1.6);
@@ -2193,7 +2253,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
       onFrameRef.current?.({
         progress,
-        velocity: journey.velocity,
+        velocity,
         stations: frames,
         room: roomAmount,
         marks: env.marksOnScreen,
