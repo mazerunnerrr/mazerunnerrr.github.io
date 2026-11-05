@@ -186,6 +186,29 @@ body {
   opacity: 1;
   color: var(--color-sand);
 }
+/* Телефон: полоска внизу рядом, черты стоймя; подписи нет — имя ближайшей
+   сферы и так в выноске и в приборе сверху. */
+@media (width < 48rem) {
+  .strip-line {
+    width: 1px;
+    height: 10px;
+    transition:
+      height 0.5s var(--ease-out-deep),
+      background-color 0.5s var(--ease-out-deep);
+  }
+  .strip a:hover .strip-line,
+  .strip a:focus-visible .strip-line {
+    width: 1px;
+    height: 16px;
+  }
+  .strip a[aria-current] .strip-line {
+    width: 1px;
+    height: 24px;
+  }
+  .strip-label {
+    display: none;
+  }
+}
 
 /* Подпись огонька «Опыта» — под огоньком, проявляется под рукой и с клавиатуры. */
 .star-label {
@@ -276,6 +299,20 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+/* Текст комнаты растворяется у краёв, а не уезжает под приборы сверху
+   и подсказку снизу (телефон, 2026-11-05). В покое края пусты: колонка
+   начинается ниже приборов и кончается выше подсказки (отступы в Home.tsx). */
+[data-room-scroll] {
+  --fade: linear-gradient(
+    to bottom,
+    transparent calc(var(--gutter) + 64px),
+    #000 calc(var(--gutter) + 120px),
+    #000 calc(100% - var(--gutter) - 40px),
+    transparent calc(100% - var(--gutter) - 14px)
+  );
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
 }
 
 /* Свечение волны звука, пока играет: линии светятся своим же цветом. */

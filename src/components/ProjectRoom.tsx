@@ -87,14 +87,15 @@ export function ProjectRoom({
       {/* Цвет проекта — свечение из глубины комнаты. При WebGL его даёт сцена. */}
       <div className="room-tint absolute inset-0" aria-hidden />
 
-      <span className="instrument pointer-events-none absolute left-1/2 top-[calc(var(--gutter)+40px)] -translate-x-1/2 whitespace-nowrap text-[var(--sand-faint)]">
+      <span className="instrument pointer-events-none absolute left-1/2 top-[calc(var(--gutter)+76px)] -translate-x-1/2 whitespace-nowrap text-[var(--sand-faint)] md:top-[calc(var(--gutter)+40px)]">
         <Flip text={t.scrollClose} />
       </span>
 
-      {/* Экран проекта — крупно, по центру. */}
+      {/* Экран проекта — крупно, по центру. На узком экране — во всю ширину
+          между полями: в 60vw на телефоне он выходил с ладонь (~230 px). */}
       <div
         ref={frameBox}
-        className="absolute left-1/2 top-[47%] w-[min(60vw,calc((100vh-300px)*1.6),1100px)] -translate-x-1/2 -translate-y-1/2 [perspective:1600px]"
+        className="absolute left-1/2 top-[47%] w-[min(calc(100vw-2*var(--gutter)),calc((100vh-300px)*1.6),1100px)] -translate-x-1/2 -translate-y-1/2 [perspective:1600px] md:w-[min(60vw,calc((100vh-300px)*1.6),1100px)]"
         aria-hidden
       >
         <div ref={frame} className="room-frame room-gl-media relative aspect-[16/10] w-full">

@@ -581,7 +581,13 @@ export function Home({
         onPointerEnter={flipHover}
         className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
       >
-        <Flip text={t.close} />
+        {/* Esc на тач-экране нет — там подпись без него. */}
+        <span className="pointer-coarse:hidden">
+          <Flip text={t.close} />
+        </span>
+        <span className="hidden pointer-coarse:inline">
+          <Flip text={t.closeTouch} />
+        </span>
       </button>
     </>
   );
@@ -755,7 +761,7 @@ export function Home({
                   <h2
                     ref={tag.title}
                     id={k === FIRST_PROJECT ? "projects" : undefined}
-                    className="instrument whitespace-nowrap text-[var(--color-sand)]"
+                    className="instrument max-w-[calc(100vw-2*var(--gutter)-16px)] text-[var(--color-sand)] md:max-w-none md:whitespace-nowrap"
                   >
                     <Flip text={`${t.stopProject} ${pad(k - FIRST_PROJECT + 1)} / ${pad(projects.length)} · ${s.project.title}`} />
                   </h2>
@@ -818,13 +824,15 @@ export function Home({
                 </p>
               </div>
               <h3 className="sr-only">{t.whatIDo}</h3>
-              <ul className="grid grid-cols-4 gap-x-[clamp(24px,2.8vw,40px)] border-t border-[var(--line)] pt-[22px]">
+              {/* На узком экране — строками: название слева, описание справа
+                  (Илья, 2026-11-05); четыре колонки там рвались по слову. */}
+              <ul className="grid grid-cols-1 gap-x-[clamp(24px,2.8vw,40px)] gap-y-[18px] border-t border-[var(--line)] pt-[22px] md:grid-cols-4">
                 {skills.map((x) => (
-                  <li key={x.title}>
+                  <li key={x.title} className="grid grid-cols-[104px_1fr] gap-x-[14px] md:block">
                     <h4 className="instrument text-[var(--color-sand)]">
                       <Flip text={x.title} />
                     </h4>
-                    <p className="mt-2 text-[13.5px] font-extralight leading-[1.6] text-[var(--sand-dim)]">{x.lead}</p>
+                    <p className="text-[13.5px] font-extralight leading-[1.6] text-[var(--sand-dim)] md:mt-2">{x.lead}</p>
                   </li>
                 ))}
               </ul>
@@ -839,7 +847,7 @@ export function Home({
             k,
             t.experience,
             <>
-              <span className="instrument pointer-events-none absolute left-1/2 top-[calc(var(--gutter)+40px)] -translate-x-1/2 whitespace-nowrap text-[var(--sand-faint)]">
+              <span className="instrument pointer-events-none absolute left-1/2 top-[calc(var(--gutter)+76px)] -translate-x-1/2 whitespace-nowrap text-[var(--sand-faint)] md:top-[calc(var(--gutter)+40px)]">
                 <Flip text={t.scrollClose} />
               </span>
               <div className="absolute bottom-[calc(var(--gutter)+24px)] left-[var(--gutter)] flex max-w-[min(560px,46vw)] flex-col gap-3">
@@ -897,7 +905,7 @@ export function Home({
           <span className="instrument text-[var(--sand-dim)]">
             <Flip text={site.status} />
           </span>
-          <span ref={routeRef} className="instrument text-[var(--sand-dim)]">
+          <span ref={routeRef} className="instrument max-w-[calc(100vw-2*var(--gutter)-64px)] truncate text-[var(--sand-dim)] md:max-w-none">
             {route[0]}
           </span>
         </div>
@@ -991,13 +999,14 @@ export function Home({
             видны — сразу ясно, сколько их и где ты. Черта ближайшей горит
             и подписана, остальные подписываются под рукой. Нажатие везёт
             к сфере, как «работы» вверху. Видна только у сфер: на имени,
-            у контактов и в комнатах гаснет. */}
+            у контактов и в комнатах гаснет. На телефоне — рядом внизу, черты
+            стоймя и без подписей: справа она ложилась на сферу (Илья, 2026-11-05). */}
         {projects.length > 0 ? (
           <nav
             ref={stripRef}
             aria-label={t.projects}
             data-faded
-            className="strip absolute right-[var(--gutter)] top-1/2 flex -translate-y-1/2 flex-col items-end"
+            className="strip absolute bottom-[var(--gutter)] left-1/2 flex -translate-x-1/2 items-end md:bottom-auto md:left-auto md:right-[var(--gutter)] md:top-1/2 md:translate-x-0 md:-translate-y-1/2 md:flex-col"
           >
             {projects.map((p, i) => (
               <a
@@ -1006,9 +1015,10 @@ export function Home({
                   stripRefs.current[i + FIRST_PROJECT] = el;
                 }}
                 href={`#${p.slug}`}
+                aria-label={p.title}
                 onClick={(e) => jump(i + FIRST_PROJECT, e)}
                 onPointerEnter={flipHover}
-                className="pointer-events-auto flex h-[14px] items-center gap-3"
+                className="pointer-events-auto flex h-[32px] w-[16px] items-end justify-center md:h-[14px] md:w-auto md:items-center md:justify-start md:gap-3"
               >
                 <span className="strip-label instrument whitespace-nowrap">
                   <Flip text={p.title} />

@@ -25,6 +25,8 @@ export const UI = {
     scrollBack: "↑ scroll up — back",
     scrollClose: "scroll to close",
     close: "close · esc",
+    /** На тач-экране Esc нет. */
+    closeTouch: "close",
     openProject: "open project ↵",
     aboutEnter: "about me ↵",
     about: "About me",
@@ -66,6 +68,7 @@ export const UI = {
     scrollBack: "↑ прокрути вверх — назад",
     scrollClose: "прокрути — закрыть",
     close: "закрыть · esc",
+    closeTouch: "закрыть",
     openProject: "открыть проект ↵",
     aboutEnter: "обо мне ↵",
     about: "Обо мне",
