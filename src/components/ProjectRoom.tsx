@@ -55,6 +55,8 @@ export function ProjectRoom({
      и в рамке 16:10 он обрезался бы по краям (Илья, 2026-11-05: «подтянуть экран
      под видео»). Пропорции — у постера или первого кадра; пока не узнали — 16:10. */
   const [ar, setAr] = useState(1.6);
+  /** Экран рисует сцена (`:root[data-gl]`). До первого входа не читается — на сервере документа нет. */
+  const gl = seen && typeof document !== "undefined" && document.documentElement.hasAttribute("data-gl");
   const arSrc = p.poster || p.shots[0]?.image;
   useEffect(() => {
     if (!seen || !arSrc) return;
@@ -118,7 +120,9 @@ export function ProjectRoom({
             aria-hidden
           >
             <div ref={frame} className="room-frame room-gl-media relative aspect-[var(--ar)] w-full">
-              {seen && (p.video || p.shots.length) ? (
+              {/* При WebGL экран рисует сцена со своим видео — вёрстке своё не нужно:
+                  лишний плеер и постер грузились и декодировались на входе в комнату. */}
+              {seen && !gl && (p.video || p.shots.length) ? (
                 <Cover video={p.video} poster={p.poster} shots={p.shots.map((s) => s.image)} alt="" active={open} fill />
               ) : null}
             </div>

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GLOW_FRAG, SHADE_FRAG, SURFACE_FRAG, SURFACE_VERT } from "@/lib/shaders";
+import { GLOW_FRAG, SHADE_FRAG, SHADE_VERT, SURFACE_FRAG, SURFACE_VERT } from "@/lib/shaders";
 
 /**
  * Комната проекта в сцене (Илья, 2026-10-21, по образцу Active Theory): экран
@@ -40,6 +40,8 @@ export const RADIUS = 34;
     с картинкой, не упирается в неё, и угол не срезается. 80, а не 48: край
     гнётся с мягким пределом и на рывке уходит дальше (2026-11-05). */
 const MARGIN = 80;
+/** Клеток по стороне у сетки света комнаты: свет считается в её вершинах. */
+const SHADE_GRID = 48;
 /** Размытие в самом быстром месте следа руки, CSS-пиксели. */
 const BLUR = 18;
 /** Наклон экрана к руке, градусы: у Active Theory он заметный. */
@@ -86,9 +88,14 @@ export class RoomSurfaces {
       uScreen: this.px,
       ...water,
     };
-    const mat = (fragmentShader: string, uniforms: Record<string, THREE.IUniform>, premultipliedAlpha = false) =>
+    const mat = (
+      fragmentShader: string,
+      uniforms: Record<string, THREE.IUniform>,
+      premultipliedAlpha = false,
+      vertexShader = SURFACE_VERT
+    ) =>
       new THREE.ShaderMaterial({
-        vertexShader: SURFACE_VERT,
+        vertexShader,
         fragmentShader,
         uniforms,
         transparent: true,
@@ -97,7 +104,8 @@ export class RoomSurfaces {
         depthWrite: false,
       });
     // Над фоном и под точками: фон уходит в глубину, стенка сферы светится на нём.
-    this.shade = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat(SHADE_FRAG, this.shadeU, true));
+    // Сетка, а не два треугольника: свет считается в её вершинах (SHADE_VERT).
+    this.shade = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, SHADE_GRID, SHADE_GRID), mat(SHADE_FRAG, this.shadeU, true, SHADE_VERT));
     this.shade.renderOrder = -0.8;
     this.screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat(SURFACE_FRAG, this.u));
     this.screenMesh.renderOrder = 6;
@@ -111,6 +119,14 @@ export class RoomSurfaces {
   resize(w: number, h: number, dpr: number) {
     this.px.value.set(w * dpr, h * dpr);
     this.shade.scale.set(w, h, 1);
+  }
+
+  /** Собрать шейдеры экрана и света заранее: three собирает только видимое,
+      поэтому на время сборки плоскости показываются (кадр при этом не рисуется). */
+  warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+    this.shade.visible = this.screenMesh.visible = true;
+    renderer.compile(scene, camera);
+    this.shade.visible = this.screenMesh.visible = false;
   }
 
   /** Где экран комнаты `k` на экране — палец по нему принадлежит экрану. */

@@ -863,40 +863,36 @@ void main(){
     кадра, свет держится у экрана, к углам комнаты темнее. Полосы берут
     смесь двух кадров, как экран, — раньше на смене скриншотов они ещё
     1,2 с показывали прежний и потом прыгали. */
-export const SHADE_FRAG = `
-precision highp float;
-uniform vec3 uColor;
-uniform float uAmt;
+/* Свет экрана на стенах комнаты — в вершинах сетки (`SHADE_GRID` клеток по
+   стороне), а не в каждом пикселе: он размыт так, что между вершинами его не
+   отличить от попиксельного, а выборок с кадра в сотни раз меньше (2026-11-05,
+   оптимизация под телефон). */
+export const SHADE_VERT = `
 uniform sampler2D uTex0;
 uniform sampler2D uTex1;
 uniform float uTexMix;
-/** Обрезка кадра, как у экрана: полосы берут то, что на нём видно. */
+/** Обрезка кадра, как у экрана: свет берёт то, что на нём видно. */
 uniform vec2 uScale;
 /** Есть ли кадр, 0..1. */
 uniform float uLit;
+uniform float uAmt;
 /** Экран в долях окна: левый нижний и правый верхний угол. */
 uniform vec4 uFrame;
-uniform sampler2D uWaterTex;
-uniform vec4 uWaterMap;
 uniform vec2 uScreen;
 varying vec2 vUv;
+varying vec3 vLight;
 void main(){
-  vec2 p = (vUv - vec2(0.5, 0.5)) * vec2(1.0, 1.15);
-  // Темнота гуще к краям: подписи по углам стоят в самой глубине.
-  float a = uAmt * mix(0.93, 0.985, smoothstep(0.25, 0.8, length(p)));
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 
   /* Свет экрана, как ambient mode у YouTube и свет в комнатах Active Theory
      (Илья, 2026-11-05: «у них выражено и помогает среде»): за экраном его же
-     кадр, увеличенный в ROOM_AMB_SCALE раз и сильно размытый (мип ROOM_AMB_LOD), —
-     комната залита цветом того, что играет, и гаснет к краям. Прежде свет брал
-     только край кадра, размазанный вдоль, и тлел полосами у самого экрана. */
+     кадр, увеличенный в ROOM_AMB_SCALE раз и сильно размытый, — комната залита
+     цветом того, что играет, и гаснет к краям. Размытие — девять выборок по сетке
+     с гауссовыми весами (одна с мелкого мипа давала блоки), без развёртки-полос. */
   vec2 mid = (uFrame.xy + uFrame.zw) * 0.5;
   vec2 ext = max((uFrame.zw - uFrame.xy) * 0.5, vec2(0.001));
-  vec2 q = (vUv - mid) / ext;
-  /* Размытие — не одна выборка с мелкого мип-уровня (на нём кадр в 25 точек,
-     и яркие куски кадра проступали за экраном блоками), а девять по сетке
-     с гауссовыми весами: свет рассеянный, без повторов того, что на экране
-     (Илья, 2026-11-05). Развёртки «как у старого телевизора» больше нет. */
+  vec2 q = (uv - mid) / ext;
   vec2 tuv = q / ${ROOM_AMB_SCALE.toFixed(2)} * 0.5 + 0.5;
   vec3 amb = vec3(0.0);
   float wsum = 0.0;
@@ -917,7 +913,19 @@ void main(){
   // Расстояние от края экрана — в долях его меньшей стороны.
   vec2 opx = max(abs(q) - 1.0, 0.0) * ext * uScreen;
   float dn = length(opx) / (2.0 * min(ext.x * uScreen.x, ext.y * uScreen.y));
-  float spill = exp(-dn * 1.7);
-  vec3 light = amb * spill * 0.7 * uLit * uAmt;
+  vLight = amb * exp(-dn * 1.7) * 0.7 * uLit * uAmt;
+}`;
+
+export const SHADE_FRAG = `
+precision highp float;
+uniform vec3 uColor;
+uniform float uAmt;
+varying vec2 vUv;
+varying vec3 vLight;
+void main(){
+  vec2 p = (vUv - vec2(0.5, 0.5)) * vec2(1.0, 1.15);
+  // Темнота гуще к краям: подписи по углам стоят в самой глубине.
+  float a = uAmt * mix(0.93, 0.985, smoothstep(0.25, 0.8, length(p)));
+  vec3 light = vLight;
   gl_FragColor = vec4(uColor * a + light, a);
 }`;

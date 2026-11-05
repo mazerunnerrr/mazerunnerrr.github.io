@@ -133,8 +133,10 @@ const SPIN_DRY = 0.4;
 /** Каждые сколько секунд на сфере сменяется скриншот и за сколько. */
 const SHOT_HOLD = 4.5;
 const SHOT_FADE = 1.2;
-/** Как часто мерить яркость кадра видео на сфере, секунды. */
-const LUM_EVERY = 0.25;
+/** Как часто мерить яркость кадра видео на сфере, секунды. Замер читает кадр
+    с видеокарты, и главный поток ждёт её; 0,25 с давали рывки на телефоне,
+    а яркость и оттенок и так подстраиваются плавно (2026-11-05). */
+const LUM_EVERY = 0.6;
 
 /** Где объект точки сейчас на экране — по этому вёрстка ставит выноски. */
 export type StationFrame = {
@@ -399,6 +401,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const renderer = (() => {
       try {
         const r = new THREE.WebGLRenderer({ antialias: false, alpha: false });
+        /* Проверка шейдеров на ошибки держит главный поток, пока видеокарта не
+           соберёт программу. В собранном сайте она не нужна — three сам советует
+           выключать её в продакшене; в разработке остаётся. */
+        r.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
         return r.getContext() ? r : null;
       } catch {
         return null;
@@ -511,6 +517,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     field.renderOrder = -1;
     scene.add(field);
     surfaces = new RoomSurfaces(scene, waterU);
+    // Шейдеры комнаты собираются сейчас, под заставкой, а не на первом входе в
+    // комнату: на телефоне сборка — это заметный рывок в момент нажатия.
+    surfaces.warm(renderer, scene, camera);
     // Вёрстка комнаты прячет то, что теперь рисует сцена (globals.css).
     document.documentElement.setAttribute("data-gl", "");
     /** Цвет кадра той комнаты, что сейчас видна, — для её подписи. */
@@ -1757,6 +1766,22 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             restless = true;
             continue;
           }
+          /* Точка стоит дома ровно и руки над объектом нет — шагать нечего: трение
+             и пружина от нуля дают ноль. После касания объект успокаивается секунду-
+             другую, и прежде все его точки считались, хотя двигались единицы. */
+          if (
+            !hand &&
+            !spread &&
+            !sprayed[i] &&
+            stir[i] <= 0.01 &&
+            disp[i3] === 0 &&
+            disp[i3 + 1] === 0 &&
+            disp[i3 + 2] === 0 &&
+            vel[i3] === 0 &&
+            vel[i3 + 1] === 0 &&
+            vel[i3 + 2] === 0
+          )
+            continue;
           let vx = vel[i3];
           /** Насколько точка под рукой: от этого — какую долю её скорости берёт. */
           let carry = 0;
@@ -1895,11 +1920,18 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
             dz2 = rm[2] * lx + rm[5] * ly + rm[8] * lz;
           }
 
+          const r2 = dx2 * dx2 + dy2 * dy2;
+          const v2 = vx * vx + vy * vy + vz * vz;
+          // Почти дома (меньше 0,05 px и почти без скорости) — сажаем ровно, и со
+          // следующего кадра точка не считается вовсе. Разница глазу не видна.
+          if (!spread && !scattered && stir[i] <= 0.01 && r2 + dz2 * dz2 < 0.0025 && v2 < 1e-6) {
+            dx2 = dy2 = dz2 = 0;
+            vel[i3] = vel[i3 + 1] = vel[i3 + 2] = 0;
+          }
           disp[i3] = dx2;
           disp[i3 + 1] = dy2;
           disp[i3 + 2] = dz2;
-          const r2 = dx2 * dx2 + dy2 * dy2;
-          if (r2 + dz2 * dz2 > 0.25 || vx * vx + vy * vy + vz * vz > 0.01) restless = true;
+          if (r2 + dz2 * dz2 > 0.25 || v2 > 0.01) restless = true;
         }
         body.restless = restless;
         if (homing && !homeLeft) body.homing = false;

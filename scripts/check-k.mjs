@@ -122,7 +122,8 @@ console.log("PageDown с контактов", JSON.stringify(await state()));
 const room = () =>
   page.evaluate(() => {
     const open = [...document.querySelectorAll("[role=dialog]")].find((d) => !d.inert);
-    const route = document.querySelector("main > div:last-child span:nth-child(3)")?.textContent;
+    // Номер точки — в скрытой для глаз строке у псевдонима (только скринридеру, 2026-11-05).
+    const route = [...document.querySelectorAll("main span.sr-only")].find((e) => /\d\d \/ \d\d/.test(e.textContent || ""))?.textContent;
     return open ? `открыта «${open.getAttribute("aria-label")}» видно ${(+getComputedStyle(open).opacity).toFixed(2)} | ${route}` : `закрыто | ${route}`;
   });
 await fresh();
