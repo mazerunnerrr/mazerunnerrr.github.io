@@ -118,10 +118,12 @@ export const REFORM_END = 0.88;
 /** Подсветка стенок комнаты, как ambient mode: во сколько раз увеличена копия
     кадра за экраном и на каком мип-уровне она размыта (5 — 1600 px → 50). */
 const AMB_SCALE = 1.5;
-const AMB_LOD = 5.5;
-/** То же для света экрана на стенах комнаты (SHADE_FRAG): шире и мягче. */
+const AMB_LOD = 6.5;
+/** То же для света экрана на стенах комнаты (SHADE_FRAG): шире и мягче;
+    SPREAD — шаг сетки из девяти выборок в долях увеличенного кадра. */
 const ROOM_AMB_SCALE = 1.8;
-const ROOM_AMB_LOD = 6.0;
+const ROOM_AMB_LOD = 6.5;
+const ROOM_AMB_SPREAD = 0.17;
 
 export const PARTICLE_VERT = `
 precision highp float;
@@ -849,8 +851,8 @@ void main(){
 
 /** Глубина комнаты: фон под стенкой сферы уходит в тёмную синеву —
     мы погрузились в проект (Илья, 2026-10-21: с оттенком проекта фон выходил
-    серо-синим, и точки сферы на нём терялись). Стены освещает сам экран — его
-    цвета, размазанные вдоль, тлеют вокруг него полосами, как у Active Theory.
+    серо-синим, и точки сферы на нём терялись). Стены освещает сам экран —
+    размытой увеличенной копией кадра вокруг него, как у Active Theory.
     Цвет с предумножением: глубина темнит, свет добавляет.
     2026-11-03 (Илья): комната тёмная, как у Active Theory, — экран собирает
     взгляд. Светлый кадр (белый сайт, бумага буклета) заливал стены серым
@@ -888,15 +890,31 @@ void main(){
   vec2 mid = (uFrame.xy + uFrame.zw) * 0.5;
   vec2 ext = max((uFrame.zw - uFrame.xy) * 0.5, vec2(0.001));
   vec2 q = (vUv - mid) / ext;
-  vec2 tuv = clamp(q / ${ROOM_AMB_SCALE.toFixed(2)} * 0.5 + 0.5, 0.0, 1.0);
-  vec2 cuv = (tuv - 0.5) * uScale + 0.5;
-  vec3 amb = mix(textureLod(uTex0, cuv, ${ROOM_AMB_LOD.toFixed(1)}).rgb, textureLod(uTex1, cuv, ${ROOM_AMB_LOD.toFixed(1)}).rgb, uTexMix);
+  /* Размытие — не одна выборка с мелкого мип-уровня (на нём кадр в 25 точек,
+     и яркие куски кадра проступали за экраном блоками), а девять по сетке
+     с гауссовыми весами: свет рассеянный, без повторов того, что на экране
+     (Илья, 2026-11-05). Развёртки «как у старого телевизора» больше нет. */
+  vec2 tuv = q / ${ROOM_AMB_SCALE.toFixed(2)} * 0.5 + 0.5;
+  vec3 amb = vec3(0.0);
+  float wsum = 0.0;
+  for (int ix = -1; ix <= 1; ix++) {
+    for (int iy = -1; iy <= 1; iy++) {
+      vec2 o = vec2(float(ix), float(iy));
+      float wk = exp(-dot(o, o) * 0.7);
+      vec2 cuv = (clamp(tuv + o * ${ROOM_AMB_SPREAD.toFixed(2)}, 0.0, 1.0) - 0.5) * uScale + 0.5;
+      vec3 s0 = textureLod(uTex0, cuv, ${ROOM_AMB_LOD.toFixed(1)}).rgb;
+      if (uTexMix > 0.001) s0 = mix(s0, textureLod(uTex1, cuv, ${ROOM_AMB_LOD.toFixed(1)}).rgb, uTexMix);
+      amb += s0 * wk;
+      wsum += wk;
+    }
+  }
+  amb /= wsum;
   // Яркость поджата: белый кадр светит вдвое ярче тёмного, а не вдесятеро.
   amb *= 0.42 / (0.14 + dot(amb, vec3(0.299, 0.587, 0.114)));
   // Расстояние от края экрана — в долях его меньшей стороны.
   vec2 opx = max(abs(q) - 1.0, 0.0) * ext * uScreen;
   float dn = length(opx) / (2.0 * min(ext.x * uScreen.x, ext.y * uScreen.y));
-  float spill = exp(-dn * 1.7) * (0.94 + 0.06 * sin(vUv.y * uScreen.y * 0.35));
+  float spill = exp(-dn * 1.7);
   vec3 light = amb * spill * 0.7 * uLit * uAmt;
   gl_FragColor = vec4(uColor * a + light, a);
 }`;
