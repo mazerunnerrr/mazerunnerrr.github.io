@@ -176,7 +176,8 @@ export type FrameInfo = {
 };
 
 export type SceneApi = {
-  goTo: (stop: number) => void;
+  /** `along` — вдоль аллеи, а не коротким путём через стык кольца. */
+  goTo: (stop: number, along?: boolean) => void;
   jumpTo: (stop: number) => void;
   /** Войти в комнату точки или выйти из неё (null). `star` — какой огонёк
       россыпи раскрыть: у «Опыта» комната у каждой работы своя. */
@@ -355,12 +356,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         focus.star = star;
         refocus?.();
       }
-      // Комнату сферы прокрутка не закрывает — только «закрыть» и Esc: рука
-      // в ней вертит сферу (Илья, 2026-11-05). Комнату огонька — в любую сторону.
+      // Комнату сферы закрывает колесо в любую сторону, Esc и «закрыть»; палец —
+      // нет, на телефоне он в ней гладит точки (Илья, 2026-11-05). Комнату
+      // огонька — прокрутка в любую сторону, «обо мне» — вверх от верха колонки.
       const st = k === null ? null : stations[k];
       journey.lock(
         k !== null,
-        st?.shape.kind === "sphere" ? "none" : st && (st.room !== "burst" || star >= 0) ? "any" : "up"
+        st?.shape.kind === "sphere" ? "wheel" : st && (st.room !== "burst" || star >= 0) ? "any" : "up"
       );
       if (k !== null) journey.goTo(k);
     };
@@ -371,7 +373,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     // Якоря вида href="#projects" при перехваченном скролле не работают:
     // прокручивать нечего. Кнопки должны двигать камеру.
     onReady?.({
-      goTo: (stop: number) => journey.goTo(stop),
+      goTo: (stop: number, along?: boolean) => journey.goTo(stop, along),
       jumpTo: (stop: number) => journey.jumpTo(stop),
       setRoom,
       roomLayout: (stop, layout) => {

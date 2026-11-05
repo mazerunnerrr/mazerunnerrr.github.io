@@ -68,7 +68,7 @@ const TOUCH_FOLLOW = 1.0;
    пока сдвинется курсор, — после крутка колесом сцена зависала посреди
    перехода до первого тычка; выброшено. */
 
-export type RoomExit = "up" | "any" | "none";
+export type RoomExit = "up" | "any" | "wheel";
 
 export type JourneyOptions = {
   /** Сколько всего точек на маршруте. */
@@ -102,7 +102,7 @@ export class Journey {
   /** Открыта комната: сцена в ней статична, колесо маршрут не двигает. */
   private locked = false;
   /** Как прокрутка выводит из комнаты: вверх от верха колонки, в любую
-      сторону (комната в один экран) или никак — только «закрыть» и Esc. */
+      сторону (комната в один экран) или в любую, но только колесом. */
   private exit: RoomExit = "up";
   /** Выход из комнаты прокруткой вверх, как у igloo. Назначает сцена. */
   onExit: (() => void) | null = null;
@@ -233,7 +233,7 @@ export class Journey {
       // В комнате колесо отдаётся ей: длинный текст прокручивается сам,
       // а маршрут стоит. Вверх от верха колонки — выход.
       if (this.locked) {
-        this.roomScroll(raw, e.target, fresh);
+        this.roomScroll(raw, e.target, fresh, false);
         return;
       }
       e.preventDefault();
@@ -280,7 +280,7 @@ export class Journey {
       if (!mine(e) || this.claimed || this.touchSwallow) return;
       const y = e.touches[0]?.clientY ?? ty;
       if (this.locked) {
-        this.roomScroll((ty - y) * TOUCH_GAIN, e.target, touchFresh);
+        this.roomScroll((ty - y) * TOUCH_GAIN, e.target, touchFresh, true);
         touchFresh = false;
         ty = y;
         return;
@@ -364,8 +364,9 @@ export class Journey {
   /** Замок на время комнаты. Кнопки и якоря (`goTo`) работают и под ним.
       `exit` — чем выводит прокрутка: «up» — вверх от верха колонки; «any» —
       комната в один экран, листать в ней нечего, закрывает прокрутка в любую
-      сторону (Илья, 2026-10-21); «none» — прокрутка не выводит вовсе, только
-      «закрыть» и Esc: в комнате сферы рука и палец её вертят (Илья, 2026-11-05). */
+      сторону (Илья, 2026-10-21); «wheel» — так же колесом, а палец не выводит:
+      в комнате сферы на телефоне он гладит точки, и закрывает её только
+      «закрыть» (Илья, 2026-11-05: на компе выход прокруткой главный, Esc — опция). */
   lock(on: boolean, exit: RoomExit = "up") {
     // Вышли посреди жеста — его хвост маршрут не двигает. Палец: один свайп
     // вниз закрывал «обо мне» и тут же уносил назад по кольцу, к «@» (Илья, 2026-11-05).
@@ -383,14 +384,14 @@ export class Journey {
       (`data-room-scroll`). Вверх — выход, но только жестом, начатым у верха
       колонки: иначе долистал текст до начала, инерция докатила — и тебя
       выбросило из комнаты посреди чтения. */
-  private roomScroll(dy: number, target: EventTarget | null, fresh: boolean) {
-    if (this.exit === "none") return;
+  private roomScroll(dy: number, target: EventTarget | null, fresh: boolean, touch: boolean) {
+    if (this.exit === "wheel" && touch) return;
     const col = (target as Element | null)?.closest?.("[data-room-scroll]") as HTMLElement | null;
     if (fresh) {
       this.exitAcc = 0;
       this.exitArmed = !col || col.scrollTop <= 0;
     }
-    const step = this.exit === "any" ? Math.abs(dy) : -dy;
+    const step = this.exit === "up" ? -dy : Math.abs(dy);
     if (step <= 0 || !this.exitArmed) {
       this.exitAcc = 0;
       return;
@@ -405,10 +406,15 @@ export class Journey {
 
   /** Прямой переход — для кнопок и якорей. На кольце у точки бесконечно
       много копий; едем к ближайшей, а не отматываем круг назад. */
-  goTo(stop: number) {
+  goTo(stop: number, along = false) {
     this.glide = null;
     const n = this.stops;
-    this.target = this.anchor = stop + n * Math.round((this.target - stop) / n);
+    /* `along` — по аллее, без короткого пути через стык кольца: с последней
+       сферы на первую полоска вела вперёд через контакты и имя (3 шага против
+       7 назад), и ход по проектам ломался (Илья, 2026-11-05). `current` всегда
+       в [0, n), поэтому точка этого же круга и есть путь вдоль. */
+    const lap = along ? Math.floor(this.current / n) * n : n * Math.round((this.target - stop) / n);
+    this.target = this.anchor = stop + lap;
   }
 
   /** Встать на точку сразу, без пролёта: возврат со страницы проекта. */

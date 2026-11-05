@@ -433,11 +433,12 @@ export function Home({
      в том числе из комнаты. Фокус едет вместе с камерой, иначе следующий
      Tab вернул бы её назад. Обработчики не каррированы нарочно: вызов вида
      jump(2) в разметке выполнялся бы во время рендера. */
-  const jump = (stop: number, e: React.MouseEvent) => {
+  /** `along` — по аллее, через сферы: так ходит полоска проектов. */
+  const jump = (stop: number, e: React.MouseEvent, along = false) => {
     if (!apiRef.current) return;
     e.preventDefault();
     if (room !== null) closeRoom();
-    apiRef.current.goTo(stop);
+    apiRef.current.goTo(stop, along);
     (stop === CONTACTS ? contactsTitleRef.current : enterRefs.current[stop])?.focus({ preventScroll: true });
   };
 
@@ -1164,7 +1165,7 @@ export function Home({
                 }}
                 href={`#${p.slug}`}
                 aria-label={p.title}
-                onClick={(e) => jump(i + FIRST_PROJECT, e)}
+                onClick={(e) => jump(i + FIRST_PROJECT, e, true)}
                 onPointerEnter={flipHover}
                 className="pointer-events-auto flex h-[32px] w-[16px] items-end justify-center md:h-[14px] md:w-auto md:items-center md:justify-start md:gap-3"
               >
