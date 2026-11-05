@@ -133,6 +133,8 @@ const SPIN_DRY = 0.4;
 /** Каждые сколько секунд на сфере сменяется скриншот и за сколько. */
 const SHOT_HOLD = 4.5;
 const SHOT_FADE = 1.2;
+/** Сколько пикселей рука может пройти с зажатой кнопкой, чтобы это ещё был клик. */
+const CLICK_PX = 6;
 /** Как часто мерить яркость кадра видео на сфере, секунды. Замер читает кадр
     с видеокарты, и главный поток ждёт её; 0,25 с давали рывки на телефоне,
     а яркость и оттенок и так подстраиваются плавно (2026-11-05). */
@@ -566,6 +568,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const spinVel = new THREE.Vector2();
     /** Рука сейчас вертит сферу. */
     let spinning = false;
+    /** Сферу схватили — рука сдвинулась больше, чем на клик (`CLICK_PX`). До этого
+        нажатие может быть кликом: сфера крутится по инерции дальше и открывается
+        на ходу, а не встаёт намертво (Илья, 2026-11-05). */
+    let spinGrab = false;
     /* Изнутри видна дальняя стенка сферы, а она при повороте едет в другую
        сторону, чем ближняя: рука вправо — купол уезжал влево (Илья,
        2026-10-18). В комнате направление разворачиваем. */
@@ -584,7 +590,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     };
     const stepSphereRot = (dt: number) => {
       // Палец, ведущий сферу вбок (`touchSpin`), вертит её сам — инерция ждёт отпускания.
-      if (!spinning && !touchSpin) {
+      if ((!spinning || !spinGrab) && !touchSpin) {
         /* Отпустили — сфера докручивается, как фиджет-спиннер (Илья, 2026-10-21:
            «чуть меньше, чем у Mole»). Одно вязкое трение (было 2,4 в секунду)
            гасило шар за полсекунды, а слабое тянуло хвост без конца; с сухим
@@ -1211,7 +1217,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           nameQ.premultiply(qStep.setFromAxisAngle(AXIS_X, (e.clientY - dragLast.y) * TWIST_PER_PX));
           nameQ.normalize();
         }
-        if (spinning) {
+        if (spinning && !spinGrab && dragTravel > CLICK_PX) {
+          // Рука пошла — сфера в руке: инерция гаснет, дальше её ведёт мышь.
+          spinGrab = true;
+          spinVel.set(0, 0);
+          spinAt = performance.now() - 16;
+        }
+        if (spinning && spinGrab) {
           const yaw = (e.clientX - dragLast.x) * spinK * spinSign;
           const pitch = (e.clientY - dragLast.y) * spinK * spinSign;
           turnSphere(yaw, pitch);
@@ -1367,7 +1379,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           (stations[nearNow]?.grip === "magnet" && room === nearNow));
       if (spinning) spinK = spinScale(room === nearNow);
       spinAt = performance.now();
-      if (spinning) spinVel.set(0, 0);
+      spinGrab = false;
       magnetArmed = settledNow && stations[nearNow]?.grip === "magnet" && room === null;
     };
     const startMagnet = () => {
@@ -1435,10 +1447,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       /* Рука встала и только потом отпустила — бросать нечего: скорость от
          последнего движения гаснет за время стоянки. Иначе шар, долго
          крутившийся по инерции, срывался бы с места после паузы. */
-      if (spinning) {
+      if (spinning && spinGrab) {
         const idle = (performance.now() - spinAt) / 1000;
         if (idle > 0.06) spinVel.multiplyScalar(Math.exp(-(idle - 0.06) / 0.04));
       }
+      spinGrab = false;
       twisting = false;
       // Отпустили магнит — точки идут домой на тех же пружинах.
       const mb = bodies[nearNow];
@@ -1450,7 +1463,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const click =
         pressed &&
         e.type === "pointerup" &&
-        Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) < 6 &&
+        Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) < CLICK_PX &&
         performance.now() - pressT < 450;
       pressed = false;
       spinning = false;
