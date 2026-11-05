@@ -165,6 +165,9 @@ export type FrameInfo = {
   marks: MarkFrame[];
   /** Скорость руки над объектом, от 0 до 1 — для звука. */
   hand: number;
+  /** Средний цвет кадра открытой комнаты, 0..1 (null — кадра нет): подпись
+      комнаты берёт из него оттенок. Объект один и тот же каждый кадр. */
+  tint: THREE.Color | null;
 };
 
 export type SceneApi = {
@@ -253,6 +256,9 @@ type Body = {
       она лежит в `userData.lum` текстуры. По ней кадр приводится к общему уровню. */
   lum: number;
   lumAt: number;
+  /** Средний цвет видео (как `lum`) и текущий цвет кадра с учётом смены скриншотов. */
+  rgb: THREE.Color;
+  tint: THREE.Color;
   vel: Float32Array;
   disp: Float32Array;
   /** Податливость каждой точки: без разброса облако летит ровным строем. */
@@ -428,6 +434,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           room: room === null ? 0 : 1,
           marks: [],
           hand: 0,
+          tint: null,
         });
       };
       tick();
@@ -502,6 +509,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     surfaces = new RoomSurfaces(scene, waterU);
     // Вёрстка комнаты прячет то, что теперь рисует сцена (globals.css).
     document.documentElement.setAttribute("data-gl", "");
+    /** Цвет кадра той комнаты, что сейчас видна, — для её подписи. */
+    const frameTint = () => {
+      const b = view.k === null ? null : bodies[view.k];
+      return b?.solid && b.u.uTexAmt.value > 0 ? b.tint : null;
+    };
     /** Комната проекта — перед самой отрисовкой, когда вёрстка уже сказала своё. */
     const drawRoom = () => {
       const k = view.k;
@@ -556,7 +568,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       sphereQ.normalize();
     };
     const stepSphereRot = (dt: number) => {
-      if (!spinning) {
+      // Палец, ведущий сферу вбок (`touchSpin`), вертит её сам — инерция ждёт отпускания.
+      if (!spinning && !touchSpin) {
         /* Отпустили — сфера докручивается, как фиджет-спиннер (Илья, 2026-10-21:
            «чуть меньше, чем у Mole»). Одно вязкое трение (было 2,4 в секунду)
            гасило шар за полсекунды, а слабое тянуло хвост без конца; с сухим
@@ -788,7 +801,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         points, geo, mat, u, a, b, n, vel, disp, give, sprayed, back, trip, pace, stir, spray, dispAttr, velAttr,
         glow: solid && spec.media ? sphereGlow(scene, u) : null,
         calm: false, morph: 0, restless: false, homing: false, solid, grip: spec.grip, shots: [], video: null, shot: 0, shotAt: 0,
-        lum: 0.35, lumAt: 0,
+        lum: 0.35, lumAt: 0, rgb: new THREE.Color(0.35, 0.35, 0.35), tint: new THREE.Color(0.35, 0.35, 0.35),
       };
       if (spec.media) loadMedia(body, spec.media);
       return body;
@@ -807,19 +820,30 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const lumCanvas = document.createElement("canvas");
     lumCanvas.width = lumCanvas.height = 24;
     const lumCtx = lumCanvas.getContext("2d", { willReadFrequently: true });
-    const meanLum = (src: CanvasImageSource) => {
+    /** Средняя яркость кадра; в `rgb` — его средний цвет (оттенок подписи комнаты). */
+    const meanLum = (src: CanvasImageSource, rgb?: THREE.Color) => {
       if (!lumCtx) return 0.35;
       lumCtx.drawImage(src, 0, 0, 24, 24);
       const d = lumCtx.getImageData(0, 0, 24, 24).data;
       let sum = 0;
-      for (let i = 0; i < d.length; i += 4) sum += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
-      return sum / (d.length / 4);
+      let r = 0;
+      let g = 0;
+      let bl = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        sum += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+        r += d[i];
+        g += d[i + 1];
+        bl += d[i + 2];
+      }
+      const n = d.length / 4;
+      rgb?.setRGB(r / n / 255, g / n / 255, bl / n / 255);
+      return sum / n;
     };
     const gainOf = (lum: number) => Math.max(0.35, Math.min(3, 0.35 / Math.max(0.02, lum)));
     /* Кадры и видео переживают пересборку мира: от размера окна они не зависят.
        Прежде ресайз выбрасывал их вместе с телами — сферы гасли до песочных,
        а все ролики скачивались заново. Освобождаются только с самой сценой. */
-    type Media = { shots: THREE.Texture[]; video: HTMLVideoElement | null; aspect: number; lum: number; ready: boolean };
+    type Media = { shots: THREE.Texture[]; video: HTMLVideoElement | null; aspect: number; lum: number; rgb: THREE.Color; ready: boolean };
     const mediaOf = new Map<NonNullable<StationSpec["media"]>, Media>();
     const applyMedia = (body: Body, m: Media) => {
       body.shots = m.shots;
@@ -828,6 +852,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       body.u.uTex0.value = body.u.uTex1.value = m.shots[0];
       body.u.uTexAspect.value = m.aspect;
       body.lum = m.lum;
+      body.rgb.copy(m.rgb);
       body.u.uTexGain.value = gainOf(m.lum);
       body.u.uTexAmt.value = 1;
       dirty = true;
@@ -835,7 +860,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     const loadMedia = (body: Body, media: NonNullable<StationSpec["media"]>) => {
       const known = mediaOf.get(media);
       if (known) return applyMedia(body, known);
-      const m: Media = { shots: [], video: null, aspect: 1.6, lum: 0.35, ready: false };
+      const m: Media = { shots: [], video: null, aspect: 1.6, lum: 0.35, rgb: new THREE.Color(0.35, 0.35, 0.35), ready: false };
       mediaOf.set(media, m);
       applyMedia(body, m);
       const ready = (tex: THREE.Texture, w: number, h: number, src: CanvasImageSource) => {
@@ -847,7 +872,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         tex.generateMipmaps = true;
         tex.needsUpdate = true;
         m.aspect = w / Math.max(h, 1);
-        m.lum = meanLum(src);
+        m.lum = meanLum(src, m.rgb);
         m.ready = true;
         // Кадр мог прийти после ресайза — тогда он нужен уже новому телу.
         const owner = bodies.find((b) => b?.shots === m.shots);
@@ -871,7 +896,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           if (!alive) return tex.dispose();
           m.shots[i] = tex;
           const img = tex.image as HTMLImageElement;
-          tex.userData.lum = meanLum(img);
+          tex.userData.rgb = new THREE.Color();
+          tex.userData.lum = meanLum(img, tex.userData.rgb);
           if (i === 0) ready(tex, img.width, img.height, img);
         });
       });
@@ -896,8 +922,12 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         const v = b.video;
         if (v && !v.paused && v.readyState >= 2 && t - b.lumAt > LUM_EVERY) {
           b.lumAt = t;
-          b.lum = meanLum(v);
+          b.lum = meanLum(v, b.rgb);
         }
+        const c0 = b.u.uTex0.value?.userData.rgb as THREE.Color | undefined;
+        const c1 = b.u.uTex1.value?.userData.rgb as THREE.Color | undefined;
+        if (v || !c0) b.tint.copy(b.rgb);
+        else b.tint.copy(c0).lerp(c1 ?? c0, b.u.uTexMix.value);
         const l0 = b.u.uTex0.value?.userData.lum as number | undefined;
         const l1 = b.u.uTex1.value?.userData.lum as number | undefined;
         const lum = v || l0 === undefined ? b.lum : l0 + ((l1 ?? l0) - l0) * b.u.uTexMix.value;
@@ -1089,12 +1119,30 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     /** Курсор над объектом с комнатой — системная «рука». Пишется только при смене. */
     let cursor = "";
 
-    /* Палец — только тому, чего коснулся (Илья, 2026-11-05). Лёг на имя, сферу
-       или «@» — жест их: тап открывает, ведение распыляет или вертит, маршрут
-       стоит (`journey.claimTouch`). В комнате проекта своё у экрана. Лёг мимо —
-       жест маршрута или комнаты, а сцена его не видит вовсе: ни кисти по точкам,
-       ни света, ни зажатия. У мыши всё как было. */
+    /* Палец — только тому, чего коснулся (Илья, 2026-11-05). Лёг на имя или «@» —
+       жест их, как зажатая мышь: распыление и поворот, тап открывает. Лёг на сферу —
+       как мышь без нажатия: точки расходятся под пальцем, тап открывает комнату.
+       В комнате сферы палец по экрану и по фону — тоже как мышь без нажатия, сфера
+       не вертится. Маршрут этими жестами не едет (`journey.claimTouch`). Лёг мимо
+       сферы на аллее — вбок вертит её по горизонтали, вверх-вниз листает маршрут;
+       мимо имени — только листает. Ничей палец сцена не видит: ни кисти, ни света.
+       У мыши всё как было. */
     let fingerFree = false;
+    /** Палец мимо сферы: ещё не ясно, вбок он или вдоль маршрута. */
+    let touchPending = false;
+    /** Палец мимо сферы ведёт вбок — вертит её по горизонтали. */
+    let touchSpin = false;
+    const touchFrom = new THREE.Vector2();
+    /** Сколько радиан поворота на пиксель руки: под рукой ближняя к зрителю
+        поверхность, изнутри комнаты — дальняя. */
+    const spinScale = (inside: boolean) => {
+      const sb = bodies[nearNow];
+      if (!sb) return spinK;
+      const R = inside ? sb.b.halfW : sb.a.halfW;
+      const cz = (inside ? sb.b.cz : sb.a.cz) ?? 0;
+      const ps = baseZ / Math.max(baseZ - (inside ? cz - R : cz + R), 60);
+      return 1 / Math.max(1, R * ps);
+    };
     const touchesObject = (x: number, y: number) => {
       if (room !== null) {
         const fr = surfaces?.frameOf(room);
@@ -1108,7 +1156,35 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     };
 
     const onMove = (e: PointerEvent) => {
-      if (fingerFree && e.pointerType === "touch") return;
+      if (e.pointerType === "touch") {
+        if (touchPending) {
+          const dx = e.clientX - touchFrom.x;
+          const dy = e.clientY - touchFrom.y;
+          if (Math.hypot(dx, dy) > 10) {
+            touchPending = false;
+            if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+              touchSpin = true;
+              journey.claimTouch();
+              spinK = spinScale(false);
+              spinAt = performance.now();
+              spinVel.set(0, 0);
+              dragLast.set(e.clientX, e.clientY);
+            }
+          }
+        }
+        if (touchSpin) {
+          const yaw = (e.clientX - dragLast.x) * spinK;
+          turnSphere(yaw, 0);
+          const now = performance.now();
+          const sec = Math.max(0.008, (now - spinAt) / 1000);
+          spinAt = now;
+          spinVel.x += (Math.max(-8, Math.min(8, yaw / sec)) - spinVel.x) * 0.4;
+          spinVel.y = 0;
+          dragLast.set(e.clientX, e.clientY);
+          return;
+        }
+        if (fingerFree) return;
+      }
       hoverTarget = 1;
       const r = rect;
       rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
@@ -1234,19 +1310,29 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const r = rect;
       if (e.pointerType === "touch") {
         const onObject = touchesObject(e.clientX - r.left, e.clientY - r.top);
-        // В комнате сферы фон — тоже её: палец вертит сферу, как мышь
-        // (Илья, 2026-11-05). Мимо имени и сфер на аллее — жест маршрута.
-        const sphereRoom = room !== null && room === nearNow && stations[room]?.grip === "spin";
-        fingerFree = !onObject && !sphereRoom;
+        const sphere = stations[nearNow]?.grip === "spin";
+        touchPending = touchSpin = false;
+        // В комнате сферы весь палец — рука без нажатия; комнату «обо мне» листает колонка.
+        fingerFree = room !== null ? !(room === nearNow && sphere) : !onObject;
         if (fingerFree) {
           hoverTarget = 0;
+          if (room === null && settledNow && sphere) {
+            touchPending = true;
+            touchFrom.set(e.clientX, e.clientY);
+          }
           return;
         }
         journey.claimTouch();
         hoverTarget = 1;
         rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
-        // Экран комнаты: рука по нему, сфера под пальцем на экране не вертится.
-        if (room !== null && onObject) return;
+        if (room !== null) return;
+        if (sphere) {
+          // Сфера под пальцем — как под мышью без нажатия; тап — вход.
+          pressed = true;
+          pressAt.set(e.clientX, e.clientY);
+          pressT = performance.now();
+          return;
+        }
       }
       dragging = true;
       dragLast.set(e.clientX, e.clientY);
@@ -1264,15 +1350,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         settledNow &&
         ((stations[nearNow]?.grip === "spray" && (room === null || room === nearNow)) ||
           (stations[nearNow]?.grip === "magnet" && room === nearNow));
-      const sb = bodies[nearNow];
-      if (spinning && sb) {
-        // Снаружи под рукой ближняя к зрителю поверхность, изнутри — дальняя.
-        const inside = room === nearNow;
-        const R = inside ? sb.b.halfW : sb.a.halfW;
-        const cz = (inside ? sb.b.cz : sb.a.cz) ?? 0;
-        const ps = baseZ / Math.max(baseZ - (inside ? cz - R : cz + R), 60);
-        spinK = 1 / Math.max(1, R * ps);
-      }
+      if (spinning) spinK = spinScale(room === nearNow);
       spinAt = performance.now();
       if (spinning) spinVel.set(0, 0);
       magnetArmed = settledNow && stations[nearNow]?.grip === "magnet" && room === null;
@@ -1317,6 +1395,14 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Палец поднят — руки над сценой больше нет; ничей палец сцену не трогал.
       if (e.pointerType === "touch") {
         hoverTarget = 0;
+        touchPending = false;
+        if (touchSpin) {
+          touchSpin = false;
+          fingerFree = false;
+          const idle = (performance.now() - spinAt) / 1000;
+          if (idle > 0.06) spinVel.multiplyScalar(Math.exp(-(idle - 0.06) / 0.04));
+          return;
+        }
         if (fingerFree) {
           fingerFree = false;
           return;
@@ -2061,6 +2147,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         room: roomAmount,
         marks: env.marksOnScreen,
         hand: handNow,
+        tint: frameTint(),
       });
       drawRoom();
 
@@ -2117,6 +2204,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           room: roomAmount,
           marks: env.marksOnScreen,
           hand: 0,
+          tint: null,
         });
         drawRoom();
         renderer.render(scene, camera);

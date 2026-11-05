@@ -53,6 +53,14 @@ const TOUCH_COMMIT = 0.1;
 /** Взмах, px/мс за последние `FLICK_MS`, — тоже переход, даже короткий. */
 const TOUCH_FLICK = 0.35;
 const FLICK_MS = 90;
+/* Доезд после пальца — сразу и с торможением к концу, как лента работ
+   у Active Theory на телефоне (замер 2026-11-05: карточка трогается сразу
+   и встаёт за 0,5–1 с). Прежде он шёл той же кривой, что откат колеса, —
+   с разгоном, ~2,2 с на шаг, и свайп читался запоздалым. */
+const TOUCH_GLIDE_MS = 650;
+const TOUCH_GLIDE_PER_STOP = 600;
+/** Пока палец на экране, камера идёт за ним плотнее, чем за колесом. */
+const TOUCH_FOLLOW = 1.0;
 /* Рука держит сцену между точками (Илья, 2026-10-20): зажатая кнопка мыши
    или продавленный тачпад — сцена стоит, сколько держишь; нажатие посреди
    отката его останавливает; отпустил — откат сразу. Пальцы, просто лежащие
@@ -87,6 +95,8 @@ export class Journey {
   private pressed = false;
   /** Палец лёг на объект (`claimTouch`): этот жест — его, не маршрута. */
   private claimed = false;
+  /** Этим касанием вышли из комнаты: остаток жеста маршрут не двигает. */
+  private touchSwallow = false;
   /** Где была цель в начале жеста: дальше соседней от неё точки жест не везёт. */
   private anchor = 0;
   /** Открыта комната: сцена в ней статична, колесо маршрут не двигает. */
@@ -106,7 +116,7 @@ export class Journey {
       сразу утаскивала бы аллею назад. */
   private swallow = false;
   /** Доводка в пути: откуда, куда, когда началась и сколько длится. */
-  private glide: { from: number; to: number; t0: number; dur: number } | null = null;
+  private glide: { from: number; to: number; t0: number; dur: number; out: boolean } | null = null;
   /** Когда камера встала после прокрутки; 0 — ещё едет. */
   private restAt = 0;
 
@@ -246,8 +256,9 @@ export class Journey {
     const onTouchEnd = (e: TouchEvent) => {
       this.touching = e.touches.length > 0;
       this.lastInput = performance.now();
-      if (!this.touching) this.claimed = false;
-      if (this.touching || this.locked || touchPath === 0) return;
+      const skip = this.touchSwallow || this.claimed;
+      if (!this.touching) this.claimed = this.touchSwallow = false;
+      if (this.touching || this.locked || skip || touchPath === 0) return;
       // Скорость пальца в конце жеста, px/мс; знак — как у `push`.
       const now = performance.now();
       const recent = trail.filter(([t]) => now - t <= FLICK_MS);
@@ -263,10 +274,10 @@ export class Journey {
       // Не дальше соседней от начала жеста — как у колеса.
       to = Math.max(Math.ceil(this.anchor - 1e-3) - 1, Math.min(Math.floor(this.anchor + 1e-3) + 1, to));
       this.target = to;
-      this.glideTo(to);
+      this.glideTo(to, true);
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (!mine(e) || this.claimed) return;
+      if (!mine(e) || this.claimed || this.touchSwallow) return;
       const y = e.touches[0]?.clientY ?? ty;
       if (this.locked) {
         this.roomScroll((ty - y) * TOUCH_GAIN, e.target, touchFresh);
@@ -345,6 +356,9 @@ export class Journey {
       он приходит раньше `touchstart`; снимается, когда поднят последний палец. */
   claimTouch() {
     this.claimed = true;
+    // Забрали посреди жеста (палец мимо сферы пошёл вбок) — что он успел
+    // сдвинуть вдоль маршрута, возвращается.
+    if (this.touching) this.target = this.anchor;
   }
 
   /** Замок на время комнаты. Кнопки и якоря (`goTo`) работают и под ним.
@@ -353,8 +367,12 @@ export class Journey {
       сторону (Илья, 2026-10-21); «none» — прокрутка не выводит вовсе, только
       «закрыть» и Esc: в комнате сферы рука и палец её вертят (Илья, 2026-11-05). */
   lock(on: boolean, exit: RoomExit = "up") {
-    // Вышли посреди жеста — его хвост маршрут не двигает.
-    if (this.locked && !on) this.swallow = true;
+    // Вышли посреди жеста — его хвост маршрут не двигает. Палец: один свайп
+    // вниз закрывал «обо мне» и тут же уносил назад по кольцу, к «@» (Илья, 2026-11-05).
+    if (this.locked && !on) {
+      this.swallow = true;
+      if (this.touching) this.touchSwallow = true;
+    }
     this.locked = on;
     this.exit = on ? exit : "up";
     this.exitAcc = 0;
@@ -420,9 +438,10 @@ export class Journey {
   /** Откат — с разгоном и торможением, а не по экспоненте, которая
       стартует на полной скорости и читается рывком. Длительность растёт
       с расстоянием: полшага — около 1,7 с, чуть-чуть — около секунды. */
-  private glideTo(to: number) {
+  private glideTo(to: number, touch = false) {
     const dist = Math.abs(to - this.current);
-    this.glide = dist > 0.001 ? { from: this.current, to, t0: performance.now(), dur: 1000 + dist * 1400 } : null;
+    const dur = touch ? TOUCH_GLIDE_MS + dist * TOUCH_GLIDE_PER_STOP : 1000 + dist * 1400;
+    this.glide = dist > 0.001 ? { from: this.current, to, t0: performance.now(), dur, out: touch } : null;
   }
 
   /** Режим без движения: камера сразу на цели. */
@@ -459,7 +478,8 @@ export class Journey {
       /* Кубическая кривая, как откат у igloo: трогается мягко, в середине
          уверенно разгоняется и долго, гладко встаёт. Синус был слишком
          ровным — без этого «премиального» рывка в середине. */
-      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // После пальца — только торможение: движение уже начато рукой.
+      const e = g.out ? 1 - Math.pow(1 - t, 3) : t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       this.current = g.from + (g.to - g.from) * e;
       if (t >= 1) this.glide = null;
     } else {
@@ -468,7 +488,7 @@ export class Journey {
       // Отзывчивее прежнего: камера догоняет колесо примерно за четверть
       // секунды вместо сорока сотых — прокрутка ощущается прямой.
       const k = 1 - Math.pow(0.0022, dt);
-      this.current += (this.target - this.current) * Math.min(1, k * 0.62);
+      this.current += (this.target - this.current) * Math.min(1, k * (this.touching ? TOUCH_FOLLOW : 0.62));
     }
     this.velocity = dt > 0 ? (this.current - prev) / dt : 0;
     this.wrap();

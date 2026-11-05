@@ -94,7 +94,7 @@ export function ProjectRoom({
   }, [seen, layout]);
 
   const link =
-    "instrument pointer-events-auto text-[var(--sand-dim)] underline decoration-[var(--line)] underline-offset-[5px] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] hover:decoration-current";
+    "instrument pointer-events-auto text-[var(--color-sand)] underline decoration-[var(--line)] underline-offset-[5px] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:decoration-current";
 
   return (
     <>
@@ -102,11 +102,13 @@ export function ProjectRoom({
       <div className="room-tint absolute inset-0" aria-hidden />
 
       {/* Экран проекта — крупно, по центру. На узком экране — во всю ширину
-          между полями: в 60vw на телефоне он выходил с ладонь (~230 px). */}
+          между полями (в 60vw на телефоне он выходил с ладонь, ~230 px) и сверху,
+          под приборами, как у Active Theory: подпись снизу растёт вверх и с ним
+          не сходится, как бы длинно ни было описание. */}
       <div
         ref={frameBox}
         style={{ "--ar": ar } as React.CSSProperties}
-        className="absolute left-1/2 top-[47%] w-[min(calc(100vw-2*var(--gutter)),calc((100vh-300px)*var(--ar)),1100px)] -translate-x-1/2 -translate-y-1/2 [perspective:1600px] md:w-[min(60vw,calc((100vh-300px)*var(--ar)),1100px)]"
+        className="absolute left-1/2 top-[calc(var(--gutter)+96px)] w-[min(calc(100vw-2*var(--gutter)),calc((100vh-300px)*var(--ar)),1100px)] -translate-x-1/2 [perspective:1600px] md:top-[47%] md:w-[min(60vw,calc((100vh-300px)*var(--ar)),1100px)] md:-translate-y-1/2"
         aria-hidden
       >
         <div ref={frame} className="room-frame room-gl-media relative aspect-[var(--ar)] w-full">
@@ -117,9 +119,10 @@ export function ProjectRoom({
       </div>
 
       {/* Подпись — мелко, в левом нижнем углу. */}
-      {/* На телефоне под подписью — «закрыть» (Илья, 2026-11-05: в левый нижний угол). */}
-      <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] w-[min(380px,calc(100vw-2*var(--gutter)))] max-md:bottom-[calc(var(--gutter)+34px)]">
-        <h2 className="instrument text-[var(--color-sand)]">
+      {/* Подпись в тон кадру (`room-ink`, цвет пишет главная по ролику) и с тёмным
+          ореолом под буквами — как у Active Theory, где текст лежит на тёмном. */}
+      <div className="room-caption absolute bottom-[var(--gutter)] left-[var(--gutter)] w-[min(380px,calc(100vw-2*var(--gutter)))]">
+        <h2 className="instrument room-ink">
           {/* Название играет под рукой, как кнопки (attachFlipHand). */}
           <span data-hand className="pointer-events-auto">
             <Flip text={p.title} />
@@ -129,11 +132,12 @@ export function ProjectRoom({
           <Flip text={`${p.year} / ${p.role} / ${STATUS_LABEL[lang][p.status]}`} />
         </p>
         {p.summary ? (
-          <p className="instrument mt-3 text-[var(--sand-dim)]">
+          <p className="instrument room-ink mt-3">
             <Flip text={p.summary} />
           </p>
         ) : null}
-        <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5">
+        {/* На телефоне справа в этой строке — «закрыть»: ссылки до него не доходят. */}
+        <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 max-md:pr-16">
           <a href={`/work/${p.slug}/`} className={link}>
             <Flip text={`${t.fullCase} ↗`} />
           </a>

@@ -319,3 +319,23 @@ body {
 .wave-glow {
   filter: drop-shadow(0 0 2px currentColor);
 }
+
+/* Подпись комнаты проекта (ProjectRoom.tsx), как у Active Theory (замер
+   2026-11-05): в тон комнате и с тёмной подложкой под буквами. Оттенок —
+   от среднего цвета ролика, его пишет главная в --room-ink; без сцены — песок.
+   Ореол — тенью текста: над светящимися точками стенок буквы не тонут.
+   На телефоне кегль крупнее — 13 px, как у них. */
+.room-ink {
+  color: rgb(var(--room-ink, 232 223 205));
+}
+.room-caption {
+  text-shadow:
+    0 0 12px rgb(5 11 32 / 0.9),
+    0 0 3px rgb(5 11 32 / 0.75);
+}
+@media (width < 48rem) {
+  .room-caption .instrument {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+}

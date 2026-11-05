@@ -40,6 +40,30 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Волна в переключателе звука: столько точек на линии и её размер. */
 const WAVE = 48;
+/** Цвет подписи комнаты из среднего цвета кадра (0..1): оттенок кадра,
+    насыщенность поджата (до 0,3), светлота 0,82 — читается на тёмном. */
+function inkOf(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d < 1e-4 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d >= 1e-4) {
+    if (max === r) h = ((g - b) / d + 6) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+  }
+  const S = Math.min(0.3, s * 0.6 + 0.06);
+  const L = 0.82;
+  const c = (1 - Math.abs(2 * L - 1)) * S;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = L - c / 2;
+  const [r1, g1, b1] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255];
+}
+
 const WAVE_W = 64;
 const WAVE_H = 20;
 const FLAT = `M0 ${WAVE_H / 2} H${WAVE_W}`;
@@ -257,6 +281,8 @@ export function Home({
   /** Рука над окном, −1..1 от центра: кадр комнаты наклоняется за ней. */
   const pointer = useRef({ x: 0, y: 0 });
   const tilt = useRef({ x: 0, y: 0, at: 0 });
+  /** Цвет подписи комнаты проекта, 0..255, и что последним записано в `--room-ink`. */
+  const ink = useRef({ r: 232, g: 223, b: 205, at: 0, written: "" });
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       pointer.current.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -396,7 +422,7 @@ export function Home({
      до сцены не доходит ни одного события, и кажется, что интерактив
      мёртв. Слои сквозные всегда, а кликабельность включают сами кнопки
      и ссылки классом `pointer-events-auto`. */
-  const onFrame = ({ progress, velocity, stations: at, room: amount, marks, hand }: FrameInfo) => {
+  const onFrame = ({ progress, velocity, stations: at, room: amount, marks, hand, tint }: FrameInfo) => {
     /** Чья сейчас точка: к ней камера ближе всего, ей и принимать нажатия. */
     const near = ((Math.round(progress) % N) + N) % N;
     /** Пока открыта комната, аллея гаснет целиком. */
@@ -454,6 +480,28 @@ export function Home({
     }
     // Кадр и название комнаты рисует сцена — ей те же проявление и рука.
     apiRef.current?.roomView(lit, lit === null ? 0 : ease(clamp01((amount - 0.35) / 0.65)), tilt.current.x, tilt.current.y);
+
+    /* Подпись комнаты проекта — в тон кадру (Илья, 2026-11-05: «эмбиентно,
+       как у Active Theory»): оттенок — от среднего цвета ролика, светлота
+       и приглушённость свои, как их холодно-серые подписи в синей комнате.
+       Кадр сменился — цвет перетекает за полсекунды. */
+    const roomEl = lit === null ? null : rooms.current[lit];
+    if (roomEl && tint) {
+      const [tr, tg, tb] = inkOf(tint.r, tint.g, tint.b);
+      const at = performance.now();
+      const dti = Math.min(0.1, (at - (ink.current.at || at)) / 1000);
+      ink.current.at = at;
+      const ki = 1 - Math.pow(0.02, dti);
+      const c = ink.current;
+      c.r += (tr - c.r) * ki;
+      c.g += (tg - c.g) * ki;
+      c.b += (tb - c.b) * ki;
+      const v = `${Math.round(c.r)} ${Math.round(c.g)} ${Math.round(c.b)}`;
+      if (v !== c.written) {
+        c.written = v;
+        roomEl.style.setProperty("--room-ink", v);
+      }
+    }
 
     /* Подпись ворот раздела — над их верхней дугой, пока ворота в кадре. */
     const gate = GATE >= 0 ? marks[GATE] : undefined;
@@ -581,9 +629,11 @@ export function Home({
         type="button"
         onClick={closeRoom}
         onPointerEnter={flipHover}
-        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:bottom-[var(--gutter)] max-md:left-[var(--gutter)] max-md:right-auto max-md:top-auto"
+        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:bottom-[var(--gutter)] max-md:top-auto"
       >
-        {/* Esc на тач-экране нет — там подпись без него. */}
+        {/* Esc на тач-экране нет — там подпись без него. На телефоне кнопка справа
+            внизу, на одной строке с «полный кейс» и на том же поле от края
+            (Илья, 2026-11-05). */}
         <span className="pointer-coarse:hidden">
           <Flip text={t.close} />
         </span>
