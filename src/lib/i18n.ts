@@ -27,6 +27,14 @@ export const UI = {
     close: "close · esc",
     /** На тач-экране Esc нет. */
     closeTouch: "close",
+    /* Подсказки на главной (Илья, 2026-11-05): еле заметные, каждая гаснет после
+       первого раза. Вторая строка — на тач-экране. */
+    hintEnjoy: "scroll & enjoy",
+    hintEnjoyTouch: "swipe & enjoy",
+    hintGrip: "hold & drag the name",
+    hintGripTouch: "drag the name",
+    hintSpin: "drag to spin",
+    hintSpinTouch: "swipe sideways to spin",
     openProject: "open project ↵",
     aboutEnter: "about me ↵",
     about: "About me",
@@ -69,6 +77,12 @@ export const UI = {
     scrollClose: "прокрути — закрыть",
     close: "закрыть · esc",
     closeTouch: "закрыть",
+    hintEnjoy: "листай и кайфуй",
+    hintEnjoyTouch: "листай и кайфуй",
+    hintGrip: "зажми и веди имя",
+    hintGripTouch: "веди пальцем по имени",
+    hintSpin: "зажми и крути",
+    hintSpinTouch: "смахни вбок — закрутится",
     openProject: "открыть проект ↵",
     aboutEnter: "обо мне ↵",
     about: "Обо мне",

@@ -338,3 +338,19 @@ body {
     letter-spacing: 0.03em;
   }
 }
+
+/* Подсказки на главной (Home.tsx, Илья 2026-11-05): еле заметные. Проявляются
+   не сразу — пусть сначала соберётся имя, — и гаснут, когда жест сделан.
+   Вторая строка под именем — ещё бледнее. */
+.hint {
+  color: rgb(232 223 205 / 0.42);
+  opacity: 0;
+  transition: opacity 1.2s var(--ease-out-deep);
+}
+.hint + .hint {
+  color: rgb(232 223 205 / 0.3);
+}
+.hint[data-on] {
+  opacity: 1;
+  transition-delay: 1.8s;
+}

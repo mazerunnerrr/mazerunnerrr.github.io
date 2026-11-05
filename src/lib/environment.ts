@@ -168,7 +168,12 @@ export class Environment {
     };
     this.dust = this.add(pos, this.dustU);
 
-    const sLen = SILT_DEPTH * baseZ;
+    /* Период ила — целое число раз в длине кольца. Иначе на стыке «имя ↔ контакты»
+       (положение 0 ↔ 9,99) сдвиг по модулю прыгал на 0,6 экрана вглубь, все пылинки
+       разом переставлялись — фон менялся рывком на первом же движении назад (Илья,
+       2026-11-05; на десктопе бывало и раньше). Пыль глубже так и устроена: её
+       период — само кольцо. */
+    const sLen = len / Math.max(1, Math.round(len / (SILT_DEPTH * baseZ)));
     const sPos = new Float32Array(SILT_DUST * 3);
     for (let i = 0; i < SILT_DUST; i++) {
       sPos[i * 3] = (Math.random() - 0.5) * w * 2.2;

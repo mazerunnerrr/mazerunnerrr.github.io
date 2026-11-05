@@ -168,6 +168,9 @@ export type FrameInfo = {
   /** Средний цвет кадра открытой комнаты, 0..1 (null — кадра нет): подпись
       комнаты берёт из него оттенок. Объект один и тот же каждый кадр. */
   tint: THREE.Color | null;
+  /** Что рука делает с объектом прямо сейчас: распыляет имя или «@», вертит
+      сферу. По первому разу гаснут подсказки на главной. */
+  grip: "spray" | "spin" | null;
 };
 
 export type SceneApi = {
@@ -435,6 +438,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           marks: [],
           hand: 0,
           tint: null,
+          grip: null,
         });
       };
       tick();
@@ -2148,6 +2152,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         marks: env.marksOnScreen,
         hand: handNow,
         tint: frameTint(),
+        // Жест засчитывается, когда рука прошла хоть немного, а не от одного нажатия.
+        grip: touchSpin || (spinning && dragTravel > 40) ? "spin" : twisting && dragTravel > 40 ? "spray" : null,
       });
       drawRoom();
 
@@ -2205,6 +2211,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           marks: env.marksOnScreen,
           hand: 0,
           tint: null,
+          grip: null,
         });
         drawRoom();
         renderer.render(scene, camera);

@@ -64,6 +64,9 @@ function inkOf(r: number, g: number, b: number): [number, number, number] {
   return [(r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255];
 }
 
+/** Где браузер помнит, какие подсказки на главной уже отработали. */
+const HINTS_KEY = "helias:hints";
+
 const WAVE_W = 64;
 const WAVE_H = 20;
 const FLAT = `M0 ${WAVE_H / 2} H${WAVE_W}`;
@@ -236,6 +239,33 @@ export function Home({
   const layers = useRef<(HTMLDivElement | null)[]>([]);
   const tagTop = useRef<(HTMLDivElement | null)[]>([]);
   const tagBottom = useRef<(HTMLDivElement | null)[]>([]);
+  /* Подсказки на главной (Илья, 2026-11-05): еле заметные, каждая гаснет после
+     первого раза и больше не показывается — браузер помнит (`HINTS_KEY`). Пока
+     память не прочитана, их нет вовсе: вернувшийся гость не видит вспышки. */
+  const hintRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [hintsDone, setHintsDone] = useState<ReadonlySet<string> | null>(null);
+  const hintsSeen = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    let saved: string[] = [];
+    try {
+      saved = JSON.parse(localStorage.getItem(HINTS_KEY) ?? "[]");
+    } catch {
+      /* Память браузера закрыта — подсказки просто покажутся снова. */
+    }
+    hintsSeen.current = new Set(saved);
+    setHintsDone(new Set(saved));
+  }, []);
+  const hintDone = (id: string) => {
+    if (hintsSeen.current.has(id)) return;
+    hintsSeen.current.add(id);
+    const all = [...hintsSeen.current];
+    try {
+      localStorage.setItem(HINTS_KEY, JSON.stringify(all));
+    } catch {
+      /* Не запомнили — покажутся при следующем визите, не страшно. */
+    }
+    setHintsDone(new Set(all));
+  };
   const rooms = useRef<(HTMLDivElement | null)[]>([]);
   const enterRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const closeRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -422,7 +452,7 @@ export function Home({
      до сцены не доходит ни одного события, и кажется, что интерактив
      мёртв. Слои сквозные всегда, а кликабельность включают сами кнопки
      и ссылки классом `pointer-events-auto`. */
-  const onFrame = ({ progress, velocity, stations: at, room: amount, marks, hand, tint }: FrameInfo) => {
+  const onFrame = ({ progress, velocity, stations: at, room: amount, marks, hand, tint, grip }: FrameInfo) => {
     /** Чья сейчас точка: к ней камера ближе всего, ей и принимать нажатия. */
     const near = ((Math.round(progress) % N) + N) % N;
     /** Пока открыта комната, аллея гаснет целиком. */
@@ -452,7 +482,18 @@ export function Home({
         const bottom = tagBottom.current[k];
         if (top) top.style.transform = `translate3d(${f.x - f.hw}px, ${f.y - f.hh}px, 0)`;
         if (bottom) bottom.style.transform = `translate3d(${f.x + f.hw}px, ${f.y + f.hh}px, 0)`;
+        // Подсказка — под объектом по центру; у сферы ниже строки «открыть проект»,
+        // у имени — сразу под буквами (полувысота имени с запасом под шрифт, буквы
+        // кончаются около её середины) и выше строки «обо мне».
+        const hint = hintRefs.current[k];
+        if (hint) hint.style.transform = `translate3d(${f.x}px, ${f.y + (stops[k].kind === "project" ? f.hh + 58 : f.hh * 0.5 + 16)}px, 0)`;
       }
+    }
+    // Подсказка гаснет, как только жест сделан: ушёл с имени, распылил, покрутил.
+    if (hintsDone) {
+      if (near !== 0) hintDone("enjoy");
+      if (grip === "spray") hintDone("grip");
+      if (grip === "spin") hintDone("spin");
     }
 
     /* Комната проявляется вслед за материей, когда та уже пошла раскрываться.
@@ -679,6 +720,18 @@ export function Home({
     },
   });
 
+  /** Строка подсказки: на мышь и на палец текст свой. Видна, пока жест не сделан. */
+  const hintLine = (id: string, mouse: string, touch: string) => (
+    <span className="hint instrument" data-on={hintsDone && !hintsDone.has(id) ? "" : undefined}>
+      <span className="pointer-coarse:hidden">
+        <Flip text={mouse} />
+      </span>
+      <span className="hidden pointer-coarse:inline">
+        <Flip text={touch} />
+      </span>
+    </span>
+  );
+
   /** Звук — линия, которая оживает волной того, что играет. Кнопок две: в строке
       приборов на десктопе и под псевдонимом на телефоне (Илья, 2026-11-05) —
       волну кадровый обработчик пишет в обе. На телефоне линия во всю ширину
@@ -892,6 +945,26 @@ export function Home({
                 </div>
               </div>
             )}
+            {s.kind === "name" || s.kind === "project" ? (
+              <div
+                ref={(el) => {
+                  hintRefs.current[k] = el;
+                }}
+                aria-hidden
+                className="absolute left-0 top-0"
+              >
+                <div className="flex -translate-x-1/2 flex-col items-center gap-1.5 whitespace-nowrap">
+                  {s.kind === "name" ? (
+                    <>
+                      {hintLine("enjoy", t.hintEnjoy, t.hintEnjoyTouch)}
+                      {hintLine("grip", t.hintGrip, t.hintGripTouch)}
+                    </>
+                  ) : (
+                    hintLine("spin", t.hintSpin, t.hintSpinTouch)
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         );
       })}
