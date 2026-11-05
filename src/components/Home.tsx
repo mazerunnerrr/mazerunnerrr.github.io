@@ -1069,7 +1069,8 @@ export function Home({
       {/* ── приборы: на всём круге ─────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[var(--gutter)] top-[var(--gutter)] flex flex-col gap-0.5">
-          <span className="instrument text-[var(--color-sand)]">
+          {/* Имя — не слово: переводчик браузера его не трогает (Илья, 2026-11-05). */}
+          <span translate="no" className="notranslate instrument text-[var(--color-sand)]">
             <Flip text={site.alias} />
           </span>
           {/* Только псевдоним: статус есть в «обо мне», проект — в выноске над

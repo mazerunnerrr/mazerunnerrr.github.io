@@ -91,7 +91,9 @@ export function Loader({ title, ready, onDone }: { title: string; ready: boolean
           );
         })}
       </svg>
-      <span className="instrument mt-6 text-[var(--color-sand)]">{title}</span>
+      <span translate="no" className="notranslate instrument mt-6 text-[var(--color-sand)]">
+        {title}
+      </span>
       <span ref={count} className="instrument mt-1 tabular-nums text-[var(--sand-faint)]">
         000
       </span>
