@@ -1,33 +1,29 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant, IBM_Plex_Mono, Manrope } from "next/font/google";
+import { preload } from "react-dom";
 import { SITE_URL, getSite } from "@/content";
+import "./fonts.css";
 import "./globals.css";
 
-/* Дисплейный сериф + чистый гротеск, оба с кириллицей — это не опция.
-   Ни Inter, ни Geist, ни Space Grotesk: они выдают шаблон с первого экрана. */
-const cormorant = Cormorant({
-  variable: "--font-cormorant",
-  subsets: ["cyrillic", "latin"],
-  weight: ["300", "400", "500"],
-  style: ["normal", "italic"],
-  display: "swap",
-});
+/* Дисплейный сериф Cormorant + чистый гротеск Manrope, оба с кириллицей — это
+   не опция. Ни Inter, ни Geist, ни Space Grotesk: они выдают шаблон с первого
+   экрана. Приборы — моноширинным IBM Plex Mono: живые показания меняются каждый
+   кадр, и в пропорциональном шрифте цифры прыгали бы по ширине.
 
-/* Приборы — моноширинным: живые показания меняются каждый кадр, и в пропорциональном
-   шрифте цифры прыгали бы по ширине. Моноширинный держит их в колонке. */
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["cyrillic", "latin"],
-  weight: ["400", "500"],
-  display: "swap",
-});
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["cyrillic", "latin"],
-  weight: ["200", "300", "400", "500"],
-  display: "swap",
-});
+   Шрифты — файлами из репозитория (fonts.css, public/fonts): next/font/google
+   на GitHub через раз ронял сборку. Заранее грузим то же, что грузил он, —
+   латиницу и кириллицу каждого начертания. */
+const FONT_PRELOAD = [
+  "cormorant-normal-latin",
+  "cormorant-normal-cyrillic",
+  "cormorant-italic-latin",
+  "cormorant-italic-cyrillic",
+  "manrope-normal-latin",
+  "manrope-normal-cyrillic",
+  "plex-mono-normal-latin-400",
+  "plex-mono-normal-cyrillic-400",
+  "plex-mono-normal-latin-500",
+  "plex-mono-normal-cyrillic-500",
+];
 
 /* Функцией, а не константой: в дев-режиме правка site.json видна по перезагрузке.
 
@@ -65,21 +61,14 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  for (const f of FONT_PRELOAD) preload(`/fonts/${f}.woff2`, { as: "font", type: "font/woff2", crossOrigin: "" });
   return (
-    /* Переменные шрифтов висят на <html>, а не на <body>: Tailwind v4
-       вычисляет @theme в контексте :root, и переменная, объявленная ниже
-       по дереву, там не видна — --font-display молча разворачивается
-       в системный гротеск. */
     /* Расширения (Dark Reader и подобные) дописывают свои атрибуты
        в <html> раньше, чем React успевает загрузиться, и гидратация
        падает на чужой разметке: `data-darkreader-proxy-injected`.
        Глушим расхождение ровно на корневом теге — глубже оно
        по-прежнему видно. */
-    <html
-      lang="en"
-      className={`${cormorant.variable} ${manrope.variable} ${plexMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <body>
         {/*
           Гасит ошибки, прилетевшие из расширений браузера: MetaMask и
