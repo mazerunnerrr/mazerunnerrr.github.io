@@ -45,6 +45,7 @@ export function ProjectRoom({
   const st = STATUS[p.status];
   const frame = useRef<HTMLDivElement>(null);
   const frameBox = useRef<HTMLDivElement>(null);
+  const caption = useRef<HTMLDivElement>(null);
   /* Картинки комнаты грузятся, только когда в неё впервые вошли: все комнаты
      смонтированы сразу, и lazy у прозрачного кадра посреди экрана ничего
      не откладывал — главная тянула скриншоты всех проектов разом. */
@@ -87,6 +88,8 @@ export function ProjectRoom({
     };
     const ro = new ResizeObserver(measure);
     ro.observe(box);
+    // На телефоне экран стоит посередине над подписью: выросла подпись — он сдвинулся.
+    if (caption.current) ro.observe(caption.current);
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
@@ -101,51 +104,58 @@ export function ProjectRoom({
       {/* Цвет проекта — свечение из глубины комнаты. При WebGL его даёт сцена. */}
       <div className="room-tint absolute inset-0" aria-hidden />
 
-      {/* Экран проекта — крупно, по центру. На узком экране — во всю ширину
-          между полями (в 60vw на телефоне он выходил с ладонь, ~230 px) и сверху,
-          под приборами, как у Active Theory: подпись снизу растёт вверх и с ним
-          не сходится, как бы длинно ни было описание. */}
-      <div
-        ref={frameBox}
-        style={{ "--ar": ar } as React.CSSProperties}
-        className="absolute left-1/2 top-[calc(var(--gutter)+96px)] w-[min(calc(100vw-2*var(--gutter)),calc((100vh-300px)*var(--ar)),1100px)] -translate-x-1/2 [perspective:1600px] md:top-[47%] md:w-[min(60vw,calc((100vh-300px)*var(--ar)),1100px)] md:-translate-y-1/2"
-        aria-hidden
-      >
-        <div ref={frame} className="room-frame room-gl-media relative aspect-[var(--ar)] w-full">
-          {seen && (p.video || p.shots.length) ? (
-            <Cover video={p.video} poster={p.poster} shots={p.shots.map((s) => s.image)} alt="" active={open} fill />
-          ) : null}
+      {/* Экран проекта — крупно, по центру. На телефоне комната — столбиком, как
+          у Active Theory: под приборами экран во всю ширину между полями, ровно
+          посередине свободного места, внизу подпись (Илья, 2026-11-05: «не слишком
+          высоко, но и не прятаться за текстом»). На десктопе обёртки растворяются
+          (`md:contents`), и всё стоит как прежде. */}
+      <div className="absolute inset-x-[var(--gutter)] bottom-[var(--gutter)] top-[calc(var(--gutter)+64px)] flex flex-col md:contents">
+        <div className="flex min-h-0 flex-1 items-center py-4 md:contents">
+          <div
+            ref={frameBox}
+            style={{ "--ar": ar } as React.CSSProperties}
+            className="w-full [perspective:1600px] md:absolute md:left-1/2 md:top-[47%] md:w-[min(60vw,calc((100vh-300px)*var(--ar)),1100px)] md:-translate-x-1/2 md:-translate-y-1/2"
+            aria-hidden
+          >
+            <div ref={frame} className="room-frame room-gl-media relative aspect-[var(--ar)] w-full">
+              {seen && (p.video || p.shots.length) ? (
+                <Cover video={p.video} poster={p.poster} shots={p.shots.map((s) => s.image)} alt="" active={open} fill />
+              ) : null}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Подпись — мелко, в левом нижнем углу. */}
-      {/* Подпись в тон кадру (`room-ink`, цвет пишет главная по ролику) и с тёмным
-          ореолом под буквами — как у Active Theory, где текст лежит на тёмном. */}
-      <div className="room-caption absolute bottom-[var(--gutter)] left-[var(--gutter)] w-[min(380px,calc(100vw-2*var(--gutter)))]">
-        <h2 className="instrument room-ink">
-          {/* Название играет под рукой, как кнопки (attachFlipHand). */}
-          <span data-hand className="pointer-events-auto">
-            <Flip text={p.title} />
-          </span>
-        </h2>
-        <p className={`instrument mt-1.5 ${st.text}`}>
-          <Flip text={`${p.year} / ${p.role} / ${STATUS_LABEL[lang][p.status]}`} />
-        </p>
-        {p.summary ? (
-          <p className="instrument room-ink mt-3">
-            <Flip text={p.summary} />
+        {/* Подпись — мелко, в левом нижнем углу, в тон кадру (`room-ink`, цвет пишет
+            главная по ролику). Шаг строк ровный, как у Active Theory. */}
+        <div
+          ref={caption}
+          className="room-caption md:absolute md:bottom-[var(--gutter)] md:left-[var(--gutter)] md:w-[min(380px,calc(100vw-2*var(--gutter)))]"
+        >
+          <h2 className="instrument room-ink">
+            {/* Название играет под рукой, как кнопки (attachFlipHand). */}
+            <span data-hand className="pointer-events-auto">
+              <Flip text={p.title} />
+            </span>
+          </h2>
+          <p className={`instrument mt-2 md:mt-1.5 ${st.text}`}>
+            <Flip text={`${p.year} / ${p.role} / ${STATUS_LABEL[lang][p.status]}`} />
           </p>
-        ) : null}
-        {/* На телефоне справа в этой строке — «закрыть»: ссылки до него не доходят. */}
-        <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 max-md:pr-16">
-          <a href={`/work/${p.slug}/`} className={link}>
-            <Flip text={`${t.fullCase} ↗`} />
-          </a>
-          {p.links.map((l, i) => (
-            <a key={i} href={l.url} target="_blank" rel="noreferrer noopener" className={link}>
-              <Flip text={`${l.label} ↗`} />
+          {p.summary ? (
+            <p className="instrument room-ink mt-2 md:mt-3">
+              <Flip text={p.summary} />
+            </p>
+          ) : null}
+          {/* На телефоне справа в этой строке — «закрыть»: ссылки до него не доходят. */}
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 max-md:pr-16 md:mt-3.5">
+            <a href={`/work/${p.slug}/`} className={link}>
+              <Flip text={`${t.fullCase} ↗`} />
             </a>
-          ))}
+            {p.links.map((l, i) => (
+              <a key={i} href={l.url} target="_blank" rel="noreferrer noopener" className={link}>
+                <Flip text={`${l.label} ↗`} />
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </>

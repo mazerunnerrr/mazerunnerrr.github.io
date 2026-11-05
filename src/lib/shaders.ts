@@ -119,6 +119,9 @@ export const REFORM_END = 0.88;
     кадра за экраном и на каком мип-уровне она размыта (5 — 1600 px → 50). */
 const AMB_SCALE = 1.5;
 const AMB_LOD = 5.5;
+/** То же для света экрана на стенах комнаты (SHADE_FRAG): шире и мягче. */
+const ROOM_AMB_SCALE = 1.8;
+const ROOM_AMB_LOD = 6.0;
 
 export const PARTICLE_VERT = `
 precision highp float;
@@ -568,7 +571,7 @@ void main(){
     vec3 rlit = min(max(mix(vec3(rl), rc, 1.5), 0.0) * 1.35 + 0.08, vec3(1.0));
     vec2 outside = max(vec2(0.0), abs(fuv - 0.5) - 0.5) * uRoomFrame.zw;
     float dn = length(outside) / min(uRoomFrame.z, uRoomFrame.w);
-    float near = exp(-dn * 2.4) * smoothstep(1.6, 0.0, dn);
+    float near = exp(-dn * 1.6) * smoothstep(2.4, 0.0, dn);
     float glow = m * uTexAmt * near;
     vBase = mix(vBase, rlit, glow * smoothstep(0.02, 0.25, rl));
     vMask *= mix(1.0, 0.45 + 1.4 * rl, glow);
@@ -872,30 +875,28 @@ uniform sampler2D uWaterTex;
 uniform vec4 uWaterMap;
 uniform vec2 uScreen;
 varying vec2 vUv;
-vec3 frameAt(vec2 uv){
-  vec2 c = (uv - 0.5) * uScale + 0.5;
-  vec3 a = texture2D(uTex0, c).rgb;
-  if (uTexMix > 0.001) a = mix(a, texture2D(uTex1, c).rgb, uTexMix);
-  return a;
-}
 void main(){
   vec2 p = (vUv - vec2(0.5, 0.5)) * vec2(1.0, 1.15);
   // Темнота гуще к краям: подписи по углам стоят в самой глубине.
   float a = uAmt * mix(0.93, 0.985, smoothstep(0.25, 0.8, length(p)));
 
-  // Свет экрана: точка стены берёт цвет ближнего к ней края кадра,
-  // размазанный вдоль, и гаснет с расстоянием от экрана.
+  /* Свет экрана, как ambient mode у YouTube и свет в комнатах Active Theory
+     (Илья, 2026-11-05: «у них выражено и помогает среде»): за экраном его же
+     кадр, увеличенный в ROOM_AMB_SCALE раз и сильно размытый (мип ROOM_AMB_LOD), —
+     комната залита цветом того, что играет, и гаснет к краям. Прежде свет брал
+     только край кадра, размазанный вдоль, и тлел полосами у самого экрана. */
   vec2 mid = (uFrame.xy + uFrame.zw) * 0.5;
   vec2 ext = max((uFrame.zw - uFrame.xy) * 0.5, vec2(0.001));
   vec2 q = (vUv - mid) / ext;
-  vec2 tuv = clamp(q, -1.0, 1.0) * 0.5 + 0.5;
-  vec3 amb = vec3(0.0);
-  for (int i = -3; i <= 3; i++) amb += frameAt(clamp(tuv + vec2(float(i) * 0.06, 0.0), 0.0, 1.0));
-  amb /= 7.0;
-  // Яркость света поджата: белый кадр светит вдвое ярче тёмного, а не вдесятеро.
-  amb *= 0.3 / (0.12 + dot(amb, vec3(0.299, 0.587, 0.114)));
-  vec2 out2 = max(abs(q) - 1.0, 0.0) * ext / 0.22;
-  float spill = exp(-dot(out2, out2) * 3.0) * (0.9 + 0.1 * sin(vUv.y * uScreen.y * 0.35));
-  vec3 light = amb * spill * 0.45 * uLit * uAmt;
+  vec2 tuv = clamp(q / ${ROOM_AMB_SCALE.toFixed(2)} * 0.5 + 0.5, 0.0, 1.0);
+  vec2 cuv = (tuv - 0.5) * uScale + 0.5;
+  vec3 amb = mix(textureLod(uTex0, cuv, ${ROOM_AMB_LOD.toFixed(1)}).rgb, textureLod(uTex1, cuv, ${ROOM_AMB_LOD.toFixed(1)}).rgb, uTexMix);
+  // Яркость поджата: белый кадр светит вдвое ярче тёмного, а не вдесятеро.
+  amb *= 0.42 / (0.14 + dot(amb, vec3(0.299, 0.587, 0.114)));
+  // Расстояние от края экрана — в долях его меньшей стороны.
+  vec2 opx = max(abs(q) - 1.0, 0.0) * ext * uScreen;
+  float dn = length(opx) / (2.0 * min(ext.x * uScreen.x, ext.y * uScreen.y));
+  float spill = exp(-dn * 1.7) * (0.94 + 0.06 * sin(vUv.y * uScreen.y * 0.35));
+  vec3 light = amb * spill * 0.7 * uLit * uAmt;
   gl_FragColor = vec4(uColor * a + light, a);
 }`;
