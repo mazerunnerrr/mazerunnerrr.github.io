@@ -344,8 +344,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         focus.star = star;
         refocus?.();
       }
-      // Комнату в один экран — проекта и огонька — закрывает прокрутка в любую сторону.
-      journey.lock(k !== null, k !== null && (stations[k]?.room !== "burst" || star >= 0));
+      // Комнату сферы прокрутка не закрывает — только «закрыть» и Esc: рука
+      // в ней вертит сферу (Илья, 2026-11-05). Комнату огонька — в любую сторону.
+      const st = k === null ? null : stations[k];
+      journey.lock(
+        k !== null,
+        st?.shape.kind === "sphere" ? "none" : st && (st.room !== "burst" || star >= 0) ? "any" : "up"
+      );
       if (k !== null) journey.goTo(k);
     };
     /** Комната проекта в сцене (roomSurface.ts) — есть, только когда есть WebGL. */
@@ -502,6 +507,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       const k = view.k;
       const b = k === null ? null : bodies[k];
       surfaces?.update(k, view.alpha, view.tx, view.ty, b?.solid ? b.u : null, w, h);
+      // Где экран — точкам стенок: они светятся кадром у его краёв (PARTICLE_VERT).
+      const fr = k === null || !b?.solid ? undefined : surfaces?.frameOf(k);
+      shared.uRoomFrame.value.set(fr?.x ?? 0, fr?.y ?? 0, fr?.w ?? 0, fr?.h ?? 0);
     };
 
     /* ── частицы ───────────────────────────────────────────────── */
@@ -594,6 +602,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       uSand: { value: SAND },
       uCamZ: { value: 1000 },
       uBaseZ: { value: 1000 },
+      uRoomFrame: { value: new THREE.Vector4() },
     };
 
     /* Среда маршрута: пыль, ориентиры, свет глав. */
@@ -1224,7 +1233,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       }
       const r = rect;
       if (e.pointerType === "touch") {
-        fingerFree = !touchesObject(e.clientX - r.left, e.clientY - r.top);
+        const onObject = touchesObject(e.clientX - r.left, e.clientY - r.top);
+        // В комнате сферы фон — тоже её: палец вертит сферу, как мышь
+        // (Илья, 2026-11-05). Мимо имени и сфер на аллее — жест маршрута.
+        const sphereRoom = room !== null && room === nearNow && stations[room]?.grip === "spin";
+        fingerFree = !onObject && !sphereRoom;
         if (fingerFree) {
           hoverTarget = 0;
           return;
@@ -1232,8 +1245,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         journey.claimTouch();
         hoverTarget = 1;
         rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
-        // Экран комнаты: рука по нему, сфера изнутри пальцем не вертится.
-        if (room !== null) return;
+        // Экран комнаты: рука по нему, сфера под пальцем на экране не вертится.
+        if (room !== null && onObject) return;
       }
       dragging = true;
       dragLast.set(e.clientX, e.clientY);

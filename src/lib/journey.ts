@@ -60,6 +60,8 @@ const FLICK_MS = 90;
    пока сдвинется курсор, — после крутка колесом сцена зависала посреди
    перехода до первого тычка; выброшено. */
 
+export type RoomExit = "up" | "any" | "none";
+
 export type JourneyOptions = {
   /** Сколько всего точек на маршруте. */
   stops: number;
@@ -89,8 +91,9 @@ export class Journey {
   private anchor = 0;
   /** Открыта комната: сцена в ней статична, колесо маршрут не двигает. */
   private locked = false;
-  /** Комната в один экран: закрывается прокруткой в любую сторону. */
-  private anyExit = false;
+  /** Как прокрутка выводит из комнаты: вверх от верха колонки, в любую
+      сторону (комната в один экран) или никак — только «закрыть» и Esc. */
+  private exit: RoomExit = "up";
   /** Выход из комнаты прокруткой вверх, как у igloo. Назначает сцена. */
   onExit: (() => void) | null = null;
   /** Сколько уже провели вверх в этом жесте. */
@@ -345,14 +348,15 @@ export class Journey {
   }
 
   /** Замок на время комнаты. Кнопки и якоря (`goTo`) работают и под ним.
-      `anyExit` — комната в один экран, листать в ней нечего: её закрывает
-      прокрутка в любую сторону, как «scroll to close» у Active Theory
-      (Илья, 2026-10-21). */
-  lock(on: boolean, anyExit = false) {
+      `exit` — чем выводит прокрутка: «up» — вверх от верха колонки; «any» —
+      комната в один экран, листать в ней нечего, закрывает прокрутка в любую
+      сторону (Илья, 2026-10-21); «none» — прокрутка не выводит вовсе, только
+      «закрыть» и Esc: в комнате сферы рука и палец её вертят (Илья, 2026-11-05). */
+  lock(on: boolean, exit: RoomExit = "up") {
     // Вышли посреди жеста — его хвост маршрут не двигает.
     if (this.locked && !on) this.swallow = true;
     this.locked = on;
-    this.anyExit = on && anyExit;
+    this.exit = on ? exit : "up";
     this.exitAcc = 0;
     this.exitArmed = false;
   }
@@ -362,12 +366,13 @@ export class Journey {
       колонки: иначе долистал текст до начала, инерция докатила — и тебя
       выбросило из комнаты посреди чтения. */
   private roomScroll(dy: number, target: EventTarget | null, fresh: boolean) {
+    if (this.exit === "none") return;
     const col = (target as Element | null)?.closest?.("[data-room-scroll]") as HTMLElement | null;
     if (fresh) {
       this.exitAcc = 0;
       this.exitArmed = !col || col.scrollTop <= 0;
     }
-    const step = this.anyExit ? Math.abs(dy) : -dy;
+    const step = this.exit === "any" ? Math.abs(dy) : -dy;
     if (step <= 0 || !this.exitArmed) {
       this.exitAcc = 0;
       return;

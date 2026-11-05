@@ -204,6 +204,9 @@ uniform float uTexAmt;
 uniform float uTexAspect;
 /** Поправка на среднюю яркость кадра: все сферы выходят одного уровня. */
 uniform float uTexGain;
+/** Экран открытой комнаты: x, y, ширина, высота в пикселях окна от левого
+    верхнего угла; ширина 0 — экрана нет. По нему стенки светятся кадром. */
+uniform vec4  uRoomFrame;
 uniform vec3  uSand;
 varying vec3 vBase;
 /** Сколько света точке даёт кадр: тёмное место кадра гасит её почти совсем. */
@@ -538,6 +541,29 @@ void main(){
   vFade = e * (1.0 - smoothstep(0.82, 1.0, depart)) * uVis * (1.0 - uDim) * swapVis * sparse * flowFade;
   vec4 mv = modelViewMatrix * vec4(P, 1.0);
   gl_Position = projectionMatrix * mv;
+
+  /* Стенки комнаты светятся тем, что играет на экране (Илья, 2026-11-05: «как
+     на аллее, только внутри»): точка берёт цвет ближайшего к ней места кадра —
+     у левого края левое, у верха верхнее, — и чем дальше от экрана, тем слабее,
+     как подсветка за телевизором. Кадр обрезан так же, как на экране (cover). */
+  if (uRoomFrame.z > 0.0 && m > 0.0 && uTexAmt > 0.0) {
+    vec2 ndc = gl_Position.xy / gl_Position.w;
+    vec2 px = vec2((ndc.x * 0.5 + 0.5) * uRes.x, (0.5 - ndc.y * 0.5) * uRes.y);
+    vec2 fuv = (px - uRoomFrame.xy) / uRoomFrame.zw;
+    float pa = uRoomFrame.z / max(uRoomFrame.w, 1.0);
+    vec2 cover = vec2(min(1.0, pa / uTexAspect), min(1.0, uTexAspect / pa));
+    vec2 q = (clamp(fuv, 0.0, 1.0) - 0.5) * cover;
+    vec2 ruv = vec2(0.5 + q.x, 0.5 - q.y);
+    vec3 rc = min(mix(texture2D(uTex0, ruv).rgb, texture2D(uTex1, ruv).rgb, uTexMix) * uTexGain, vec3(1.0));
+    float rl = dot(rc, vec3(0.299, 0.587, 0.114));
+    vec3 rhue = min(max(mix(vec3(rl), rc, 1.4), 0.0) * (sandL / max(rl, 0.08)), vec3(1.0));
+    vec3 rlit = mix(uSand, rhue, 0.6) * (0.85 + pow(rl, 1.4) * 0.6);
+    vec2 outside = max(vec2(0.0), abs(fuv - 0.5) - 0.5) * uRoomFrame.zw;
+    float near = exp(-length(outside) / (0.45 * min(uRoomFrame.z, uRoomFrame.w)));
+    float glow = m * uTexAmt * near;
+    vBase = mix(vBase, rlit, glow);
+    vMask *= mix(1.0, 0.8 + 0.5 * smoothstep(0.05, 0.7, rl), glow);
+  }
   // Точка растёт по мере приближения к камере. Без этого летящая в лицо
   // частица остаётся такой же мелкой, и полёта не чувствуется вовсе.
   // Квадрат под точку растёт вместе со штрихом, иначе он обрежется краем.
