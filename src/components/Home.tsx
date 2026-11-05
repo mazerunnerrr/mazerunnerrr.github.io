@@ -581,7 +581,7 @@ export function Home({
         type="button"
         onClick={closeRoom}
         onPointerEnter={flipHover}
-        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:left-[var(--gutter)] max-md:right-auto max-md:top-[calc(var(--gutter)+56px)]"
+        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+40px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:bottom-[var(--gutter)] max-md:left-[var(--gutter)] max-md:right-auto max-md:top-auto"
       >
         {/* Esc на тач-экране нет — там подпись без него. */}
         <span className="pointer-coarse:hidden">

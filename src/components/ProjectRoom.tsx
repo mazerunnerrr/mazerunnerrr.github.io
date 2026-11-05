@@ -117,7 +117,8 @@ export function ProjectRoom({
       </div>
 
       {/* Подпись — мелко, в левом нижнем углу. */}
-      <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] w-[min(380px,calc(100vw-2*var(--gutter)))]">
+      {/* На телефоне под подписью — «закрыть» (Илья, 2026-11-05: в левый нижний угол). */}
+      <div className="absolute bottom-[var(--gutter)] left-[var(--gutter)] w-[min(380px,calc(100vw-2*var(--gutter)))] max-md:bottom-[calc(var(--gutter)+34px)]">
         <h2 className="instrument text-[var(--color-sand)]">
           {/* Название играет под рукой, как кнопки (attachFlipHand). */}
           <span data-hand className="pointer-events-auto">
