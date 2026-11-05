@@ -41,11 +41,11 @@ export function ContactForm({ url, lang }: { url: string; lang: Lang }) {
     <form onSubmit={send} className="pointer-events-auto w-full max-w-[640px]">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="eyebrow text-[var(--sand-faint)]">{t.formName}</span>
+          <span className="eyebrow text-[var(--sand-dim)]">{t.formName}</span>
           <input name="name" className={FIELD} autoComplete="name" maxLength={80} />
         </label>
         <label className="block">
-          <span className="eyebrow text-[var(--sand-faint)]">{t.formReach}</span>
+          <span className="eyebrow text-[var(--sand-dim)]">{t.formReach}</span>
           <input
             name="contact"
             required
@@ -57,7 +57,7 @@ export function ContactForm({ url, lang }: { url: string; lang: Lang }) {
       </div>
 
       <label className="mt-4 block">
-        <span className="eyebrow text-[var(--sand-faint)]">{t.formTask}</span>
+        <span className="eyebrow text-[var(--sand-dim)]">{t.formTask}</span>
         <textarea name="message" required rows={3} maxLength={4000} className={`${FIELD} resize-y`} />
       </label>
 

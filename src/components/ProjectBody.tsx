@@ -62,7 +62,7 @@ export function ProjectBody({ project, lang }: { project: Project; lang: Lang })
             {project.summary}
           </p>
         ) : null}
-        <p className="eyebrow mt-7 text-[var(--sand-faint)]">
+        <p className="eyebrow mt-7 text-[var(--sand-dim)]">
           <Flip text={`${project.year} · ${project.role}`} />
         </p>
       </header>
@@ -129,7 +129,7 @@ export function ProjectBody({ project, lang }: { project: Project; lang: Lang })
           ) : null}
           {project.did.length ? (
             <>
-              <h3 className="eyebrow mt-7 text-[var(--sand-faint)]">{t.whatIDid}</h3>
+              <h3 className="eyebrow mt-7 text-[var(--sand-dim)]">{t.whatIDid}</h3>
               <ul className="mt-4 space-y-3">
                 {project.did.map((d, i) => (
                   <li key={i} className="relative max-w-[66ch] pl-5 text-[13.5px] font-extralight leading-[1.75] text-[var(--sand-dim)]">

@@ -22,7 +22,7 @@ export function ProjectPage({ project: both }: { project: Record<Lang, Project> 
       {/* Назад — к точке этого проекта на маршруте, а не к первой. */}
       <Link
         href={`/#${project.slug}`}
-        className="eyebrow text-[var(--sand-faint)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
+        className="eyebrow text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
       >
         {t.backToRoute}
       </Link>
@@ -31,7 +31,7 @@ export function ProjectPage({ project: both }: { project: Record<Lang, Project> 
 
       <Link
         href={`/#${project.slug}`}
-        className="eyebrow mt-[clamp(40px,7vh,90px)] inline-block border-t border-[var(--line)] pt-5 text-[var(--sand-faint)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
+        className="eyebrow mt-[clamp(40px,7vh,90px)] inline-block border-t border-[var(--line)] pt-5 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
       >
         {t.backToRoute}
       </Link>

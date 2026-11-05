@@ -807,20 +807,42 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       return sum / (d.length / 4);
     };
     const gainOf = (lum: number) => Math.max(0.35, Math.min(3, 0.35 / Math.max(0.02, lum)));
+    /* Кадры и видео переживают пересборку мира: от размера окна они не зависят.
+       Прежде ресайз выбрасывал их вместе с телами — сферы гасли до песочных,
+       а все ролики скачивались заново. Освобождаются только с самой сценой. */
+    type Media = { shots: THREE.Texture[]; video: HTMLVideoElement | null; aspect: number; lum: number; ready: boolean };
+    const mediaOf = new Map<NonNullable<StationSpec["media"]>, Media>();
+    const applyMedia = (body: Body, m: Media) => {
+      body.shots = m.shots;
+      body.video = m.video;
+      if (!m.ready) return;
+      body.u.uTex0.value = body.u.uTex1.value = m.shots[0];
+      body.u.uTexAspect.value = m.aspect;
+      body.lum = m.lum;
+      body.u.uTexGain.value = gainOf(m.lum);
+      body.u.uTexAmt.value = 1;
+      dirty = true;
+    };
     const loadMedia = (body: Body, media: NonNullable<StationSpec["media"]>) => {
+      const known = mediaOf.get(media);
+      if (known) return applyMedia(body, known);
+      const m: Media = { shots: [], video: null, aspect: 1.6, lum: 0.35, ready: false };
+      mediaOf.set(media, m);
+      applyMedia(body, m);
       const ready = (tex: THREE.Texture, w: number, h: number, src: CanvasImageSource) => {
-        if (!alive || !bodies.includes(body)) return;
+        if (!alive) return;
         /* Мип-уровни нужны экрану комнаты: размытие в следе руки берёт
            выборки с уровня помельче (SURFACE_FRAG). У видео three пересобирает
            их на каждом новом кадре. */
         tex.minFilter = THREE.LinearMipmapLinearFilter;
         tex.generateMipmaps = true;
         tex.needsUpdate = true;
-        body.u.uTexAspect.value = w / Math.max(h, 1);
-        body.lum = meanLum(src);
-        body.u.uTexGain.value = gainOf(body.lum);
-        body.u.uTexAmt.value = 1;
-        dirty = true;
+        m.aspect = w / Math.max(h, 1);
+        m.lum = meanLum(src);
+        m.ready = true;
+        // Кадр мог прийти после ресайза — тогда он нужен уже новому телу.
+        const owner = bodies.find((b) => b?.shots === m.shots);
+        if (owner) applyMedia(owner, m);
       };
       if (media.video) {
         const v = document.createElement("video");
@@ -830,24 +852,31 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         v.playsInline = true;
         v.preload = "auto";
         const tex = new THREE.VideoTexture(v);
-        body.video = v;
-        body.shots = [tex];
-        body.u.uTex0.value = body.u.uTex1.value = tex;
+        m.video = body.video = v;
+        m.shots.push(tex);
         v.addEventListener("loadeddata", () => ready(tex, v.videoWidth, v.videoHeight, v), { once: true });
         return;
       }
       media.images.forEach((src, i) => {
         loader.load(src, (tex) => {
           if (!alive) return tex.dispose();
-          body.shots[i] = tex;
+          m.shots[i] = tex;
           const img = tex.image as HTMLImageElement;
           tex.userData.lum = meanLum(img);
-          if (i === 0) {
-            body.u.uTex0.value = body.u.uTex1.value = tex;
-            ready(tex, img.width, img.height, img);
-          }
+          if (i === 0) ready(tex, img.width, img.height, img);
         });
       });
+    };
+    const dropMedia = () => {
+      for (const m of mediaOf.values()) {
+        for (const t of m.shots) t?.dispose();
+        if (m.video) {
+          m.video.pause();
+          m.video.removeAttribute("src");
+          m.video.load();
+        }
+      }
+      mediaOf.clear();
     };
 
     /** Смена скриншотов на сфере: держим кадр, затем плавно переливаем
@@ -892,12 +921,6 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           scene.remove(b.glow.mesh);
           b.glow.mesh.geometry.dispose();
           (b.glow.mesh.material as THREE.Material).dispose();
-        }
-        for (const t of b.shots) t?.dispose();
-        if (b.video) {
-          b.video.pause();
-          b.video.removeAttribute("src");
-          b.video.load();
         }
       }
       bodies = [];
@@ -987,6 +1010,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        ступенчатая, но работает. */
     const waterFilter = renderer.extensions.has("OES_texture_float_linear") ? THREE.LinearFilter : THREE.NearestFilter;
     const resize = () => {
+      /* Окно шлёт resize и без смены размера сцены: на телефоне — когда
+         прячется адресная строка, а сцена высотой в 100vh. Мир от этого
+         не меняется, а пересборка стоит 130 мс на десктопе и ~400 на телефоне. */
+      if (w === host.clientWidth && h === host.clientHeight) return syncRect();
       w = host.clientWidth;
       h = host.clientHeight;
       water = new Water(w, h);
@@ -2058,8 +2085,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       dropBodies();
+      dropMedia();
       env.dispose();
       surfaces?.dispose();
+      scene.remove(field);
+      field.geometry.dispose();
+      field.material.dispose();
+      waterU.uWaterTex.value.dispose();
       document.documentElement.removeAttribute("data-gl");
       renderer.dispose();
       if (renderer.domElement.parentNode === host) host.removeChild(renderer.domElement);
