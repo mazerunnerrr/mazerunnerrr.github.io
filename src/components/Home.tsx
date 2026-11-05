@@ -963,7 +963,7 @@ export function Home({
             у Active Theory, вид свой: без капсулы и свечения — строка
             приборов, а звук — линия, которая оживает волной того, что
             играет. Работает и из комнаты: сначала выводит на аллею.
-            На телефоне (Илья, 2026-11-05): «контакт | работы» строкой, язык
+            На телефоне (Илья, 2026-11-05): «работы | контакт» строкой, язык
             под ними, звук — слева под псевдонимом. */}
         <nav
           aria-label={t.nav}
@@ -975,13 +975,13 @@ export function Home({
                 href="#projects"
                 onClick={(e) => jump(FIRST_PROJECT, e)}
                 onPointerEnter={flipHover}
-                className="instrument order-3 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] md:order-1"
+                className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] md:order-1"
               >
                 <Flip text={t.work} />
               </a>
             ) : null}
             {projects.length > 0 ? (
-              <span aria-hidden className="instrument order-2 text-[var(--sand-faint)] md:hidden">
+              <span aria-hidden className="instrument text-[var(--sand-faint)] md:hidden">
                 |
               </span>
             ) : null}
@@ -989,7 +989,7 @@ export function Home({
               href="#contacts"
               onClick={(e) => jump(CONTACTS, e)}
               onPointerEnter={flipHover}
-              className="instrument order-1 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] md:order-3"
+              className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] md:order-3"
             >
               <Flip text={t.contact} />
             </a>

@@ -115,6 +115,11 @@ void main(){
    в буквы (Илья, 2026-10-21). */
 export const REFORM_END = 0.88;
 
+/** Подсветка стенок комнаты, как ambient mode: во сколько раз увеличена копия
+    кадра за экраном и на каком мип-уровне она размыта (5 — 1600 px → 50). */
+const AMB_SCALE = 1.5;
+const AMB_LOD = 5.5;
+
 export const PARTICLE_VERT = `
 precision highp float;
 /* Два дома точки: объект, каким он стоит на аллее (A), и каким раскрывается
@@ -542,27 +547,31 @@ void main(){
   vec4 mv = modelViewMatrix * vec4(P, 1.0);
   gl_Position = projectionMatrix * mv;
 
-  /* Стенки комнаты светятся тем, что играет на экране (Илья, 2026-11-05: «как
-     на аллее, только внутри»): точка берёт цвет ближайшего к ней места кадра —
-     у левого края левое, у верха верхнее, — и чем дальше от экрана, тем слабее,
-     как подсветка за телевизором. Кадр обрезан так же, как на экране (cover). */
+  /* Стенки комнаты светятся тем, что играет на экране, как ambient mode
+     у YouTube (Илья, 2026-11-05): за экраном его же кадр, увеличенный
+     в AMB_SCALE раз и сильно размытый (мип-уровень AMB_LOD). Точка не
+     повторяет пиксель края, а берёт продолжение картинки — цвета перетекают
+     друг в друга и плавно гаснут от экрана вглубь комнаты. Тёмное в кадре
+     не светит. Кадр обрезан так же, как на экране (cover). */
   if (uRoomFrame.z > 0.0 && m > 0.0 && uTexAmt > 0.0) {
     vec2 ndc = gl_Position.xy / gl_Position.w;
     vec2 px = vec2((ndc.x * 0.5 + 0.5) * uRes.x, (0.5 - ndc.y * 0.5) * uRes.y);
     vec2 fuv = (px - uRoomFrame.xy) / uRoomFrame.zw;
     float pa = uRoomFrame.z / max(uRoomFrame.w, 1.0);
     vec2 cover = vec2(min(1.0, pa / uTexAspect), min(1.0, uTexAspect / pa));
-    vec2 q = (clamp(fuv, 0.0, 1.0) - 0.5) * cover;
+    vec2 q = (clamp(0.5 + (fuv - 0.5) / ${AMB_SCALE.toFixed(2)}, 0.0, 1.0) - 0.5) * cover;
     vec2 ruv = vec2(0.5 + q.x, 0.5 - q.y);
-    vec3 rc = min(mix(texture2D(uTex0, ruv).rgb, texture2D(uTex1, ruv).rgb, uTexMix) * uTexGain, vec3(1.0));
+    vec3 rc = mix(textureLod(uTex0, ruv, ${AMB_LOD.toFixed(1)}).rgb, textureLod(uTex1, ruv, ${AMB_LOD.toFixed(1)}).rgb, uTexMix);
+    rc = min(rc * uTexGain, vec3(1.0));
     float rl = dot(rc, vec3(0.299, 0.587, 0.114));
-    vec3 rhue = min(max(mix(vec3(rl), rc, 1.4), 0.0) * (sandL / max(rl, 0.08)), vec3(1.0));
-    vec3 rlit = mix(uSand, rhue, 0.6) * (0.85 + pow(rl, 1.4) * 0.6);
+    // Оттенок насыщеннее, яркость — от самого кадра: свет, а не перекраска песка.
+    vec3 rlit = min(max(mix(vec3(rl), rc, 1.5), 0.0) * 1.35 + 0.08, vec3(1.0));
     vec2 outside = max(vec2(0.0), abs(fuv - 0.5) - 0.5) * uRoomFrame.zw;
-    float near = exp(-length(outside) / (0.45 * min(uRoomFrame.z, uRoomFrame.w)));
+    float dn = length(outside) / min(uRoomFrame.z, uRoomFrame.w);
+    float near = exp(-dn * 2.4) * smoothstep(1.6, 0.0, dn);
     float glow = m * uTexAmt * near;
-    vBase = mix(vBase, rlit, glow);
-    vMask *= mix(1.0, 0.8 + 0.5 * smoothstep(0.05, 0.7, rl), glow);
+    vBase = mix(vBase, rlit, glow * smoothstep(0.02, 0.25, rl));
+    vMask *= mix(1.0, 0.45 + 1.4 * rl, glow);
   }
   // Точка растёт по мере приближения к камере. Без этого летящая в лицо
   // частица остаётся такой же мелкой, и полёта не чувствуется вовсе.

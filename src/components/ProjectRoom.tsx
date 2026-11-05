@@ -50,6 +50,19 @@ export function ProjectRoom({
      не откладывал — главная тянула скриншоты всех проектов разом. */
   const [seen, setSeen] = useState(open);
   if (open && !seen) setSeen(true);
+  /* Экран — в пропорциях своего кадра: ролик без чёрных полос бывает шире 16:10,
+     и в рамке 16:10 он обрезался бы по краям (Илья, 2026-11-05: «подтянуть экран
+     под видео»). Пропорции — у постера или первого кадра; пока не узнали — 16:10. */
+  const [ar, setAr] = useState(1.6);
+  const arSrc = p.poster || p.shots[0]?.image;
+  useEffect(() => {
+    if (!seen || !arSrc) return;
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalHeight) setAr(img.naturalWidth / img.naturalHeight);
+    };
+    img.src = arSrc;
+  }, [seen, arSrc]);
 
   useEffect(() => {
     bind((tx, ty) => {
@@ -92,10 +105,11 @@ export function ProjectRoom({
           между полями: в 60vw на телефоне он выходил с ладонь (~230 px). */}
       <div
         ref={frameBox}
-        className="absolute left-1/2 top-[47%] w-[min(calc(100vw-2*var(--gutter)),calc((100vh-300px)*1.6),1100px)] -translate-x-1/2 -translate-y-1/2 [perspective:1600px] md:w-[min(60vw,calc((100vh-300px)*1.6),1100px)]"
+        style={{ "--ar": ar } as React.CSSProperties}
+        className="absolute left-1/2 top-[47%] w-[min(calc(100vw-2*var(--gutter)),calc((100vh-300px)*var(--ar)),1100px)] -translate-x-1/2 -translate-y-1/2 [perspective:1600px] md:w-[min(60vw,calc((100vh-300px)*var(--ar)),1100px)]"
         aria-hidden
       >
-        <div ref={frame} className="room-frame room-gl-media relative aspect-[16/10] w-full">
+        <div ref={frame} className="room-frame room-gl-media relative aspect-[var(--ar)] w-full">
           {seen && (p.video || p.shots.length) ? (
             <Cover video={p.video} poster={p.poster} shots={p.shots.map((s) => s.image)} alt="" active={open} fill />
           ) : null}
