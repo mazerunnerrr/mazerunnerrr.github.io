@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { buildShape, burstShape, focusShape, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
+import { buildShape, burstShape, focusShape, inkOf, textShape, type Shape, type ShapeSpec } from "@/lib/shapes";
 import { FIELD_VERT, FIELD_FRAG, PARTICLE_VERT, PARTICLE_FRAG, REFORM_END } from "@/lib/shaders";
 import { Journey } from "@/lib/journey";
 import { RoomSurfaces, sphereGlow, type RoomLayout } from "@/lib/roomSurface";
@@ -86,6 +86,8 @@ export type StationSpec = {
       плавно, по мере подлёта к точке, — поэтому формы, рука и пересборка
       в соседа не знают о сдвиге. */
   rise?: number;
+  /** Во сколько раз длиннее колесом и пальцем путь от этой точки к следующей. */
+  stretch?: number;
 };
 
 const FLOW = { streak: 1, implode: 2, scatter: 3, condense: 4, vortex: 5 } as const;
@@ -152,6 +154,9 @@ export type StationFrame = {
   hh: number;
   /** Нижний край точек под центром (`Shape.inkBottom`), иначе полувысота. */
   ink: number;
+  /** Правый край точек от центра и просвет между буквами (`Shape.inkRight`, `gap`). */
+  inkR: number;
+  gap: number;
   /** Видимость объекта, 0..1. */
   vis: number;
 };
@@ -331,7 +336,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        а при «уменьшить движение» кадр рисовался однажды и больше никогда.
        В обоих случаях слои не проявлялись, и сайт сворачивался в первый
        экран: до «Что делаю» и «Проектов» было не добраться ничем. */
-    const journey = new Journey({ stops: N });
+    const journey = new Journey({ stops: N, stretch: (k) => stations[k]?.stretch ?? 1 });
     // Корень — вся страница сайта, а не только канвас: курсор часто
     // стоит над текстовым слоем, и оттуда колесо тоже должно вести камеру.
     const detachJourney = journey.attach(host.closest("main") ?? host);
@@ -423,7 +428,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
 
     /** Положение объектов для вёрстки. Заводится однажды и переписывается
         на месте: новый массив каждый кадр — лишняя работа сборщику мусора. */
-    const frames: StationFrame[] = stations.map(() => ({ d: 0, x: 0, y: 0, hw: 0, hh: 0, ink: 0, vis: 0 }));
+    const frames: StationFrame[] = stations.map(() => ({ d: 0, x: 0, y: 0, hw: 0, hh: 0, ink: 0, inkR: 0, gap: 0, vis: 0 }));
     let raf = 0;
 
     /* При «уменьшить движение» камера не едет, а переставляется: положение
@@ -465,6 +470,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           f.hw = Math.min(w * 0.3, 320);
           f.hh = 70;
           f.ink = 70;
+          f.inkR = f.hw;
+          f.gap = 16;
           f.vis = Math.max(0, 1 - Math.abs(f.d) * 2);
         }
         const fb = fallbackRef.current;
@@ -655,6 +662,9 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     /** Скорость руки над объектом, от 0 до 1 — для звука. */
     let handNow = 0;
     const ptrPrev = new THREE.Vector2(-9999, -9999);
+    /** Рука только что вернулась (в окно или новым касанием): её прыжок
+        с прошлого места — не мах, и кисть по нему не проходит. */
+    let ptrFresh = true;
 
     /** Общие настройки шейдера: одни и те же значения у всех объектов. */
     const shared = {
@@ -1041,7 +1051,15 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       dropBodies();
       bodies = stations.map(() => null);
       const n = sampled.count;
-      const first: Shape = { points: sampled.points, halfW: sampled.width / 2, halfH: sampled.height / 2 };
+      const ink = inkOf(sampled.points);
+      const first: Shape = {
+        points: sampled.points,
+        halfW: sampled.width / 2,
+        halfH: sampled.height / 2,
+        inkBottom: ink.bottom,
+        inkRight: ink.right,
+        gap: ink.gap,
+      };
 
       for (let i = 0; i < N; i++) {
         const st = stations[i];
@@ -1247,6 +1265,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         }
         if (fingerFree) return;
       }
+      if (hoverTarget === 0) ptrFresh = true;
       hoverTarget = 1;
       const r = rect;
       rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
@@ -1391,6 +1410,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           return;
         }
         journey.claimTouch();
+        ptrFresh = true;
         hoverTarget = 1;
         rawMouse.set(e.clientX - r.left - w / 2, -(e.clientY - r.top) + h / 2);
         if (room !== null) return;
@@ -1560,6 +1580,11 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        подняли ещё раз (2026-10-21): кисть шире и бьёт в ROOM_KICK раз сильнее. */
     const HIT_ROOM = 170;
     const ROOM_KICK = 2.6;
+    /* Но скорость руки в комнате берёт только ядро кисти. Весь круг в 170 px
+       ехал за рукой как одна плита: ведёшь по кругу — точки изнутри и снаружи
+       от курсора идут по той же дуге, будто привязаны ниточкой по радиусу
+       (Илья, 2026-11-06). Остальная кисть точки расталкивает и закручивает. */
+    const CORE_ROOM = 64;
     const SWEEP = 0.0030;   // увлечение по ходу руки — основная сила
     const PUSH = 0.0010;    // отталкивание от точки касания
     const CURL = 0.0015;    // закрутка вбок, чтобы не расходились строем
@@ -1609,10 +1634,17 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        фигуры против наших ~6%. Здесь так же: к прежнему удару точка под
        кистью перенимает долю скорости самой руки — тем сильнее, чем ближе.
        Замер на сфере: мах 800 px/с уносит на ~90 px — 25% её высоты. */
-    const CARRY = 0.85; // доля скорости руки, которую берёт точка (Илья: 85%)
+    const CARRY = 0.95; // доля скорости руки, которую берёт точка (Илья, 2026-11-06: 95%, было 85%)
     const GRIP = 0.9;                     // как быстро берёт: доля разницы за кадр
-    /** Скачок курсора больше этого за кадр — не мах, а возврат руки в окно. */
-    const TELEPORT = 160;
+    /* Скачок курсора больше этой доли окна за кадр — не мах, а сбой. Было
+       160 px: резкий рывок мышью (от ~9000 px/с) целиком принимался за возврат
+       руки в окно, и имя со сферой переставали отвечать (Илья, 2026-11-06;
+       замер: 11 400 px/с — сдвинуто 1437 точек из ~12 тыс., 19 000 — ни одной).
+       Возврат руки в окно теперь ловит `ptrFresh`, а это — страховка, как у
+       igloo (0,3 окна за шаг). */
+    const TELEPORT = 0.35;
+    /** Потолок скорости руки, которую берут точки, — px за кадр. */
+    const HAND_MAX = 120;
     /* Возврат облака после распыления (Илья, 2026-10-20: «слишком долго
        встают на места, вымораживает»). Было 5,9 с: самый быстрый ход в первые
        доли секунды, дальше длинный хвост. Теперь каждая точка идёт домой
@@ -1634,10 +1666,14 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       physT += dt;
       // Скорость руки сглаживаем и ограничиваем: рывок мышью через весь
       // экран иначе выстреливает облако одним кадром.
-      const raw = ptrPrev.x > -9000 && rawMouse.x > -9000
+      const fresh = ptrFresh;
+      ptrFresh = false;
+      const raw = !fresh && ptrPrev.x > -9000 && rawMouse.x > -9000
         ? { x: rawMouse.x - ptrPrev.x, y: rawMouse.y - ptrPrev.y }
         : { x: 0, y: 0 };
       ptrPrev.copy(rawMouse);
+      const lost = fresh || Math.hypot(raw.x, raw.y) > Math.max(w, h) * TELEPORT;
+      if (lost) raw.x = raw.y = 0;
       /* Сглаживание и потолок решают, сколько удара доходит до точек.
 
          Было 0.3 и 55: рука на 120 пикселях за кадр отдавала облаку 55 —
@@ -1647,15 +1683,16 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
          весь экран. */
       // Скачок курсора — не мах: он влетел в окно или его бросили через
       // экран. Перенятая скорость такого скачка выстреливала точки столбом.
-      if (Math.hypot(raw.x, raw.y) > TELEPORT) handVel.set(0, 0);
+      if (lost) handVel.set(0, 0);
       else handVel.lerp(new THREE.Vector2(raw.x, raw.y), 0.55);
-      const speed = Math.min(handVel.length(), 120);
+      const handLen = handVel.length();
+      const speed = Math.min(handLen, HAND_MAX);
       const moving = speed > 0.35 && hover > 0.01 && settled;
       handNow = Math.min(1, speed / 60) * hover;
 
       /* Вода — везде, где прошла рука, и на ходу тоже: мешаешь толщу, а не
          объект. Успокоилась — ни шага, ни заливки текстуры. */
-      if ((raw.x || raw.y) && Math.hypot(raw.x, raw.y) < TELEPORT && hover > 0.01)
+      if ((raw.x || raw.y) && hover > 0.01)
         water.splat(rawMouse.x - raw.x, rawMouse.y - raw.y, rawMouse.x, rawMouse.y, h * WATER_R);
       if (water.stirred) {
         // Быстрая вода — только в комнате проекта, по её экрану; «обо мне» не трогаем.
@@ -1671,8 +1708,15 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       // Рука — в координатах мира: камера у точки с `rise` поднята.
       const hx = rawMouse.x;
       const hy = rawMouse.y - lift;
-      const vhx = handVel.x;
-      const vhy = handVel.y;
+      /* Кисть проходит весь путь руки за кадр, а не только место, где рука
+         оказалась: на быстром рывке рука шагает за кадр на 100–300 px, и
+         точки между этими местами не задевались вовсе. */
+      const hx0 = hx - raw.x;
+      const hy0 = hy - raw.y;
+      const sgl2 = raw.x * raw.x + raw.y * raw.y;
+      const capK = handLen > HAND_MAX ? HAND_MAX / handLen : 1;
+      const vhx = handVel.x * capK;
+      const vhy = handVel.y * capK;
 
       // Трение и возврат — за кадр, приведённые к реальному шагу времени.
       const fric = Math.pow(FRICTION, dt * 60);
@@ -1777,6 +1821,13 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         const n = body.n;
         const roomy = !body.solid && body.morph > 0.5;
         const hit = roomy ? HIT_ROOM : HIT;
+        const core = roomy ? CORE_ROOM : HIT;
+        // Глубину шейдер у плоских форм поджимает (`uDepth`): рука ищет точку там же.
+        const dk = body.u.uDepth.value;
+        /* Длинный шаг руки за кадр — на подшаги не длиннее полукисти: прежде
+           рука на рывке шагала дальше своей кисти и проскакивала точки. Пока
+           шаг короче, подшаг один — ровно прежний счёт по месту руки. */
+        const subs = Math.min(16, Math.max(1, Math.ceil(Math.sqrt(sgl2) / (hit * 0.5))));
         const kick = roomy ? KICK * ROOM_KICK : KICK;
         if (spread) body.calm = roomy;
         let restless = false;
@@ -1853,29 +1904,48 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
               const x = bx;
               const y = by;
               const z = homeZ ? homeZ[i] : 0;
-              const ps = baseZ / Math.max(baseZ - (rm[2] * x + rm[5] * y + rm[8] * z + homeCz), 60);
+              const ps = baseZ / Math.max(baseZ - ((rm[2] * x + rm[5] * y + rm[8] * z) * dk + homeCz), 60);
               bx = (rm[0] * x + rm[3] * y + rm[6] * z) * ps;
               by = (rm[1] * x + rm[4] * y + rm[7] * z) * ps;
             }
-            const dx = bx + disp[i3] - hx;
-            const dy = by + disp[i3 + 1] - hy;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < hit) {
-              const t2 = dist / hit;
-              const near = (1 - t2) * (1 - t2);
-              const s = speed * near * give[i];
-              const k = s * kick;
-              vx += vhx * k * SWEEP;
-              vy += vhy * k * SWEEP;
-              if (dist > 1) {
-                vx += (dx / dist) * k * PUSH;
-                vy += (dy / dist) * k * PUSH;
+            const px = bx + disp[i3];
+            const py = by + disp[i3 + 1];
+            // Сперва — задевает ли точку путь руки за кадр вообще.
+            let qx = px - hx;
+            let qy = py - hy;
+            if (subs > 1) {
+              const t = Math.max(0, Math.min(1, ((px - hx0) * raw.x + (py - hy0) * raw.y) / sgl2));
+              qx = px - (hx0 + raw.x * t);
+              qy = py - (hy0 + raw.y * t);
+            }
+            if (qx * qx + qy * qy < hit * hit) {
+              for (let j = 1; j <= subs; j++) {
+                const dx = px - (subs > 1 ? hx0 + (raw.x * j) / subs : hx);
+                const dy = py - (subs > 1 ? hy0 + (raw.y * j) / subs : hy);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist >= hit) continue;
+                const t2 = dist / hit;
+                const near = (1 - t2) * (1 - t2);
+                const s = speed * near * give[i];
+                // Удар делится на подшаги: за кадр точка получает столько же,
+                // сколько прежде, — только без пропусков на длинном шаге.
+                const k = (s * kick) / subs;
+                // По ходу руки ведёт только ядро: на аллее это вся кисть.
+                const c2 = Math.max(0, 1 - dist / core);
+                const along = core === hit ? 1 : (c2 * c2) / Math.max(near, 1e-6);
+                vx += vhx * k * SWEEP * along;
+                vy += vhy * k * SWEEP * along;
+                if (dist > 1) {
+                  vx += (dx / dist) * k * PUSH;
+                  vy += (dy / dist) * k * PUSH;
+                }
+                vx += (-dy / (dist + 60)) * k * CURL;
+                vy += (dx / (dist + 60)) * k * CURL;
+                vz += (Math.random() - 0.5) * k * DEPTH;
+                // Скорость руки берёт тот, кого рука накрыла хоть раз за кадр.
+                carry = Math.max(carry, core === hit ? near : c2 * c2);
+                if (near > stir[i]) stir[i] = near;
               }
-              vx += (-dy / (dist + 60)) * k * CURL;
-              vy += (dx / (dist + 60)) * k * CURL;
-              vz += (Math.random() - 0.5) * k * DEPTH;
-              carry = near;
-              if (near > stir[i]) stir[i] = near;
             }
           }
 
@@ -2117,6 +2187,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         f.hw = b?.a.halfW ?? 0;
         f.hh = b?.a.halfH ?? 0;
         f.ink = b?.a.inkBottom ?? f.hh;
+        f.inkR = b?.a.inkRight ?? f.hw;
+        f.gap = b?.a.gap ?? 0;
         f.vis = b ? vis * (1 - away) : 0;
         if (!b) continue;
 

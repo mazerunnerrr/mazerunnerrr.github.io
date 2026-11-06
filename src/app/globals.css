@@ -116,10 +116,29 @@ body {
    сборщик дописывает запасное правило без смешивания, и в браузере без
    color-mix все буквы надписи горели бы белым навсегда. */
 @supports (color: color-mix(in srgb, red, red)) {
+  /* Волна по буквам комнаты (`wave.ts`, как у igloo): свет `--w` — без ореола,
+     у igloo буква только светлеет. */
+  [data-c] {
+    color: color-mix(in srgb, var(--light) calc(var(--w, 0) * 80%), currentColor);
+  }
   [data-split] > span {
-    color: color-mix(in srgb, var(--light) calc(var(--l, 0) * 100%), currentColor);
+    color: color-mix(in srgb, var(--light) calc(max(var(--l, 0), var(--w, 0) * 0.8) * 100%), currentColor);
     text-shadow: 0 0 0.7em color-mix(in srgb, var(--light) calc(var(--l, 0) * 75%), transparent);
   }
+}
+
+/* Перебор знаков волной (`wave.ts`): подменный знак рисуется поверх буквы,
+   сама буква прозрачна. Текст не меняется — ширина строки стоит. */
+[data-g] {
+  position: relative;
+  -webkit-text-fill-color: transparent;
+}
+[data-g]::after {
+  content: attr(data-g);
+  position: absolute;
+  left: 0;
+  top: 0;
+  -webkit-text-fill-color: currentColor;
 }
 
 /* Поля экрана: все приборы стоят на одном расстоянии от краёв. */

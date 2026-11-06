@@ -75,6 +75,9 @@ export type JourneyOptions = {
   stops: number;
   /** За сколько пикселей колеса проходится одна точка. */
   pxPerStop?: number;
+  /** Во сколько раз длиннее путь от точки k к следующей: колесом и пальцем
+      он требует больше хода, доезд после пальца тянется дольше. */
+  stretch?: (k: number) => number;
 };
 
 export class Journey {
@@ -87,6 +90,7 @@ export class Journey {
 
   readonly stops: number;
   private pxPerStop: number;
+  private stretch: (k: number) => number;
   private detach: Array<() => void> = [];
   /** Когда рука последний раз двигала маршрут. Пока палец на экране — не доводим. */
   private lastInput = 0;
@@ -120,9 +124,17 @@ export class Journey {
   /** Когда камера встала после прокрутки; 0 — ещё едет. */
   private restAt = 0;
 
-  constructor({ stops, pxPerStop = PX_PER_STOP }: JourneyOptions) {
+  constructor({ stops, pxPerStop = PX_PER_STOP, stretch = () => 1 }: JourneyOptions) {
     this.stops = stops;
     this.pxPerStop = pxPerStop;
+    this.stretch = stretch;
+  }
+
+  /** Растяжка отрезка, по которому из `t` идут в сторону `dir`. */
+  private stretchAt(t: number, dir: number) {
+    const n = this.stops;
+    const k = dir >= 0 ? Math.floor(t + 1e-6) : Math.ceil(t - 1e-6) - 1;
+    return this.stretch(((k % n) + n) % n);
   }
 
   /**
@@ -151,7 +163,8 @@ export class Journey {
       if (fresh) this.anchor = this.target;
       const lo = Math.ceil(this.anchor - 1e-3) - 1;
       const hi = Math.floor(this.anchor + 1e-3) + 1;
-      this.target = Math.max(lo, Math.min(hi, this.target + dy / this.pxPerStop));
+      const px = this.pxPerStop * this.stretchAt(this.target, dy);
+      this.target = Math.max(lo, Math.min(hi, this.target + dy / px));
       this.lastInput = performance.now();
       this.glide = null;
     };
@@ -269,7 +282,8 @@ export class Journey {
       const base = Math.round(this.anchor);
       let to: number;
       if (Math.abs(v) >= TOUCH_FLICK) to = v > 0 ? Math.floor(p + 1e-3) + 1 : Math.ceil(p - 1e-3) - 1;
-      else if (Math.abs(p - base) >= TOUCH_COMMIT) to = base + Math.sign(p - base);
+      // Порог — в пикселях пальца: на растянутом отрезке та же доля точки длиннее.
+      else if (Math.abs(p - base) >= TOUCH_COMMIT / this.stretchAt(base, p - base)) to = base + Math.sign(p - base);
       else to = base;
       // Не дальше соседней от начала жеста — как у колеса.
       to = Math.max(Math.ceil(this.anchor - 1e-3) - 1, Math.min(Math.floor(this.anchor + 1e-3) + 1, to));
@@ -446,7 +460,9 @@ export class Journey {
       с расстоянием: полшага — около 1,7 с, чуть-чуть — около секунды. */
   private glideTo(to: number, touch = false) {
     const dist = Math.abs(to - this.current);
-    const dur = touch ? TOUCH_GLIDE_MS + dist * TOUCH_GLIDE_PER_STOP : 1000 + dist * 1400;
+    const dur = touch
+      ? (TOUCH_GLIDE_MS + dist * TOUCH_GLIDE_PER_STOP) * this.stretchAt(this.current, to - this.current)
+      : 1000 + dist * 1400;
     this.glide = dist > 0.001 ? { from: this.current, to, t0: performance.now(), dur, out: touch } : null;
   }
 

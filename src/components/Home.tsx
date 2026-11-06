@@ -10,6 +10,8 @@ import { ContactForm } from "@/components/ContactForm";
 import { Loader } from "@/components/Loader";
 import { Ambience } from "@/lib/ambience";
 import { attachFlipHand, Flip, flipIn } from "@/components/Flip";
+import { WaveText } from "@/components/WaveText";
+import { attachWave } from "@/lib/wave";
 import { clamp01, ease, fade, lightUp } from "@/lib/layer";
 import { ProjectRoom, type RoomUpdate } from "@/components/ProjectRoom";
 import { ACCENT_HEX, STATUS, accentOf } from "@/lib/status";
@@ -66,6 +68,14 @@ function inkOf(r: number, g: number, b: number): [number, number, number] {
 
 /** Где браузер помнит, какие подсказки на главной уже отработали. */
 const HINTS_KEY = "helias:hints";
+/* Переходы «имя ↔ проекты» и «проекты ↔ контакты» заметнее прочих:
+   колесом на них уходит полтора-два крутка, пальцем доезд тянется дольше
+   (Илья, 2026-11-06: «чтобы переход был заметнее, а не проскипан»). */
+const STRETCH = 1.75;
+/** Выбор звука посетителем: "off" — выключил сам. */
+const SOUND_KEY = "helias:sound";
+/** Сколько пикселей строки `.instrument` (11/17,6 px) над верхом заглавных. */
+const NAME_LEAD = 5;
 
 const WAVE_W = 64;
 const WAVE_H = 20;
@@ -157,6 +167,7 @@ export function Home({
         dim: 0.6,
         leave: "streak",
         reform: true,
+        stretch: STRETCH,
       },
       /* Проекты — сферы-сетки одного вида, на каждой проступает кадр
          проекта: сразу видно, что это работы и что по ним можно нажать.
@@ -173,7 +184,7 @@ export function Home({
       ...(JSON.parse(spheres) as { media: StationSpec["media"]; tint: string }[]).map(
         ({ media, tint }, i, all): StationSpec => ({
           ...(i === 0 ? { arrive: "condense" as const } : {}),
-          ...(i === all.length - 1 ? { leave: "scatter" as const } : {}),
+          ...(i === all.length - 1 ? { leave: "scatter" as const, stretch: STRETCH } : {}),
           shape: { kind: "sphere", r: 0.2 },
           room: { kind: "sphere", r: 1.5, cz: 0.55 },
           grip: "spin",
@@ -335,10 +346,39 @@ export function Home({
   const [room, setRoom] = useState<number | null>(null);
   const lastRoom = useRef<number | null>(null);
 
-  // Звук выключен по умолчанию и собирается только по первому нажатию:
-  // браузер не даёт аудио начаться без жеста посетителя.
-  const [sound, setSound] = useState(false);
+  /* Звук включён по умолчанию (Илья, 2026-11-06), а выключенный посетителем
+     остаётся выключенным и при следующем визите (`SOUND_KEY`). Заиграть
+     браузер даёт только после жеста: первый клик, тап или клавиша — колесо
+     и движение мыши жестом не считаются. До него прибор горит, но молчит. */
+  const [sound, setSound] = useState(true);
   const ambienceRef = useRef<Ambience | null>(null);
+  const soundRef = useRef(sound);
+  const roomNow = useRef(room);
+  useEffect(() => {
+    soundRef.current = sound;
+    roomNow.current = room;
+  }, [sound, room]);
+  const startSound = useCallback(() => {
+    if (ambienceRef.current) return;
+    ambienceRef.current = new Ambience(site.music);
+    ambienceRef.current.duck(roomNow.current !== null);
+    ambienceRef.current.set(true);
+  }, [site.music]);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SOUND_KEY) === "off") setSound(false);
+    } catch {}
+    const onGesture = (e: Event) => {
+      // Нажатие по самому прибору решает toggleSound: первое — «заиграй».
+      if ((e.target as Element | null)?.closest?.(".sound-toggle")) return;
+      if (soundRef.current) startSound();
+      stop();
+    };
+    const kinds = ["pointerdown", "keydown", "touchend"] as const;
+    const stop = () => kinds.forEach((k) => window.removeEventListener(k, onGesture, true));
+    kinds.forEach((k) => window.addEventListener(k, onGesture, true));
+    return stop;
+  }, [startSound]);
   const lastSound = useRef(0);
   useEffect(() => () => ambienceRef.current?.close(), []);
   // Надписи под рукой: цифры и щелчки. Щёлкает звук мира, пока он включён.
@@ -350,15 +390,31 @@ export function Home({
       detach();
     };
   }, []);
+  /* Буквы комнаты отвечают руке волной, как у igloo (`wave.ts`). Волна читает
+     буквы открытой комнаты; язык сменился — перечитывает. */
+  const waveRef = useRef<ReturnType<typeof attachWave> | null>(null);
+  useEffect(() => {
+    const w = attachWave();
+    waveRef.current = w;
+    return () => w.detach();
+  }, []);
+  useEffect(() => {
+    waveRef.current?.setRoot(room !== null ? rooms.current[room] : null);
+  }, [room, lang]);
   const toggleSound = () => {
     hintDone("sound");
-    const next = !sound;
-    if (next && !ambienceRef.current) {
-      ambienceRef.current = new Ambience(site.music);
-      ambienceRef.current.duck(room !== null);
+    // Прибор горит, но ещё молчал: первое нажатие — «заиграй», а не «выключи».
+    if (sound && !ambienceRef.current) {
+      startSound();
+      return;
     }
+    const next = !sound;
+    if (next) startSound();
     ambienceRef.current?.set(next);
     setSound(next);
+    try {
+      localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+    } catch {}
   };
   /* Ушёл со вкладки — звук стихает, вернулся — возвращается, если был
      включён (Илья, 2026-10-19, по образцу igloo.inc). */
@@ -483,7 +539,14 @@ export function Home({
         const top = tagTop.current[k];
         const bottom = tagBottom.current[k];
         if (top) top.style.transform = `translate3d(${f.x - f.hw}px, ${f.y - f.hh}px, 0)`;
-        if (bottom) bottom.style.transform = `translate3d(${f.x + f.hw}px, ${f.y + f.hh}px, 0)`;
+        /* «обо мне» — под последней буквой имени, на просвет между буквами
+           ниже них, правым краем по букве (Илья, 2026-11-06); `NAME_LEAD` —
+           воздух строки над заглавными. Вход проекта — у угла сферы. */
+        if (bottom)
+          bottom.style.transform =
+            stops[k].kind === "name"
+              ? `translate3d(${f.x + f.inkR}px, ${f.y + f.ink + f.gap - NAME_LEAD}px, 0)`
+              : `translate3d(${f.x + f.hw}px, ${f.y + f.hh}px, 0)`;
         // Подсказка — под объектом по центру; у сферы ниже строки «открыть проект»,
         // у имени — сразу под буквами (полувысота имени с запасом под шрифт, буквы
         // кончаются около её середины) и выше строки «обо мне».
@@ -942,7 +1005,7 @@ export function Home({
               ))
             ) : (
               <div ref={tag.bottom} className="absolute left-0 top-0">
-                <div className="-translate-x-full whitespace-nowrap pt-4 text-right">
+                <div className={`-translate-x-full whitespace-nowrap text-right ${s.kind === "name" ? "" : "pt-4"}`}>
                   {enterButton(k, s.kind === "project" ? t.openProject : t.aboutEnter)}
                 </div>
               </div>
@@ -981,17 +1044,40 @@ export function Home({
           return roomShell(
             k,
             t.about,
-            <div className="mx-auto flex min-h-full max-w-[1160px] flex-col">
+            <div data-wave className="mx-auto flex min-h-full max-w-[1160px] flex-col">
               <div className="my-auto flex flex-col items-center py-[clamp(24px,5vh,56px)] text-center">
                 <p className="instrument text-[var(--sand-dim)]">
                   <Flip text={site.status} />
                 </p>
                 <h2 className="font-display mt-[clamp(18px,3vh,30px)] max-w-[22ch] text-[clamp(28px,2.4vw,40px)] font-light leading-[1.18]">
-                  {site.thesis}
+                  <WaveText text={site.thesis} />
                 </h2>
                 <p className="mt-[clamp(18px,3vh,26px)] max-w-[54ch] text-[16px] font-extralight leading-[1.75] text-[var(--sand-dim)]">
-                  {site.intro}
+                  <WaveText text={site.intro} />
                 </p>
+                {/* «Откуда я это умею» и «Как работаю» — двумя строками под абзацем
+                    (Илья, 2026-11-06); на телефоне — как направления: подпись слева. */}
+                {site.origin || site.process ? (
+                  <div className="mt-[clamp(22px,3.4vh,34px)] grid w-full max-w-[720px] grid-cols-1 gap-x-[clamp(24px,3vw,44px)] gap-y-[18px] text-left md:grid-cols-2">
+                    {(
+                      [
+                        [t.originLabel, site.origin],
+                        [t.processLabel, site.process],
+                      ] as const
+                    ).map(([label, text]) =>
+                      text ? (
+                        <div key={label} className="grid grid-cols-[104px_1fr] gap-x-[14px] md:block">
+                          <h3 className="instrument text-[var(--color-sand)]">
+                            <Flip text={label} />
+                          </h3>
+                          <p className="text-[13.5px] font-extralight leading-[1.6] text-[var(--sand-dim)] md:mt-2">
+                            <WaveText text={text} />
+                          </p>
+                        </div>
+                      ) : null
+                    )}
+                  </div>
+                ) : null}
               </div>
               <h3 className="sr-only">{t.whatIDo}</h3>
               {/* На узком экране — строками: название слева, описание справа
@@ -1002,7 +1088,9 @@ export function Home({
                     <h4 className="instrument text-[var(--color-sand)]">
                       <Flip text={x.title} />
                     </h4>
-                    <p className="text-[13.5px] font-extralight leading-[1.6] text-[var(--sand-dim)] md:mt-2">{x.lead}</p>
+                    <p className="text-[13.5px] font-extralight leading-[1.6] text-[var(--sand-dim)] md:mt-2">
+                      <WaveText text={x.lead} />
+                    </p>
                   </li>
                 ))}
               </ul>

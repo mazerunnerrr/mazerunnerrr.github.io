@@ -139,6 +139,7 @@ export function ProjectRoom({
             главная по ролику). Шаг строк ровный, как у Active Theory. */}
         <div
           ref={caption}
+          data-wave
           className="room-caption md:absolute md:bottom-[var(--gutter)] md:left-[var(--gutter)] md:w-[min(380px,calc(100vw-2*var(--gutter)))]"
         >
           <h2 className="instrument room-ink">

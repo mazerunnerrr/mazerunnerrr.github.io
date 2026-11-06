@@ -197,6 +197,18 @@ collections:
             widget: text
             i18n: true
             required: [ru]
+          - name: origin
+            label: Откуда я это умею
+            widget: text
+            i18n: true
+            required: false
+            hint: "«Обо мне», под абзацем слева. Пусто — строки нет"
+          - name: process
+            label: Как работаю
+            widget: text
+            i18n: true
+            required: false
+            hint: "«Обо мне», под абзацем справа. Пусто — строки нет"
           - name: status
             label: Строка статуса
             widget: string

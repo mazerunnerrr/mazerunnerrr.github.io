@@ -40,6 +40,10 @@ export type Shape = {
   /** Нижний край самих точек под центром, пиксели: у надписи он ближе
       полувысоты холста — под «@» по нему встают контакты. */
   inkBottom?: number;
+  /** Правый край точек от центра и просвет между буквами, пиксели: по ним
+      «обо мне» встаёт под последней буквой имени. */
+  inkRight?: number;
+  gap?: number;
 };
 
 const FAMILY = "var(--font-cormorant), Georgia, serif";
@@ -69,6 +73,37 @@ export async function textShape(word: string, w: number, h: number, first: boole
     s = await sampleText({ lines: [text], fontSize: size, fontFamily: FAMILY, lineHeight: 1.12, fontWeight: "400", step: 1 });
   }
   return s;
+}
+
+/**
+ * Где кончаются буквы надписи: нижний и правый край точек и просвет между
+ * буквами — медиана пустых столбцов внутри слова. Сквозь букву пустой столбец
+ * не проходит (у H перекладина, у A вершина), поэтому пустые — только между ними.
+ */
+export function inkOf(points: Float32Array) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  for (let i = 0; i < points.length; i += 2) {
+    if (points[i] < minX) minX = points[i];
+    if (points[i] > maxX) maxX = points[i];
+    if (points[i + 1] < minY) minY = points[i + 1];
+  }
+  if (!(maxX >= minX)) return { bottom: 0, right: 0, gap: 0 };
+  const W = Math.ceil(maxX - minX) + 1;
+  const col = new Uint8Array(W);
+  for (let i = 0; i < points.length; i += 2) col[Math.round(points[i] - minX)] = 1;
+  const runs: number[] = [];
+  let run = 0;
+  for (let x = 0; x < W; x++) {
+    if (!col[x]) run++;
+    else {
+      if (run >= 2) runs.push(run);
+      run = 0;
+    }
+  }
+  runs.sort((a, b) => a - b);
+  return { bottom: -minY, right: maxX, gap: runs.length ? runs[runs.length >> 1] : 0 };
 }
 
 /**
