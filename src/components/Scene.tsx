@@ -384,18 +384,60 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        так, будто стоят рядом (`place`): у них расстояния соседей, свет главы
        перетекает от одной к другой, пыль проходит путь в один шаг. Темп — тот
        же, каким камера догоняет цель на обычном переходе. */
-    let hop: { from: number; to: number; dir: 1 | -1; t: number; v: number } | null = null;
+    /** `ramp` — разгон после разворота, 0..1: волна сперва встаёт, потом идёт назад. */
+    type Hop = { from: number; to: number; dir: 1 | -1; t: number; v: number; ramp: number };
+    /** За сколько секунд волна набирает ход после разворота. */
+    const HOP_TURN = 0.3;
+    let hop: Hop | null = null;
     /** Насколько пыль отстала от камеры после шагов: она прошла по шагу, а камера — дальше. */
     let dustShift = 0;
+    /** Куда пыль смотрит при шаге — по нему сдвиг пыли остаётся непрерывным. */
+    const dustAt = (x: Hop | null) => (x ? x.from + x.dir * x.t : journey.current);
     const hopTo = (stop: number) => {
-      const from = ((Math.round(journey.current) % N) + N) % N;
+      const wrap = (k: number) => ((k % N) + N) % N;
       const sphere = (k: number) => stations[k]?.shape.kind === "sphere";
-      const still = Math.abs(journey.target - journey.current) < 0.02 && bodies.every((b) => !b || b.morph < 0.001);
-      if (reduced || hop || room !== null || !still || from === stop || Math.abs(stop - from) === 1 || !sphere(from) || !sphere(stop)) {
+      const calm = bodies.every((b) => !b || b.morph < 0.001);
+      if (reduced || room !== null || !calm || !sphere(stop)) {
         journey.goTo(stop, true);
         return;
       }
-      hop = { from, to: stop, dir: stop > from ? 1 : -1, t: 0, v: 0 };
+      /* Что сейчас на экране как шаг: идущий шаг полоски или камера между
+         двумя сферами (колесо, соседний переход). Прежде такой шаг отдавался
+         маршруту, и передумавшего посреди пересборки камера везла через все
+         сферы между ними (Илья, 2026-11-06). */
+      let now: Hop | null = hop;
+      if (!now) {
+        const c = journey.current;
+        const s0 = wrap(Math.floor(c));
+        const f = c - Math.floor(c);
+        if (f > 0.02 && f < 0.98 && sphere(s0) && sphere(wrap(s0 + 1)))
+          now = { from: s0, to: wrap(s0 + 1), dir: 1, t: f, v: 0, ramp: 0 };
+      }
+      let next: Hop;
+      if (now) {
+        if (hop && stop === hop.to) return;
+        /* Пересобираемся из того, что видно, — одной волной. Назад к уходящей —
+           та же пересборка вспять. На другую — доля, что уже собрана, становится
+           новой сферой: до середины пути уходящая уходит дальше, а приходящей
+           становится новая; после середины собранная уходит обратно той же
+           волной, а новая встаёт на место уходившей. Смещения обеих видимых
+           сфер при этом те же, что были, — рывка нет. */
+        next =
+          stop === now.to
+            ? now
+            : stop === now.from || now.t >= 0.5
+              ? { from: now.to, to: stop, dir: -now.dir as 1 | -1, t: 1 - now.t, v: 0, ramp: 0 }
+              : { ...now, to: stop };
+      } else {
+        const from = wrap(Math.round(journey.current));
+        if (from === stop || Math.abs(stop - from) === 1 || !sphere(from)) {
+          journey.goTo(stop, true);
+          return;
+        }
+        next = { from, to: stop, dir: stop > from ? 1 : -1, t: 0, v: 0, ramp: 1 };
+      }
+      dustShift += dustAt(hop) - dustAt(next);
+      hop = next;
       journey.jumpTo(stop);
     };
     const endHop = () => {
@@ -2295,7 +2337,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         if (off > 0.02 && off < N - 0.02) endHop();
         else {
           const prev = hop.t;
-          hop.t += (1 - hop.t) * Math.min(1, k * 0.62);
+          // После разворота шаг не стартует с места на полной скорости, а разгоняется.
+          if (hop.ramp < 1) hop.ramp = Math.min(1, hop.ramp + dt / HOP_TURN);
+          const ramp = hop.ramp * hop.ramp * (3 - 2 * hop.ramp);
+          hop.t += (1 - hop.t) * Math.min(1, k * 0.62) * ramp;
           if (1 - hop.t < 0.001) hop.t = 1;
           hop.v = dt > 0 ? ((hop.t - prev) * hop.dir) / dt : 0;
           if (hop.t >= 1) endHop();
