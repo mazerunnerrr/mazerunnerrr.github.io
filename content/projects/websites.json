@@ -4,13 +4,13 @@
   "year": "2026",
   "role": "сайты на заказ под ключ",
   "status": "в работе",
-  "summary": "Делаю сайты на заказ на нескольких языках, с админкой: заказчик сам меняет тексты, работы и цены, а сайт пересобирается после каждой публикации. Astro, Sanity, Cloudflare.",
-  "task": "Типичный заказ: материалы разбросаны (здесь работы художника лежали в Telegram-канале), а сайт нужен на нескольких языках и такой, чтобы заказчик вёл его сам, без разработчика под рукой.",
-  "solution": "Такие сайты я делаю по одним лекалам. Статический сайт на Astro: быстрый, дешёвый в содержании, ломаться в нём нечему. Содержимое живёт в Sanity, заказчик правит его в админке на своём языке, а публикация через вебхук пересобирает сайт на Cloudflare. Без текста на основном языке публикация не пройдёт, и сайт не останется наполовину переведённым.",
-  "result": "Здесь сайт работает на временном адресе: 89 страниц на трёх языках, админка подключена, публикация доходит до сайта сама. Осталось подключить домен и сдать заказчику.",
+  "summary": "Делаю сайты на заказ на нескольких языках, с админкой: тексты, работы и цены вы меняете сами, а сайт пересобирается после каждой публикации. Astro, Sanity, Cloudflare.",
+  "task": "Типичный заказ: материалы разбросаны (здесь работы художника лежали в Telegram-канале), а сайт нужен на нескольких языках и такой, чтобы вести его самому, без разработчика под рукой.",
+  "solution": "Такие сайты я делаю по одним лекалам. Статический сайт на Astro: быстрый, дешёвый в содержании, ломаться в нём нечему. Содержимое живёт в Sanity: вы правите его в админке на своём языке, а публикация через вебхук пересобирает сайт на Cloudflare. Без текста на основном языке публикация не пройдёт, и сайт не останется наполовину переведённым.",
+  "result": "Здесь сайт работает на временном адресе: 89 страниц на трёх языках, админка подключена, публикация доходит до сайта сама. Осталось подключить домен и сдать сайт.",
   "did": [
     {
-      "title": "Разобрал материалы заказчика",
+      "title": "Разобрал материалы",
       "detail": "Выгрузку канала разложил по сериям; 15 оригиналов коллажей сопоставил со сжатыми фото по перцептивному хешу, HEIC перевёл в JPEG."
     },
     {
@@ -86,13 +86,13 @@
   "accent": "clay",
   "en": {
     "role": "custom websites, turnkey",
-    "summary": "I build custom websites in several languages with an admin panel: the client changes texts, works and prices themselves, and the site rebuilds after every publish. Astro, Sanity, Cloudflare.",
-    "task": "A typical order: the material is scattered (here the artist's works lived in a Telegram channel), and the site has to work in several languages and be something the client runs alone, without a developer on call.",
-    "solution": "I build these sites to one pattern. A static Astro site: fast, cheap to keep, nothing to break. Content lives in Sanity, the client edits it in the admin in their own language, and publishing triggers a rebuild on Cloudflare through a webhook. A page can't be published without its main-language text, so the site never ends up half-translated.",
+    "summary": "I build custom websites in several languages with an admin panel: you change texts, works and prices yourself, and the site rebuilds after every publish. Astro, Sanity, Cloudflare.",
+    "task": "A typical order: the material is scattered (here the artist's works lived in a Telegram channel), and the site has to work in several languages and be something you can run yourself, without a developer on call.",
+    "solution": "I build these sites to one pattern. A static Astro site: fast, cheap to keep, nothing to break. Content lives in Sanity, you edit it in the admin in your own language, and publishing triggers a rebuild on Cloudflare through a webhook. A page can't be published without its main-language text, so the site never ends up half-translated.",
     "result": "Here the site runs on a temporary address: 89 pages in three languages, the admin connected, publishing reaches the site on its own. What's left is the domain and the handover.",
     "did": [
       {
-        "title": "Sorted the client's material",
+        "title": "Sorted the material",
         "detail": "Split the channel export into series; matched 15 original collages to compressed photos by perceptual hash, converted HEIC to JPEG."
       },
       {
@@ -156,13 +156,13 @@
   },
   "uk": {
     "role": "сайти на замовлення під ключ",
-    "summary": "Роблю сайти на замовлення кількома мовами, з адмінкою: замовник сам змінює тексти, роботи й ціни, а сайт перезбирається після кожної публікації. Astro, Sanity, Cloudflare.",
-    "task": "Типове замовлення: матеріали розкидані (тут роботи художника лежали в Telegram-каналі), а сайт потрібен кількома мовами й такий, щоб замовник вів його сам, без розробника під рукою.",
-    "solution": "Такі сайти я роблю за одними лекалами. Статичний сайт на Astro: швидкий, дешевий в утриманні, ламатися в ньому нічому. Вміст живе в Sanity, замовник править його в адмінці своєю мовою, а публікація через вебхук перезбирає сайт на Cloudflare. Без тексту основною мовою публікація не пройде, і сайт не залишиться наполовину перекладеним.",
-    "result": "Тут сайт працює на тимчасовій адресі: 89 сторінок трьома мовами, адмінку підключено, публікація доходить до сайту сама. Залишилося підключити домен і здати замовнику.",
+    "summary": "Роблю сайти на замовлення кількома мовами, з адмінкою: тексти, роботи й ціни ви змінюєте самі, а сайт перезбирається після кожної публікації. Astro, Sanity, Cloudflare.",
+    "task": "Типове замовлення: матеріали розкидані (тут роботи художника лежали в Telegram-каналі), а сайт потрібен кількома мовами й такий, щоб вести його самому, без розробника під рукою.",
+    "solution": "Такі сайти я роблю за одними лекалами. Статичний сайт на Astro: швидкий, дешевий в утриманні, ламатися в ньому нічому. Вміст живе в Sanity: ви правите його в адмінці своєю мовою, а публікація через вебхук перезбирає сайт на Cloudflare. Без тексту основною мовою публікація не пройде, і сайт не залишиться наполовину перекладеним.",
+    "result": "Тут сайт працює на тимчасовій адресі: 89 сторінок трьома мовами, адмінку підключено, публікація доходить до сайту сама. Залишилося підключити домен і здати сайт.",
     "did": [
       {
-        "title": "Розібрав матеріали замовника",
+        "title": "Розібрав матеріали",
         "detail": "Вивантаження каналу розклав за серіями; 15 оригіналів колажів зіставив зі стиснутими фото за перцептивним хешем, HEIC перевів у JPEG."
       },
       {

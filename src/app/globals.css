@@ -356,17 +356,33 @@ body {
 }
 /* Текст комнаты растворяется у краёв, а не уезжает под приборы сверху
    и подсказку снизу (телефон, 2026-11-05). В покое края пусты: колонка
-   начинается ниже приборов и кончается выше подсказки (отступы в Home.tsx). */
+   начинается ниже приборов и кончается выше подсказки. */
 [data-room-scroll] {
+  /* Поля колонки: сверху под приборами, снизу над подсказкой. Затухание
+     привязано к ним — где начинается текст, там кончается прозрачное. */
+  --room-top: calc(var(--gutter) + 150px);
+  --room-bottom: calc(var(--gutter) + 40px);
+  padding-top: var(--room-top);
+  padding-bottom: var(--room-bottom);
   --fade: linear-gradient(
     to bottom,
-    transparent calc(var(--gutter) + 64px),
-    #000 calc(var(--gutter) + 120px),
-    #000 calc(100% - var(--gutter) - 40px),
-    transparent calc(100% - var(--gutter) - 14px)
+    transparent calc(var(--room-top) - 86px),
+    #000 calc(var(--room-top) - 30px),
+    #000 calc(100% - var(--room-bottom)),
+    transparent calc(100% - var(--room-bottom) + 26px)
   );
   -webkit-mask-image: var(--fade);
   mask-image: var(--fade);
+}
+/* На компьютере «обо мне» встаёт в окно целиком, без прокрутки, от 650 px
+   высоты (Илья, 2026-11-10: «приходится докручивать»). Поле сверху тает
+   с высотой окна: на 900 и выше — прежние 150 px, на 650 — около 40.
+   Текст по центру с приборами в углах не пересекается. */
+@media (width >= 48rem) {
+  [data-room-scroll] {
+    --room-top: calc(var(--gutter) + clamp(12px, 45vh - 252px, 150px));
+    --room-bottom: calc(var(--gutter) + 28px);
+  }
 }
 
 /* Свечение волны звука, пока играет: линии светятся своим же цветом. */

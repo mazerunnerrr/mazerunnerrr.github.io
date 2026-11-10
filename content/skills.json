@@ -10,7 +10,7 @@
     },
     {
       "title": "Сайты",
-      "lead": "Сайты на заказ на Astro и Next.js, на нескольких языках. Тексты и цены заказчик правит сам в админке, а публикация пересобирает сайт без разработчика. Интерактивная графика на WebGL."
+      "lead": "Сайты на заказ на Astro и Next.js, на нескольких языках. Тексты и цены вы правите сами в админке, а публикация пересобирает сайт без разработчика. Интерактивная графика на WebGL."
     },
     {
       "title": "Дизайн и запуск",
@@ -29,7 +29,7 @@
       },
       {
         "title": "Websites",
-        "lead": "Custom websites on Astro and Next.js, in several languages. The client edits texts and prices in the admin, and publishing rebuilds the site without a developer. Interactive WebGL graphics."
+        "lead": "Custom websites on Astro and Next.js, in several languages. You edit texts and prices in the admin yourself, and publishing rebuilds the site without a developer. Interactive WebGL graphics."
       },
       {
         "title": "Design & launch",
@@ -49,7 +49,7 @@
       },
       {
         "title": "Сайти",
-        "lead": "Сайти на замовлення на Astro і Next.js, кількома мовами. Тексти й ціни замовник править сам в адмінці, а публікація перезбирає сайт без розробника. Інтерактивна графіка на WebGL."
+        "lead": "Сайти на замовлення на Astro і Next.js, кількома мовами. Тексти й ціни ви правите самі в адмінці, а публікація перезбирає сайт без розробника. Інтерактивна графіка на WebGL."
       },
       {
         "title": "Дизайн і запуск",

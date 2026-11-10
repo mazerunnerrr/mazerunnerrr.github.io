@@ -4,10 +4,10 @@
   "year": "2026",
   "role": "дизайн и полиграфия на заказ",
   "status": "заморожен",
-  "summary": "Книга продаж на 12 полос для ЖК BRUGGE застройщика Optimus: три варианта оформления и свой знак в виде фламандского фронтона. Собирается кодом в два файла: для экрана и для типографии. Работа сделана, заказчик остановил проект на финише.",
-  "task": "Прежний вариант буклета заказчик отклонил. Нужна была книга продаж уровня премиального квартала: свой образ, точные планировки и файлы, которые примет типография.",
+  "summary": "Книга продаж на 12 полос для ЖК BRUGGE застройщика Optimus: три варианта оформления и свой знак в виде фламандского фронтона. Собирается кодом в два файла: для экрана и для типографии. Работа сделана, застройщик остановил проект на финише.",
+  "task": "Прежний вариант буклета застройщик отклонил. Нужна была книга продаж уровня премиального квартала: свой образ, точные планировки и файлы, которые примет типография.",
   "solution": "Образ взял из самого здания: ступенчатый фламандский фронтон, снятый с логотипа, срезает верх каждого рендера — скрипт находит небо в кадре и подбирает глубину выреза, чтобы не задеть крыши. Вёрстка в HTML, сборка в PDF скриптами: версия для экрана в RGB и для печати в CMYK с вылетами и метками реза.",
-  "result": "Три законченных варианта — тёмный, светлый и «Щипець» — и тизеры для заказчика. Площади всех 12 типов квартир сверены с рабочими чертежами архитектора: в прежнем буклете у двух они были перепутаны.",
+  "result": "Три законченных варианта — тёмный, светлый и «Щипець» — и тизеры для застройщика. Площади всех 12 типов квартир сверены с рабочими чертежами архитектора: в прежнем буклете у двух они были перепутаны.",
   "did": [
     {
       "title": "Знак «Щипець»",
@@ -89,10 +89,10 @@
   "en": {
     "title": "Design",
     "role": "design and print to order",
-    "summary": "A 12-page sales book for the BRUGGE residential quarter by developer Optimus: three design variants and a mark of its own, a Flemish gable. Built by code into two files: one for screens, one for print. The work is done; the client put the project on hold at the finish line.",
-    "task": "The client had turned down the previous version of the book. They needed a sales book on the level of a premium development: an identity of its own, accurate floor plans and files a print shop would accept.",
+    "summary": "A 12-page sales book for the BRUGGE residential quarter by developer Optimus: three design variants and a mark of its own, a Flemish gable. Built by code into two files: one for screens, one for print. The work is done; the developer put the project on hold at the finish line.",
+    "task": "The developer had turned down the previous version of the book. They needed a sales book on the level of a premium development: an identity of its own, accurate floor plans and files a print shop would accept.",
     "solution": "The identity came from the building itself: the stepped Flemish gable from the logo crops the top of every render — a script finds the sky in the frame and picks the depth of the cut so it never touches a roof. Layout in HTML, PDFs built by scripts: RGB for screens and CMYK for print with bleed and crop marks.",
-    "result": "Three finished variants — dark, light and Gable — plus teasers for the client. The areas of all 12 apartment types were checked against the architect's working drawings: the previous book had two of them mixed up.",
+    "result": "Three finished variants — dark, light and Gable — plus teasers for the developer. The areas of all 12 apartment types were checked against the architect's working drawings: the previous book had two of them mixed up.",
     "did": [
       {
         "title": "The Gable mark",
@@ -159,10 +159,10 @@
   "uk": {
     "title": "Дизайн",
     "role": "дизайн і поліграфія на замовлення",
-    "summary": "Книга продажів на 12 сторінок для ЖК BRUGGE забудовника Optimus: три варіанти оформлення і власний знак у вигляді фламандського фронтону. Збирається кодом у два файли: для екрана і для друкарні. Роботу зроблено, замовник зупинив проєкт на фініші.",
-    "task": "Попередній варіант буклета замовник відхилив. Потрібна була книга продажів рівня преміального кварталу: власний образ, точні планування і файли, які прийме друкарня.",
+    "summary": "Книга продажів на 12 сторінок для ЖК BRUGGE забудовника Optimus: три варіанти оформлення і власний знак у вигляді фламандського фронтону. Збирається кодом у два файли: для екрана і для друкарні. Роботу зроблено, забудовник зупинив проєкт на фініші.",
+    "task": "Попередній варіант буклета забудовник відхилив. Потрібна була книга продажів рівня преміального кварталу: власний образ, точні планування і файли, які прийме друкарня.",
     "solution": "Образ узяв із самої будівлі: ступінчастий фламандський фронтон, знятий із логотипу, зрізає верх кожного рендера — скрипт знаходить небо в кадрі й добирає глибину вирізу, щоб не зачепити дахи. Верстка в HTML, збірка в PDF скриптами: версія для екрана в RGB і для друку в CMYK із вильотами та мітками обрізу.",
-    "result": "Три завершені варіанти — темний, світлий і «Щипець» — та тизери для замовника. Площі всіх 12 типів квартир звірено з робочими кресленнями архітектора: у попередньому буклеті у двох вони були переплутані.",
+    "result": "Три завершені варіанти — темний, світлий і «Щипець» — та тизери для забудовника. Площі всіх 12 типів квартир звірено з робочими кресленнями архітектора: у попередньому буклеті у двох вони були переплутані.",
     "did": [
       {
         "title": "Знак «Щипець»",

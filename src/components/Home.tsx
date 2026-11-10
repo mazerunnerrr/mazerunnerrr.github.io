@@ -878,7 +878,7 @@ export function Home({
       ) : (
         <div
           data-room-scroll
-          className="no-scrollbar pointer-events-auto absolute inset-0 touch-pan-y overflow-y-auto overscroll-contain px-[var(--gutter)] pb-[calc(var(--gutter)+40px)] pt-[calc(var(--gutter)+150px)]"
+          className="no-scrollbar pointer-events-auto absolute inset-0 touch-pan-y overflow-y-auto overscroll-contain px-[var(--gutter)]"
         >
           {children}
         </div>
@@ -1064,11 +1064,11 @@ export function Home({
             k,
             t.about,
             <div data-wave className="mx-auto flex min-h-full max-w-[1160px] flex-col">
-              <div className="my-auto flex flex-col items-center py-[clamp(24px,5vh,56px)] text-center">
+              <div className="my-auto flex flex-col items-center py-[clamp(24px,5vh,56px)] text-center md:py-[clamp(4px,9vh_-_56px,56px)]">
                 <p className="instrument text-[var(--sand-dim)]">
                   <Flip text={site.status} />
                 </p>
-                <h2 className="font-display mt-[clamp(18px,3vh,30px)] max-w-[22ch] text-[clamp(28px,2.4vw,40px)] font-light leading-[1.18]">
+                <h2 className="font-display mt-[clamp(18px,3vh,30px)] max-w-[26ch] text-[clamp(28px,2.4vw,40px)] font-light leading-[1.18]">
                   <WaveText text={site.thesis} still />
                 </h2>
                 <p className="mt-[clamp(18px,3vh,26px)] max-w-[54ch] text-[16px] font-extralight leading-[1.75] text-[var(--sand-dim)]">

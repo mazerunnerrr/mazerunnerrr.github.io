@@ -1,23 +1,23 @@
 {
   "alias": "Helias",
   "thesis": "Беру задачу и довожу до работающего продукта",
-  "intro": "Разбираюсь в бизнесе заказчика, проектирую систему и собираю её сам, с AI-инструментами. Поэтому быстрее и дешевле студии, а решения принимаю без цепочки менеджеров.",
+  "intro": "Разбираюсь в бизнесе, проектирую систему и собираю её сам, с AI-инструментами. Поэтому быстрее и дешевле студии, а решения принимаю без цепочки менеджеров.",
   "origin": "Секрета нет. Мне правда интересно делать интересные вещи, для себя и для других. Код пишу вместе с ИИ.",
-  "process": "Беру у заказчика вводные, разбираюсь с ними и отдаю результат: быстро, без боли и без швов. Делаю всё, что нужно задаче.",
+  "process": "Беру вводные, разбираюсь с ними и отдаю результат: быстро, без боли и без швов. Делаю всё, что нужно задаче.",
   "status": "Удалённо · CET · открыт к проектам",
   "music": "/media/fly-up-high.m4a",
   "en": {
     "thesis": "I take a task and see it through to a working product",
-    "intro": "I get to know the client's business, design the system and build it myself, with AI tools. That makes me faster and cheaper than a studio, and decisions don't wait on a chain of managers.",
+    "intro": "I learn how the business works, design the system and build it myself, with AI tools. That makes me faster and cheaper than a studio, and decisions don't wait on a chain of managers.",
     "origin": "No secret. I like making interesting things, for myself and for other people. I write the code together with AI.",
-    "process": "I take the client's input, work through it and hand back the result: fast, painless, no loose ends. Whatever the task needs, I do.",
+    "process": "I take the input, work through it and hand back the result: fast, painless, no loose ends. Whatever the task needs, I do.",
     "status": "Remote · CET · open to projects"
   },
   "uk": {
     "thesis": "Беру завдання і доводжу до робочого продукту",
-    "intro": "Розбираюся в бізнесі замовника, проєктую систему і збираю її сам, з AI-інструментами. Тому швидше й дешевше за студію, а рішення ухвалюю без ланцюжка менеджерів.",
+    "intro": "Розбираюся в бізнесі, проєктую систему і збираю її сам, з AI-інструментами. Тому швидше й дешевше за студію, а рішення ухвалюю без ланцюжка менеджерів.",
     "origin": "Секрету немає. Мені справді цікаво робити цікаві речі, для себе й для інших. Код пишу разом із ШІ.",
-    "process": "Беру в замовника вхідні дані, розбираюся з ними й віддаю результат: швидко, без болю і без швів. Роблю все, що потрібно завданню.",
+    "process": "Беру вхідні дані, розбираюся з ними й віддаю результат: швидко, без болю і без швів. Роблю все, що потрібно завданню.",
     "status": "Віддалено · CET · відкритий до проєктів"
   }
 }

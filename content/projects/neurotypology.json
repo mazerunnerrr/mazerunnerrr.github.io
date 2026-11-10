@@ -1,5 +1,5 @@
 {
-  "title": "Нейротипология",
+  "title": "Базы данных и инструменты",
   "slug": "neurotypology",
   "year": "2026",
   "role": "личный инструмент с ИИ",
@@ -80,7 +80,7 @@
   "links": [],
   "accent": "amber",
   "en": {
-    "title": "Neurotypology",
+    "title": "Databases & tools",
     "role": "personal AI tool",
     "summary": "A tool for a subject I study: a base of 43 features, face markup on photos and data coming in from a Telegram bot. Claude does the analysis strictly by that base and doesn't make things up.",
     "task": "An analysis by the neurotypology method means 43 features, hundreds of variants and markup of a face from a photo. Keeping it in my head and in notes didn't work, and an AI left to itself starts making things up.",
@@ -142,7 +142,7 @@
     ]
   },
   "uk": {
-    "title": "Нейротипологія",
+    "title": "Бази даних та інструменти",
     "role": "особистий інструмент із ШІ",
     "summary": "Інструмент для предмета, який я вивчаю: база з 43 ознак, розмітка обличчя за фото й приймання даних із Telegram-бота. Claude розбирає суворо за цією базою і нічого не домислює.",
     "task": "Розбір за методикою нейротипології — це 43 ознаки, сотні варіантів і розмітка обличчя за фото. Тримати це в голові й у нотатках не виходило, а ШІ, якому дають свободу, починає домислювати.",
