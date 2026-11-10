@@ -129,6 +129,16 @@
         "image": "/media/exchange-agent/03-guard.webp",
         "caption": "Bargaining: the model asks for a concession through a tool, the server checks the margin floor"
       }
+    ],
+    "stack": [
+      "Python",
+      "aiogram",
+      "FastAPI",
+      "PostgreSQL",
+      "Redis",
+      "LLM with tool calling",
+      "Next.js",
+      "Docker"
     ]
   },
   "uk": {

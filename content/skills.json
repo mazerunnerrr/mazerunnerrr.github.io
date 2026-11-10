@@ -1,59 +1,59 @@
 {
   "items": [
     {
-      "title": "Агенты и боты",
-      "lead": "Бот в Telegram ведёт диалог вместо человека: принимает заявку, считает, напоминает и отдаёт ответ тогда, когда его спросили."
+      "title": "Боты и ИИ-агенты",
+      "lead": "Telegram-боты, которые работают вместо человека: ведут диалог с клиентом, считают по правилам, расшифровывают видео и проверяют факты через Claude. Python, aiogram, FastAPI, Whisper, Docker."
     },
     {
-      "title": "Веб и админки",
-      "lead": "Интерфейс, которым пользуются каждый день: доска задач, карточки, таблицы — со входом, правами и понятным поведением на телефоне."
+      "title": "Приложения и CRM",
+      "lead": "Системы со своей базой данных: сервер на FastAPI, PostgreSQL или SQLite, вход и бэкапы. Плюс версия для телефона как PWA, Android-виджет, связка с Google Calendar и мини-CRM для операторов."
     },
     {
-      "title": "Интеграции",
-      "lead": "Сервисы начинают разговаривать друг с другом: задачи уезжают в календарь, события — в мессенджер, данные ходят сами и по расписанию."
+      "title": "Сайты",
+      "lead": "Сайты на заказ на Astro и Next.js, на нескольких языках. Тексты и цены заказчик правит сам в админке, а публикация пересобирает сайт без разработчика. Интерактивная графика на WebGL."
     },
     {
-      "title": "Автоматизация процессов",
-      "lead": "То, что делалось руками по шагам, происходит само: по времени, по событию или по одной кнопке — вместе с уведомлением о результате."
+      "title": "Дизайн и запуск",
+      "lead": "Что нужно продукту до запуска и вокруг него: книга продаж для типографии (её собираю кодом), питч-дек, экономика, маркетинг-план, промо-ролик. Canva, Higgsfield, Python для обработки рендеров."
     }
   ],
   "en": {
     "items": [
       {
-        "title": "Agents and bots",
-        "lead": "A Telegram bot handles the conversation instead of a person: it takes the request, does the math, sends reminders and answers the moment someone asks."
+        "title": "Bots & AI agents",
+        "lead": "Telegram bots that do a person's job: they talk to customers, calculate by the rules, transcribe video and fact-check with Claude. Python, aiogram, FastAPI, Whisper, Docker."
       },
       {
-        "title": "Web apps and admin panels",
-        "lead": "Interfaces people use every day, like task boards, cards and tables, with login, permissions and predictable behavior on a phone."
+        "title": "Apps & CRM",
+        "lead": "Systems with their own database: a FastAPI server, PostgreSQL or SQLite, logins and backups. Plus a phone version as a PWA, an Android widget, Google Calendar sync and a mini-CRM for operators."
       },
       {
-        "title": "Integrations",
-        "lead": "Services start talking to each other. Tasks land in the calendar, events go to the messenger, and data moves by itself, on schedule."
+        "title": "Websites",
+        "lead": "Custom websites on Astro and Next.js, in several languages. The client edits texts and prices in the admin, and publishing rebuilds the site without a developer. Interactive WebGL graphics."
       },
       {
-        "title": "Process automation",
-        "lead": "Work that used to be done by hand, step by step, happens on its own: on a timer, on an event or at the press of a button, and you get notified of the result."
+        "title": "Design & launch",
+        "lead": "What a product needs before and around launch: a sales book for print (I build it with code), a pitch deck, economics, a marketing plan, a promo video. Canva, Higgsfield, Python for render processing."
       }
     ]
   },
   "uk": {
     "items": [
       {
-        "title": "Агенти й боти",
-        "lead": "Бот у Telegram веде діалог замість людини: приймає заявку, рахує, нагадує і дає відповідь тоді, коли його запитали."
+        "title": "Боти та ШІ-агенти",
+        "lead": "Telegram-боти, які працюють замість людини: ведуть діалог із клієнтом, рахують за правилами, розшифровують відео й перевіряють факти через Claude. Python, aiogram, FastAPI, Whisper, Docker."
       },
       {
-        "title": "Веб і адмінки",
-        "lead": "Інтерфейс, яким користуються щодня: дошка завдань, картки, таблиці — із входом, правами й зрозумілою поведінкою на телефоні."
+        "title": "Застосунки та CRM",
+        "lead": "Системи з власною базою даних: сервер на FastAPI, PostgreSQL або SQLite, вхід і бекапи. Плюс версія для телефона як PWA, Android-віджет, зв'язка з Google Calendar і міні-CRM для операторів."
       },
       {
-        "title": "Інтеграції",
-        "lead": "Сервіси починають розмовляти один з одним: завдання потрапляють у календар, події — в месенджер, дані ходять самі й за розкладом."
+        "title": "Сайти",
+        "lead": "Сайти на замовлення на Astro і Next.js, кількома мовами. Тексти й ціни замовник править сам в адмінці, а публікація перезбирає сайт без розробника. Інтерактивна графіка на WebGL."
       },
       {
-        "title": "Автоматизація процесів",
-        "lead": "Те, що робилося руками крок за кроком, відбувається само собою: за часом, за подією або однією кнопкою — разом зі сповіщенням про результат."
+        "title": "Дизайн і запуск",
+        "lead": "Що потрібно продукту до запуску і навколо нього: книга продажів для друкарні (її збираю кодом), пітч-дек, економіка, маркетинг-план, проморолик. Canva, Higgsfield, Python для обробки рендерів."
       }
     ]
   }

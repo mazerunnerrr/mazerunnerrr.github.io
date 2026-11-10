@@ -1,16 +1,16 @@
 {
   "title": "Веб-сайты",
-  "slug": "ingvar-katsarian",
+  "slug": "websites",
   "year": "2026",
-  "role": "премиальный сайт под ключ",
+  "role": "сайты на заказ под ключ",
   "status": "в работе",
-  "summary": "Сайт-портфолио художника Ингвара Кацаряна на трёх языках: работы по сериям, перформансы, магазин по запросу. Работы и цены художник меняет сам в админке, и сайт обновляется после каждой публикации.",
-  "task": "Работы художника были разбросаны по Telegram-каналу. Нужен был сайт на украинском, английском и русском, который художник ведёт сам, без разработчика под рукой.",
-  "solution": "Статический сайт на Astro: быстрый, дешёвый в содержании, ломаться в нём нечему. Содержимое живёт в Sanity — художник правит его в админке на своём языке, а публикация через вебхук запускает пересборку на Cloudflare. Без украинского текста публикация не пройдёт: сайт не останется наполовину переведённым.",
-  "result": "Сайт работает на временном адресе: 89 страниц на трёх языках, админка подключена, публикация доходит до сайта сама. Осталось подключить домен и сдать заказчику.",
+  "summary": "Делаю сайты на заказ на нескольких языках, с админкой: заказчик сам меняет тексты, работы и цены, а сайт пересобирается после каждой публикации. Astro, Sanity, Cloudflare.",
+  "task": "Типичный заказ: материалы разбросаны (здесь работы художника лежали в Telegram-канале), а сайт нужен на нескольких языках и такой, чтобы заказчик вёл его сам, без разработчика под рукой.",
+  "solution": "Такие сайты я делаю по одним лекалам. Статический сайт на Astro: быстрый, дешёвый в содержании, ломаться в нём нечему. Содержимое живёт в Sanity, заказчик правит его в админке на своём языке, а публикация через вебхук пересобирает сайт на Cloudflare. Без текста на основном языке публикация не пройдёт, и сайт не останется наполовину переведённым.",
+  "result": "Здесь сайт работает на временном адресе: 89 страниц на трёх языках, админка подключена, публикация доходит до сайта сама. Осталось подключить домен и сдать заказчику.",
   "did": [
     {
-      "title": "Разобрал архив из Telegram",
+      "title": "Разобрал материалы заказчика",
       "detail": "Выгрузку канала разложил по сериям; 15 оригиналов коллажей сопоставил со сжатыми фото по перцептивному хешу, HEIC перевёл в JPEG."
     },
     {
@@ -54,45 +54,45 @@
     }
   ],
   "scheme": "",
-  "video": "/media/ingvar-katsarian/video.mp4",
-  "poster": "/media/ingvar-katsarian/poster.webp",
+  "video": "/media/websites/video.mp4",
+  "poster": "/media/websites/poster.webp",
   "shots": [
     {
-      "image": "/media/ingvar-katsarian/01-home.webp",
+      "image": "/media/websites/01-home.webp",
       "caption": "Главная: перформансы художника на первом экране"
     },
     {
-      "image": "/media/ingvar-katsarian/02-collage.webp",
+      "image": "/media/websites/02-collage.webp",
       "caption": "Коллажи по сериям, у каждой работы кнопка запроса цены"
     },
     {
-      "image": "/media/ingvar-katsarian/03-work-page.webp",
+      "image": "/media/websites/03-work-page.webp",
       "caption": "Страница работы: год, размер, серия и запрос на покупку"
     },
     {
-      "image": "/media/ingvar-katsarian/04-performance.webp",
+      "image": "/media/websites/04-performance.webp",
       "caption": "Перформанс «Нефертити»: текст и документация"
     },
     {
-      "image": "/media/ingvar-katsarian/05-shop.webp",
+      "image": "/media/websites/05-shop.webp",
       "caption": "Магазин по запросу: четыре шага от выбора работы до оплаты"
     },
     {
-      "image": "/media/ingvar-katsarian/06-ukrainian.webp",
+      "image": "/media/websites/06-ukrainian.webp",
       "caption": "Тот же раздел на украинском — сайт на трёх языках"
     }
   ],
   "links": [],
   "accent": "clay",
   "en": {
-    "role": "premium turnkey website",
-    "summary": "A three-language portfolio site for artist Ingvar Katsarian: works by series, performances, a shop on request. The artist edits works and prices himself in the admin panel, and the site updates after every publish.",
-    "task": "The artist's work was scattered across a Telegram channel. He needed a site in Ukrainian, English and Russian that he could run himself, without a developer on call.",
-    "solution": "A static Astro site: fast, cheap to keep, nothing to break. Content lives in Sanity, where the artist edits it in his own language, and publishing triggers a rebuild on Cloudflare through a webhook. A page can't be published without its Ukrainian text, so the site never ends up half-translated.",
-    "result": "The site runs on a temporary address: 89 pages in three languages, the admin connected, publishing reaches the site on its own. What's left is the domain and the handover.",
+    "role": "custom websites, turnkey",
+    "summary": "I build custom websites in several languages with an admin panel: the client changes texts, works and prices themselves, and the site rebuilds after every publish. Astro, Sanity, Cloudflare.",
+    "task": "A typical order: the material is scattered (here the artist's works lived in a Telegram channel), and the site has to work in several languages and be something the client runs alone, without a developer on call.",
+    "solution": "I build these sites to one pattern. A static Astro site: fast, cheap to keep, nothing to break. Content lives in Sanity, the client edits it in the admin in their own language, and publishing triggers a rebuild on Cloudflare through a webhook. A page can't be published without its main-language text, so the site never ends up half-translated.",
+    "result": "Here the site runs on a temporary address: 89 pages in three languages, the admin connected, publishing reaches the site on its own. What's left is the domain and the handover.",
     "did": [
       {
-        "title": "Sorted the Telegram archive",
+        "title": "Sorted the client's material",
         "detail": "Split the channel export into series; matched 15 original collages to compressed photos by perceptual hash, converted HEIC to JPEG."
       },
       {
@@ -128,41 +128,41 @@
     ],
     "shots": [
       {
-        "image": "/media/ingvar-katsarian/01-home.webp",
+        "image": "/media/websites/01-home.webp",
         "caption": "Home page: the artist's performances on the first screen"
       },
       {
-        "image": "/media/ingvar-katsarian/02-collage.webp",
+        "image": "/media/websites/02-collage.webp",
         "caption": "Collages by series, each work with a price inquiry button"
       },
       {
-        "image": "/media/ingvar-katsarian/03-work-page.webp",
+        "image": "/media/websites/03-work-page.webp",
         "caption": "Work page: year, size, series and a purchase inquiry"
       },
       {
-        "image": "/media/ingvar-katsarian/04-performance.webp",
+        "image": "/media/websites/04-performance.webp",
         "caption": "The Nefertiti performance: text and documentation"
       },
       {
-        "image": "/media/ingvar-katsarian/05-shop.webp",
+        "image": "/media/websites/05-shop.webp",
         "caption": "Shop by inquiry: four steps from choosing a work to payment"
       },
       {
-        "image": "/media/ingvar-katsarian/06-ukrainian.webp",
+        "image": "/media/websites/06-ukrainian.webp",
         "caption": "The same section in Ukrainian; the site runs in three languages"
       }
     ],
     "title": "Websites"
   },
   "uk": {
-    "role": "преміальний сайт під ключ",
-    "summary": "Сайт-портфоліо художника Інгвара Кацаряна трьома мовами: роботи за серіями, перформанси, магазин за запитом. Роботи й ціни художник змінює сам в адмінці, і сайт оновлюється після кожної публікації.",
-    "task": "Роботи художника були розкидані по Telegram-каналу. Потрібен був сайт українською, англійською та російською, який художник веде сам, без розробника під рукою.",
-    "solution": "Статичний сайт на Astro: швидкий, дешевий в утриманні, ламатися в ньому нічому. Вміст живе в Sanity — художник редагує його в адмінці своєю мовою, а публікація через вебхук запускає перезбирання на Cloudflare. Без українського тексту публікація не пройде: сайт не залишиться наполовину перекладеним.",
-    "result": "Сайт працює на тимчасовій адресі: 89 сторінок трьома мовами, адмінку підключено, публікація доходить до сайту сама. Залишилося підключити домен і здати замовнику.",
+    "role": "сайти на замовлення під ключ",
+    "summary": "Роблю сайти на замовлення кількома мовами, з адмінкою: замовник сам змінює тексти, роботи й ціни, а сайт перезбирається після кожної публікації. Astro, Sanity, Cloudflare.",
+    "task": "Типове замовлення: матеріали розкидані (тут роботи художника лежали в Telegram-каналі), а сайт потрібен кількома мовами й такий, щоб замовник вів його сам, без розробника під рукою.",
+    "solution": "Такі сайти я роблю за одними лекалами. Статичний сайт на Astro: швидкий, дешевий в утриманні, ламатися в ньому нічому. Вміст живе в Sanity, замовник править його в адмінці своєю мовою, а публікація через вебхук перезбирає сайт на Cloudflare. Без тексту основною мовою публікація не пройде, і сайт не залишиться наполовину перекладеним.",
+    "result": "Тут сайт працює на тимчасовій адресі: 89 сторінок трьома мовами, адмінку підключено, публікація доходить до сайту сама. Залишилося підключити домен і здати замовнику.",
     "did": [
       {
-        "title": "Розібрав архів із Telegram",
+        "title": "Розібрав матеріали замовника",
         "detail": "Вивантаження каналу розклав за серіями; 15 оригіналів колажів зіставив зі стиснутими фото за перцептивним хешем, HEIC перевів у JPEG."
       },
       {
@@ -198,27 +198,27 @@
     ],
     "shots": [
       {
-        "image": "/media/ingvar-katsarian/01-home.webp",
+        "image": "/media/websites/01-home.webp",
         "caption": "Головна: перформанси художника на першому екрані"
       },
       {
-        "image": "/media/ingvar-katsarian/02-collage.webp",
+        "image": "/media/websites/02-collage.webp",
         "caption": "Колажі за серіями, у кожної роботи кнопка запиту ціни"
       },
       {
-        "image": "/media/ingvar-katsarian/03-work-page.webp",
+        "image": "/media/websites/03-work-page.webp",
         "caption": "Сторінка роботи: рік, розмір, серія і запит на купівлю"
       },
       {
-        "image": "/media/ingvar-katsarian/04-performance.webp",
+        "image": "/media/websites/04-performance.webp",
         "caption": "Перформанс «Нефертіті»: текст і документація"
       },
       {
-        "image": "/media/ingvar-katsarian/05-shop.webp",
+        "image": "/media/websites/05-shop.webp",
         "caption": "Магазин за запитом: чотири кроки від вибору роботи до оплати"
       },
       {
-        "image": "/media/ingvar-katsarian/06-ukrainian.webp",
+        "image": "/media/websites/06-ukrainian.webp",
         "caption": "Той самий розділ українською — сайт трьома мовами"
       }
     ],
