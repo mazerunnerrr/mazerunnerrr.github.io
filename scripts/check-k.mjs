@@ -21,6 +21,8 @@ const ctx = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   reducedMotion: mode === "reduce" ? "reduce" : "no-preference",
 });
+// Как вернувшийся посетитель: на первом визите заставка ждёт нажатия (Loader.tsx).
+await ctx.addInitScript(() => localStorage.setItem("helias:entered", "1"));
 const page = await ctx.newPage();
 let popups = 0;
 ctx.on("page", () => popups++);

@@ -45,6 +45,8 @@ const ctx = await browser.newContext({
   deviceScaleFactor: 1,
   reducedMotion: "no-preference",
 });
+// Как вернувшийся посетитель: на первом визите заставка ждёт нажатия (Loader.tsx).
+await ctx.addInitScript(() => localStorage.setItem("helias:entered", "1"));
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));

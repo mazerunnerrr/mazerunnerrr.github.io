@@ -312,6 +312,39 @@ body {
     visibility: hidden;
   }
 }
+/* Экран входа на первом визите (Loader.tsx, Илья 2026-11-10): кольцо ждёт
+   нажатия и мягко дышит — видно, что его ждут; вместо счётчика — «старт».
+   Сама заставка не уходит по таймеру: без нажатия звук не заиграет. */
+.loader-enter,
+.loader-hint {
+  display: none;
+}
+:root[data-first] .loader {
+  animation: none;
+}
+:root[data-first] .loader-enter {
+  display: block;
+  cursor: pointer;
+}
+:root[data-first] .loader-hint {
+  display: inline;
+}
+:root[data-first] .loader-count {
+  visibility: hidden;
+}
+:root[data-first] .loader-dot {
+  animation: loader-breathe 2.8s ease-in-out infinite;
+}
+@keyframes loader-breathe {
+  50% {
+    fill: rgba(232, 223, 205, 0.4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-first] .loader-dot {
+    animation: none;
+  }
+}
 
 /* Прокрутка без видимой полосы — для комнаты, которой на низком окне
    не хватает экрана. Полоса посреди сцены ломала картинку. */

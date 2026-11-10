@@ -84,6 +84,8 @@ const run = async () => {
     reducedMotion: "no-preference",
   });
 
+  // Как вернувшийся посетитель: на первом визите заставка ждёт нажатия (Loader.tsx).
+  await context.addInitScript(() => localStorage.setItem("helias:entered", "1"));
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));

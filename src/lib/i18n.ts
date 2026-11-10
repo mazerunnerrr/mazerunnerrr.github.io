@@ -31,6 +31,9 @@ export const UI = {
     closeTouch: "close",
     /* Подсказки на главной (Илья, 2026-11-05): еле заметные, каждая гаснет после
        первого раза. Вторая строка — на тач-экране. */
+    /* Экран входа на первом визите (Илья, 2026-11-10): кольцо ждёт нажатия —
+       иначе браузер не даёт загрузке звучать. Надпись — «старт» (Илья). */
+    enter: "start",
     hintEnjoy: "scroll & enjoy",
     hintEnjoyTouch: "swipe & enjoy",
     hintGrip: "hold & drag the name",
@@ -84,6 +87,7 @@ export const UI = {
     scrollClose: "прокрути — закрыть",
     close: "закрыть · esc",
     closeTouch: "закрыть",
+    enter: "старт",
     hintEnjoy: "листай и кайфуй",
     hintEnjoyTouch: "листай и кайфуй",
     hintGrip: "зажми и веди имя",
@@ -135,6 +139,7 @@ export const UI = {
     scrollClose: "прокрути — закрити",
     close: "закрити · esc",
     closeTouch: "закрити",
+    enter: "старт",
     hintEnjoy: "гортай і кайфуй",
     hintEnjoyTouch: "гортай і кайфуй",
     hintGrip: "затисни і веди ім'я",

@@ -32,6 +32,8 @@ const TICK_GAIN = 0.09;
 const TICK_GAP = 0.035;
 /** Где браузер помнит выбор посетителя: "off" — выключил сам. */
 export const SOUND_KEY = "helias:sound";
+/** Посетитель уже входил: заставка больше не ждёт нажатия (Loader.tsx, layout.tsx). */
+export const ENTER_KEY = "helias:entered";
 
 /* Щелчок — как колесо выбора времени в будильнике iPhone (Илья, 2026-10-21:
    «премиальный звук»): не шорох, а чистый короткий «тк» — три затухающих
@@ -77,14 +79,15 @@ export class Clicks {
   private last = 0;
   private wake = () => void this.ctx?.resume();
 
-  constructor() {
+  /** `now` — зовут из нажатия: звук разрешён, контекст заводим сразу. */
+  constructor(now = false) {
     try {
       if (localStorage.getItem(SOUND_KEY) === "off") return;
     } catch {}
     if (typeof AudioContext === "undefined") return;
     // Где браузер прямо говорит «до жеста нельзя», контекст заводим по жесту.
     const policy = (navigator as Navigator & { getAutoplayPolicy?: (t: string) => string }).getAutoplayPolicy?.("audiocontext");
-    if (policy === "disallowed") {
+    if (!now && policy === "disallowed") {
       this.wake = () => {
         this.start();
         void this.ctx?.resume();
@@ -100,6 +103,7 @@ export class Clicks {
     this.out = this.ctx.createGain();
     this.out.gain.value = TICK_GAIN;
     this.out.connect(this.ctx.destination);
+    void this.ctx.resume();
   }
 
   tick(k = 1) {

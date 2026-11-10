@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { preload } from "react-dom";
 import { SITE_URL, getSite } from "@/content";
+import { ENTER_KEY } from "@/lib/ambience";
 import "./fonts.css";
 import "./globals.css";
 
@@ -70,6 +71,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        по-прежнему видно. */
     <html lang="en" suppressHydrationWarning>
       <body>
+        {/* Первый визит — экран входа: кольцо заставки ждёт нажатия, и загрузка
+            звучит (Илья, 2026-11-10). Метка ставится до первой отрисовки: иначе
+            вернувшийся на миг видел бы «старт», а новичок — счётчик. Хранилище
+            закрыто — считаем визит первым. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(!localStorage.getItem("${ENTER_KEY}"))document.documentElement.setAttribute("data-first","")}catch(_){document.documentElement.setAttribute("data-first","")}`,
+          }}
+        />
         {/*
           Гасит ошибки, прилетевшие из расширений браузера: MetaMask и
           подобные валятся собственным кодом на любой странице, а дев-оверлей

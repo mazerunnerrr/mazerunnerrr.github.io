@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Clicks } from "@/lib/ambience";
+import { Clicks, ENTER_KEY } from "@/lib/ambience";
 
 /** Сколько точек в кольце и его радиус. */
 const DOTS = 64;
@@ -27,9 +27,28 @@ const U_HOLD = 1 - Math.cbrt(2 * (1 - HOLD)) / 2;
  * готова — кольцо ждёт на HOLD; уходя, наплывает на зрителя и гаснет, и в тот
  * же миг точки собирают имя. Если скрипты не запустились, CSS убирает её сам
  * через 9 секунд.
+ *
+ * На первом визите кольцо ждёт нажатия — «старт» (Илья,
+ * 2026-11-10): до первого жеста браузер не даёт звучать, а загрузка со
+ * щелчками — часть входа. Сцена тем временем строится. Метку первого визита
+ * (`data-first` на <html>) ставит инлайн-скрипт в layout.tsx до отрисовки,
+ * по ней CSS показывает надпись вместо счётчика; нажатие её снимает и
+ * запоминает вход (`ENTER_KEY`). Дальше заставка идёт сама.
  */
-export function Loader({ title, ready, onDone }: { title: string; ready: boolean; onDone: () => void }) {
+export function Loader({
+  title,
+  enter,
+  ready,
+  onDone,
+}: {
+  title: string;
+  enter: string;
+  ready: boolean;
+  onDone: () => void;
+}) {
   const box = useRef<HTMLDivElement>(null);
+  /** Вход по нажатию — живёт в эффекте, кнопка зовёт его через ссылку. */
+  const begin = useRef(() => {});
   const count = useRef<HTMLSpanElement>(null);
   const dots = useRef<(SVGCircleElement | null)[]>([]);
   const readyRef = useRef(ready);
@@ -42,6 +61,7 @@ export function Loader({ title, ready, onDone }: { title: string; ready: boolean
   });
 
   useEffect(() => {
+    const root = document.documentElement;
     let last = performance.now();
     /** Доля пройденного времени круга: стоит, пока сцена не готова. */
     let u = 0;
@@ -49,16 +69,38 @@ export function Loader({ title, ready, onDone }: { title: string; ready: boolean
     let shown = -1;
     let raf = 0;
     let timer = 0;
-    const clicks = new Clicks();
+    /** Кольцо пошло: сразу у вернувшегося, по нажатию — на первом визите. */
+    let started = !root.hasAttribute("data-first");
+    let clicks = started ? new Clicks() : null;
+    begin.current = () => {
+      if (started) return;
+      started = true;
+      // Это нажатие — жест: звук разрешён с первой же точки.
+      clicks = new Clicks(true);
+      root.removeAttribute("data-first");
+      try {
+        localStorage.setItem(ENTER_KEY, "1");
+      } catch {}
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (started || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      begin.current();
+    };
+    window.addEventListener("keydown", onKey);
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
+      if (!started) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       u = Math.min(readyRef.current ? 1 : U_HOLD, u + (dt * 1000) / DUR);
       const p = inOut(u);
       const on = Math.round(p * DOTS);
       for (; lit < on; lit++) {
         dots.current[lit]?.setAttribute("data-on", "");
-        clicks.tick(0.8);
+        clicks?.tick(0.8);
       }
       const pct = Math.min(100, Math.round(p * 100));
       if (pct !== shown && count.current) {
@@ -66,7 +108,8 @@ export function Loader({ title, ready, onDone }: { title: string; ready: boolean
         count.current.textContent = String(pct).padStart(3, "0");
       }
       if (readyRef.current && u >= 1) {
-        clicks.close();
+        clicks?.close();
+        window.removeEventListener("keydown", onKey);
         box.current?.setAttribute("data-done", "");
         doneRef.current();
         timer = window.setTimeout(() => setGone(true), 950);
@@ -78,14 +121,15 @@ export function Loader({ title, ready, onDone }: { title: string; ready: boolean
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(timer);
-      clicks.close();
+      window.removeEventListener("keydown", onKey);
+      clicks?.close();
     };
   }, []);
 
   if (gone) return null;
   return (
-    <div ref={box} aria-hidden className="loader fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--color-void)]">
-      <svg className="loader-ring" width="160" height="160" viewBox="0 0 160 160">
+    <div ref={box} className="loader fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--color-void)]">
+      <svg aria-hidden className="loader-ring" width="160" height="160" viewBox="0 0 160 160">
         {Array.from({ length: DOTS }, (_, i) => {
           const a = (i / DOTS) * Math.PI * 2 - Math.PI / 2;
           return (
@@ -102,12 +146,19 @@ export function Loader({ title, ready, onDone }: { title: string; ready: boolean
           );
         })}
       </svg>
-      <span translate="no" className="notranslate instrument mt-6 text-[var(--color-sand)]">
+      <span aria-hidden translate="no" className="notranslate instrument mt-6 text-[var(--color-sand)]">
         {title}
       </span>
-      <span ref={count} className="instrument mt-1 tabular-nums text-[var(--sand-faint)]">
-        000
+      {/* Счётчик и надпись входа — на одном месте; на первом визите до нажатия
+          видна надпись (CSS по `data-first`). */}
+      <span aria-hidden className="mt-1 grid justify-items-center">
+        <span ref={count} className="loader-count instrument tabular-nums text-[var(--sand-faint)] [grid-area:1/1]">
+          000
+        </span>
+        <span className="loader-hint instrument whitespace-nowrap text-[var(--sand-dim)] [grid-area:1/1]">{enter}</span>
       </span>
+      {/* Нажать можно куда угодно: весь экран — кнопка входа. */}
+      <button type="button" aria-label={enter} onClick={() => begin.current()} className="loader-enter absolute inset-0 outline-none" />
     </div>
   );
 }
