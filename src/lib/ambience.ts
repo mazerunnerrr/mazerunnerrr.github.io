@@ -55,15 +55,22 @@ const makeClick = (ctx: AudioContext) => {
 
 /** Ровный, как у колеса iPhone: высота и громкость гуляют едва-едва, на 2%
     и 8%, — дробь звучит живой, но одним и тем же механизмом. */
-const playClick = (ctx: AudioContext, click: AudioBuffer, out: AudioNode, k: number) => {
+const playClick = (ctx: AudioContext, click: AudioBuffer, out: AudioNode, k: number, when = ctx.currentTime) => {
   const src = ctx.createBufferSource();
   src.buffer = click;
   src.playbackRate.value = 0.98 + Math.random() * 0.04;
   const g = ctx.createGain();
   g.gain.value = k * (0.92 + Math.random() * 0.16);
   src.connect(g).connect(out);
-  src.start(ctx.currentTime);
+  src.start(when);
 };
+
+/* Щелчки заставки ставятся на аудиочасы ровно на миг своей точки, а не на кадр:
+   по кадрам ритм рвался (50 → 76 → 33 мс), и разгон слышался неровным
+   (Илья, 2026-11-10). LAG — запас, чтобы не ставить в прошлое; GAP — меньше
+   самого частого шага кольца (~22 мс), щёлкает каждая точка. */
+const CLICKS_LAG = 0.04;
+const CLICKS_GAP = 0.018;
 
 /**
  * Щелчки без музыки — для заставки, пока мира ещё нет (Илья, 2026-11-10: точка
@@ -106,12 +113,14 @@ export class Clicks {
     void this.ctx.resume();
   }
 
-  tick(k = 1) {
+  /** `ago` — сколько секунд назад загорелась точка: щелчок встаёт на её время. */
+  tick(k = 1, ago = 0) {
     const ctx = this.ctx;
     if (!ctx || !this.click || !this.out || ctx.state !== "running" || document.hidden) return;
-    if (ctx.currentTime - this.last < TICK_GAP) return;
-    this.last = ctx.currentTime;
-    playClick(ctx, this.click, this.out, k);
+    const when = Math.max(ctx.currentTime, ctx.currentTime + CLICKS_LAG - ago);
+    if (when - this.last < CLICKS_GAP) return;
+    this.last = when;
+    playClick(ctx, this.click, this.out, k, when);
   }
 
   /** Последний щелчок успевает доиграть — потом контекст закрывается. */

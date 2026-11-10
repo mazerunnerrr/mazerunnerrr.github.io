@@ -1285,7 +1285,7 @@ export function Home({
         ) : null}
       </div>
 
-      <Loader title={site.alias} enter={t.enter} ready={loaded} onDone={onRevealed} />
+      <Loader enter={t.enter} ready={loaded} onDone={onRevealed} />
     </main>
   );
 }
