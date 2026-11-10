@@ -30,6 +30,94 @@ const DUCK_GAIN = 0.4;
 /** Громкость щелчка надписи и самый частый щелчок, с. */
 const TICK_GAIN = 0.09;
 const TICK_GAP = 0.035;
+/** Где браузер помнит выбор посетителя: "off" — выключил сам. */
+export const SOUND_KEY = "helias:sound";
+
+/* Щелчок — как колесо выбора времени в будильнике iPhone (Илья, 2026-10-21:
+   «премиальный звук»): не шорох, а чистый короткий «тк» — три затухающих
+   тона без шумового хвоста: искра 4 кГц, основной 1,5 кГц и телесный
+   750 Гц. Из четырёх на слух Илья выбрал этот, «деревянный»: прежний
+   (5,2 / 2,1 / 1,05 кГц) был почти тем, но звонче. Вход за 0,3 мс — без
+   ступеньки в колонках. Собирается один раз, дальше только проигрывается. */
+const makeClick = (ctx: AudioContext) => {
+  const n = Math.round(ctx.sampleRate * 0.014);
+  const click = ctx.createBuffer(1, n, ctx.sampleRate);
+  const c = click.getChannelData(0);
+  const tone = (t: number, hz: number, tau: number) => Math.sin(2 * Math.PI * hz * t) * Math.exp(-t / tau);
+  for (let i = 0; i < n; i++) {
+    const t = i / ctx.sampleRate;
+    c[i] = Math.min(1, t / 0.0003) * (0.3 * tone(t, 4000, 0.0003) + tone(t, 1500, 0.0013) + 0.55 * tone(t, 750, 0.0024));
+  }
+  return click;
+};
+
+/** Ровный, как у колеса iPhone: высота и громкость гуляют едва-едва, на 2%
+    и 8%, — дробь звучит живой, но одним и тем же механизмом. */
+const playClick = (ctx: AudioContext, click: AudioBuffer, out: AudioNode, k: number) => {
+  const src = ctx.createBufferSource();
+  src.buffer = click;
+  src.playbackRate.value = 0.98 + Math.random() * 0.04;
+  const g = ctx.createGain();
+  g.gain.value = k * (0.92 + Math.random() * 0.16);
+  src.connect(g).connect(out);
+  src.start(ctx.currentTime);
+};
+
+/**
+ * Щелчки без музыки — для заставки, пока мира ещё нет (Илья, 2026-11-10: точка
+ * кольца загорается — щелчок, как у букв под рукой). Звук браузер даёт начать
+ * только после жеста: на первом визите заставка молчит, пока посетитель
+ * не нажал; на сайте, где звук уже играл, Chrome может разрешить сразу.
+ * Выключенный посетителем звук молчит и здесь.
+ */
+export class Clicks {
+  private ctx: AudioContext | null = null;
+  private click: AudioBuffer | null = null;
+  private out: GainNode | null = null;
+  private last = 0;
+  private wake = () => void this.ctx?.resume();
+
+  constructor() {
+    try {
+      if (localStorage.getItem(SOUND_KEY) === "off") return;
+    } catch {}
+    if (typeof AudioContext === "undefined") return;
+    // Где браузер прямо говорит «до жеста нельзя», контекст заводим по жесту.
+    const policy = (navigator as Navigator & { getAutoplayPolicy?: (t: string) => string }).getAutoplayPolicy?.("audiocontext");
+    if (policy === "disallowed") {
+      this.wake = () => {
+        this.start();
+        void this.ctx?.resume();
+      };
+    } else this.start();
+    for (const k of ["pointerdown", "keydown", "touchend"]) window.addEventListener(k, this.wake, true);
+  }
+
+  private start() {
+    if (this.ctx) return;
+    this.ctx = new AudioContext();
+    this.click = makeClick(this.ctx);
+    this.out = this.ctx.createGain();
+    this.out.gain.value = TICK_GAIN;
+    this.out.connect(this.ctx.destination);
+  }
+
+  tick(k = 1) {
+    const ctx = this.ctx;
+    if (!ctx || !this.click || !this.out || ctx.state !== "running" || document.hidden) return;
+    if (ctx.currentTime - this.last < TICK_GAP) return;
+    this.last = ctx.currentTime;
+    playClick(ctx, this.click, this.out, k);
+  }
+
+  /** Последний щелчок успевает доиграть — потом контекст закрывается. */
+  close() {
+    for (const k of ["pointerdown", "keydown", "touchend"]) window.removeEventListener(k, this.wake, true);
+    const ctx = this.ctx;
+    this.ctx = null;
+    if (ctx) window.setTimeout(() => void ctx.close(), 300);
+  }
+}
 /* Громкость трека из админки (Илья, 2026-10-21: «на средней громкости Мака —
    как на максимальной»). Трек сведён громко: −8,7 LUFS, пики +1,4 dBFS, —
    на 5 дБ громче, чем ютуб приводит любой ролик (−14 LUFS). Фоновой музыке
@@ -91,20 +179,7 @@ export class Ambience {
     this.ui = ctx.createGain();
     this.ui.gain.value = TICK_GAIN;
     this.ui.connect(ctx.destination);
-    /* Щелчок — как колесо выбора времени в будильнике iPhone (Илья, 2026-10-21:
-       «премиальный звук»): не шорох, а чистый короткий «тк» — три затухающих
-       тона без шумового хвоста: искра 4 кГц, основной 1,5 кГц и телесный
-       750 Гц. Из четырёх на слух Илья выбрал этот, «деревянный»: прежний
-       (5,2 / 2,1 / 1,05 кГц) был почти тем, но звонче. Вход за 0,3 мс — без
-       ступеньки в колонках. Собирается один раз, дальше только проигрывается. */
-    const n = Math.round(ctx.sampleRate * 0.014);
-    this.click = ctx.createBuffer(1, n, ctx.sampleRate);
-    const c = this.click.getChannelData(0);
-    const tone = (t: number, hz: number, tau: number) => Math.sin(2 * Math.PI * hz * t) * Math.exp(-t / tau);
-    for (let i = 0; i < n; i++) {
-      const t = i / ctx.sampleRate;
-      c[i] = Math.min(1, t / 0.0003) * (0.3 * tone(t, 4000, 0.0003) + tone(t, 1500, 0.0013) + 0.55 * tone(t, 750, 0.0024));
-    }
+    this.click = makeClick(ctx);
 
     if (music) {
       const a = new Audio(music);
@@ -208,20 +283,12 @@ export class Ambience {
     }
   }
 
-  /** Щелчок надписи под рукой. Ровный, как у колеса iPhone: высота и громкость
-      гуляют едва-едва, на 2% и 8%, — дробь звучит живой, но одним и тем же
-      механизмом. Звук выключен или вкладка в фоне — тишина. */
+  /** Щелчок надписи под рукой. Звук выключен или вкладка в фоне — тишина. */
   tick(k = 1) {
     const t = this.ctx.currentTime;
     if (!this.on || this.away || t - this.lastTick < TICK_GAP) return;
     this.lastTick = t;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.click;
-    src.playbackRate.value = 0.98 + Math.random() * 0.04;
-    const g = this.ctx.createGain();
-    g.gain.value = k * (0.92 + Math.random() * 0.16);
-    src.connect(g).connect(this.ui);
-    src.start(t);
+    playClick(this.ctx, this.click, this.ui, k);
   }
 
   /** Несколько раз в секунду: рука и пролёт, оба от 0 до 1. */

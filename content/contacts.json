@@ -24,5 +24,18 @@
         "url": "mailto:directed.by.our@gmail.com"
       }
     ]
+  },
+  "uk": {
+    "name": "Ілля",
+    "links": [
+      {
+        "label": "Telegram",
+        "url": "https://t.me/Mazerrunnerr"
+      },
+      {
+        "label": "Пошта",
+        "url": "mailto:directed.by.our@gmail.com"
+      }
+    ]
   }
 }

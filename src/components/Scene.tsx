@@ -356,6 +356,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
     let refocus: (() => void) | null = null;
     const setRoom = (k: number | null, star = -1) => {
       if (k !== null && !stations[k]?.room) return;
+      if (k !== null) pending = null;
       room = k;
       if (k !== null) litRoom = k;
       if (k !== null && star >= 0) {
@@ -383,38 +384,64 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
        Камера сразу встаёт у нужной сферы, а уходящая и приходящая рисуются
        так, будто стоят рядом (`place`): у них расстояния соседей, свет главы
        перетекает от одной к другой, пыль проходит путь в один шаг. Темп — тот
-       же, каким камера догоняет цель на обычном переходе. */
-    /** `ramp` — разгон после разворота, 0..1: волна сперва встаёт, потом идёт назад. */
-    type Hop = { from: number; to: number; dir: 1 | -1; t: number; v: number; ramp: number };
+       же, каким камера догоняет цель на обычном переходе.
+
+       Так же ходят «работы», «контакт» и псевдоним в углу (Илья, 2026-11-10:
+       с третьей сферы к контактам — «раскручивается как последняя, и появляется
+       @», а не все сферы подряд). Уходящая играет роль соседки цели своего вида
+       (`as`): к контактам сфера уходит разлётом последней сферы, к имени —
+       обратным сгущением первой, «@» к работам — уходом имени. */
+    /** `ramp` — разгон после разворота, 0..1: волна сперва встаёт, потом идёт назад.
+        `as` — чей уход (или приход вспять) показывает уходящая. */
+    type Hop = { from: number; to: number; dir: 1 | -1; t: number; v: number; ramp: number; as: number };
     /** За сколько секунд волна набирает ход после разворота. */
     const HOP_TURN = 0.3;
+    /** Во сколько раз быстрее сворачивается комната, когда за ней ждёт шаг. */
+    const RUSH = 2;
+    /** Камера ближе этого к точке — стоит: шаг можно начинать (доля перехода). */
+    const SETTLED = 0.03;
     let hop: Hop | null = null;
+    /** Шаг, заказанный, пока сцена занята: комната сворачивается или камера
+        между точками. `pendingAt` — цель маршрута в миг заказа: рука повела
+        маршрут сама — заказ снят. */
+    let pending: number | null = null;
+    let pendingAt = 0;
     /** Насколько пыль отстала от камеры после шагов: она прошла по шагу, а камера — дальше. */
     let dustShift = 0;
     /** Куда пыль смотрит при шаге — по нему сдвиг пыли остаётся непрерывным. */
     const dustAt = (x: Hop | null) => (x ? x.from + x.dir * x.t : journey.current);
+    const wrap = (k: number) => ((k % N) + N) % N;
+    const kindOf = (k: number) => stations[k]?.shape.kind;
+    const sphere = (k: number) => kindOf(k) === "sphere";
+    const calm = () => bodies.every((b) => !b || b.morph < 0.001);
+    /** Ближайшая к цели точка того же вида, что `from`, со стороны `dir`
+        (вперёд — перед целью, назад — за ней) и сколько до неё шагов. */
+    const standIn = (from: number, to: number, dir: 1 | -1) => {
+      for (let i = 1; i < N; i++) {
+        const k = wrap(to - dir * i);
+        if (kindOf(k) === kindOf(from)) return { k, i };
+      }
+      return { k: from, i: N };
+    };
     const hopTo = (stop: number) => {
-      const wrap = (k: number) => ((k % N) + N) % N;
-      const sphere = (k: number) => stations[k]?.shape.kind === "sphere";
-      const calm = bodies.every((b) => !b || b.morph < 0.001);
-      if (reduced || room !== null || !calm || !sphere(stop)) {
-        journey.goTo(stop, true);
+      pending = null;
+      if (reduced || room !== null) {
+        journey.goTo(stop, sphere(stop));
         return;
       }
-      /* Что сейчас на экране как шаг: идущий шаг полоски или камера между
-         двумя сферами (колесо, соседний переход). Прежде такой шаг отдавался
-         маршруту, и передумавшего посреди пересборки камера везла через все
-         сферы между ними (Илья, 2026-11-06). */
+      /* Что сейчас на экране как шаг между сферами: идущий шаг полоски или
+         камера между двумя сферами (колесо, соседний переход). Прежде такой шаг
+         отдавался маршруту, и передумавшего посреди пересборки камера везла
+         через все сферы между ними (Илья, 2026-11-06). */
       let now: Hop | null = hop;
-      if (!now) {
-        const c = journey.current;
+      const c = journey.current;
+      if (!now && calm()) {
         const s0 = wrap(Math.floor(c));
         const f = c - Math.floor(c);
         if (f > 0.02 && f < 0.98 && sphere(s0) && sphere(wrap(s0 + 1)))
-          now = { from: s0, to: wrap(s0 + 1), dir: 1, t: f, v: 0, ramp: 0 };
+          now = { from: s0, to: wrap(s0 + 1), dir: 1, t: f, v: 0, ramp: 0, as: s0 };
       }
-      let next: Hop;
-      if (now) {
+      if (now && sphere(now.from) && sphere(now.to) && sphere(stop)) {
         if (hop && stop === hop.to) return;
         /* Пересобираемся из того, что видно, — одной волной. Назад к уходящей —
            та же пересборка вспять. На другую — доля, что уже собрана, становится
@@ -422,23 +449,59 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
            становится новая; после середины собранная уходит обратно той же
            волной, а новая встаёт на место уходившей. Смещения обеих видимых
            сфер при этом те же, что были, — рывка нет. */
-        next =
+        const next: Hop =
           stop === now.to
             ? now
             : stop === now.from || now.t >= 0.5
-              ? { from: now.to, to: stop, dir: -now.dir as 1 | -1, t: 1 - now.t, v: 0, ramp: 0 }
+              ? { from: now.to, to: stop, dir: -now.dir as 1 | -1, t: 1 - now.t, v: 0, ramp: 0, as: now.to }
               : { ...now, to: stop };
-      } else {
-        const from = wrap(Math.round(journey.current));
-        if (from === stop || Math.abs(stop - from) === 1 || !sphere(from)) {
-          journey.goTo(stop, true);
-          return;
-        }
-        next = { from, to: stop, dir: stop > from ? 1 : -1, t: 0, v: 0, ramp: 1 };
+        dustShift += dustAt(hop) - dustAt(next);
+        hop = next;
+        journey.jumpTo(stop);
+        return;
       }
+      /* Сцена занята — комната ещё сворачивается, идёт другой шаг или камера
+         между точками: шаг ждёт, пока всё встанет. Камеру между точками
+         довозим до ближайшей, свёрнутую комнату торопим (`RUSH`). */
+      const off = Math.abs(c - Math.round(c));
+      if (hop || !calm() || off > SETTLED || Math.abs(journey.target - c) > SETTLED) {
+        if (hop && stop === hop.to) return;
+        if (!hop && calm()) journey.goTo(wrap(Math.round(journey.target)));
+        pending = stop;
+        pendingAt = journey.target;
+        return;
+      }
+      const from = wrap(Math.round(c));
+      const gap = wrap(stop - from);
+      // На месте или сосед — обычный переход, короткой стороной кольца.
+      if (gap === 0 || gap === 1 || gap === N - 1) {
+        journey.goTo(stop);
+        return;
+      }
+      let dir: 1 | -1;
+      let as = from;
+      if (sphere(from) && sphere(stop)) dir = stop > from ? 1 : -1;
+      else {
+        // Сторона, где соседка цели того же вида ближе; поровну — вперёд.
+        const fw = standIn(from, stop, 1);
+        const bw = standIn(from, stop, -1);
+        dir = bw.i < fw.i ? -1 : 1;
+        as = dir > 0 ? fw.k : bw.k;
+      }
+      const next: Hop = { from, to: stop, dir, t: 0, v: 0, ramp: 1, as };
       dustShift += dustAt(hop) - dustAt(next);
       hop = next;
       journey.jumpTo(stop);
+    };
+    /** Заказанный шаг — как только сцена освободилась. Зовётся раз в кадр. */
+    const firePending = () => {
+      if (pending === null || hop) return;
+      if (room !== null || journey.target !== pendingAt) {
+        pending = null;
+        return;
+      }
+      const c = journey.current;
+      if (calm() && Math.abs(c - Math.round(c)) <= SETTLED && Math.abs(journey.target - c) <= SETTLED) hopTo(pending);
     };
     const endHop = () => {
       if (!hop) return;
@@ -2192,7 +2255,10 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
         const want = room === k && Math.abs(ringOffset(progress, k, N)) < 0.35 ? 1 : 0;
         b.morph = reduced
           ? want
-          : Math.max(0, Math.min(1, b.morph + Math.sign(want - b.morph) * (dt / (b.solid ? UNFOLD : BURST))));
+          : Math.max(
+              0,
+              Math.min(1, b.morph + Math.sign(want - b.morph) * (dt / (b.solid ? UNFOLD : BURST)) * (pending !== null ? RUSH : 1))
+            );
         // Мир гаснет и текст комнаты проявляется в такт видимому раскрытию, а не по часам.
         roomAmount = Math.max(roomAmount, b.solid ? unfoldAt(b.morph) : burstAt(b.morph));
       }
@@ -2215,7 +2281,8 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
           ((!!b?.solid && !!bodies[other]?.solid) || (!!stations[k].reform && !!stations[other].reform));
         // Подлёт — минус, уход — плюс; на точке ноль.
         // Прилёт — пока объект впереди, уход — когда он позади.
-        const flow = d < 0 ? stations[k].arrive : stations[k].leave;
+        const role = hop && k === hop.from ? stations[hop.as] : stations[k];
+        const flow = d < 0 ? role.arrive : role.leave;
         const pass = swap ? 0 : Math.sign(d) * Math.min(1, Math.abs(d) / ((flow && REACH[flow]) || PASS));
         const away = swap ? Math.min(1, Math.abs(d)) : Math.abs(pass);
         // В комнате остальной мир гаснет: сцена принадлежит ей одной.
@@ -2330,6 +2397,7 @@ export function Scene({ stations, onFrame, onReady, onPick, onExit, landmarks = 
       hover += (hoverTarget - hover) * Math.min(1, k * 0.5);
 
       // Маршрут ведёт объекты.
+      firePending();
       const progress = journey.update(dt);
       if (hop) {
         // Колесо или палец повели камеру — шаг кончен, дальше обычный маршрут.

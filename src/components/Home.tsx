@@ -8,7 +8,7 @@ import type { Contacts, Experience, Project, Site, Skill } from "@/content";
 import { starSpots } from "@/lib/shapes";
 import { ContactForm } from "@/components/ContactForm";
 import { Loader } from "@/components/Loader";
-import { Ambience } from "@/lib/ambience";
+import { Ambience, SOUND_KEY } from "@/lib/ambience";
 import { attachFlipHand, Flip, flipIn } from "@/components/Flip";
 import { WaveText } from "@/components/WaveText";
 import { attachWave } from "@/lib/wave";
@@ -72,8 +72,6 @@ const HINTS_KEY = "helias:hints";
    колесом на них уходит полтора-два крутка, пальцем доезд тянется дольше
    (Илья, 2026-11-06: «чтобы переход был заметнее, а не проскипан»). */
 const STRETCH = 1.75;
-/** Выбор звука посетителем: "off" — выключил сам. */
-const SOUND_KEY = "helias:sound";
 /** Сколько пикселей строки `.instrument` (11/17,6 px) над верхом заглавных. */
 const NAME_LEAD = 5;
 
@@ -485,22 +483,29 @@ export function Home({
     return () => window.removeEventListener("keydown", onKey);
   }, [room, closeRoom]);
 
-  /* Переход из переключателя: к работам или к контактам — откуда угодно,
-     в том числе из комнаты. Фокус едет вместе с камерой, иначе следующий
+  /* Переход из переключателя: к работам, к контактам или к имени — откуда
+     угодно, в том числе из комнаты. Фокус едет вместе с камерой, иначе следующий
      Tab вернул бы её назад. Обработчики не каррированы нарочно: вызов вида
      jump(2) в разметке выполнялся бы во время рендера. */
-  /** `along` — по аллее, через сферы: так ходит полоска проектов. */
+  /** `along` — одним шагом, без пролёта через точки между ними: так ходят полоска
+      проектов, «работы», «контакт» и псевдоним в углу (`hopTo` в Scene.tsx). */
   const jump = (stop: number, e: React.MouseEvent, along = false) => {
     if (!apiRef.current) return;
     e.preventDefault();
     if (room !== null) closeRoom();
     apiRef.current.goTo(stop, along);
+    // Этот фокус камеру не зовёт: она уже едет, а `follow` повёз бы её пролётом.
+    focusing.current = true;
     (stop === CONTACTS ? contactsTitleRef.current : enterRefs.current[stop])?.focus({ preventScroll: true });
+    focusing.current = false;
   };
 
   /* Tab ведёт по маршруту: фокус, попавший в погасший слой, зовёт камеру
      к его точке. Раньше он молча вставал на невидимую ссылку. */
-  const follow = (stop: number) => apiRef.current?.goTo(stop);
+  const focusing = useRef(false);
+  const follow = (stop: number) => {
+    if (!focusing.current) apiRef.current?.goTo(stop);
+  };
 
   /* Всё, что меняется каждый кадр, пишется прямо в style и textContent.
      Через состояние React это был бы ре-рендер шестьдесят раз в секунду.
@@ -547,7 +552,7 @@ export function Home({
             stops[k].kind === "name"
               ? `translate3d(${f.x + f.inkR}px, ${f.y + f.ink + f.gap - NAME_LEAD}px, 0)`
               : `translate3d(${f.x + f.hw}px, ${f.y + f.hh}px, 0)`;
-        // Подсказка — под объектом по центру; у сферы ниже строки «открыть проект»,
+        // Подсказка — под объектом по центру; у сферы ниже строки «открыть»,
         // у имени — сразу под буквами (полувысота имени с запасом под шрифт, буквы
         // кончаются около её середины) и выше строки «обо мне».
         const hint = hintRefs.current[k];
@@ -721,8 +726,9 @@ export function Home({
       путь назад прокруткой вверх, как у igloo. Кнопку одну Илья не нашёл. */
   const closeButton = (k: number, hint: boolean) => (
     <>
+      {/* Пальцем прокрутка из «обо мне» не выводит — на телефоне подсказки нет. */}
       {hint ? (
-        <span className="instrument pointer-events-none absolute bottom-[var(--gutter)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[var(--sand-dim)]">
+        <span className="instrument pointer-events-none absolute bottom-[var(--gutter)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[var(--sand-dim)] pointer-coarse:hidden">
           <Flip text={t.scrollBack} />
         </span>
       ) : null}
@@ -733,11 +739,11 @@ export function Home({
         type="button"
         onClick={closeRoom}
         onPointerEnter={flipHover}
-        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+56px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)] max-md:bottom-[var(--gutter)] max-md:top-auto"
+        className="instrument pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--gutter)+56px)] z-10 text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
       >
-        {/* Esc на тач-экране нет — там подпись без него. На телефоне кнопка справа
-            внизу, на одной строке с «полный кейс» и на том же поле от края; на
-            десктопе — справа сверху под языком (Илья, 2026-11-05). */}
+        {/* Esc на тач-экране нет — там подпись без него. Кнопка везде справа
+            сверху под языком: на телефоне она стояла внизу, но вверху её видно
+            лучше (Илья, 2026-11-10). */}
         <span className="pointer-coarse:hidden">
           <Flip text={t.close} />
         </span>
@@ -799,7 +805,8 @@ export function Home({
       псевдонимом (Илья, 2026-11-05) во всю его ширину: `w-0 min-w-full` не даёт
       ей самой раздвинуть колонку.
       Пока её ни разу не нажимали, она изредка мягко вспыхивает: без этого
-      линию принимали за деталь интерьера (Илья, 2026-11-05). */
+      линию принимали за деталь интерьера (Илья, 2026-11-05). Играет — горит песком,
+      как остальные приборы, а не голубым (Илья, 2026-11-10). */
   const soundButton = (className: string) => (
     <button
       type="button"
@@ -808,7 +815,7 @@ export function Home({
       aria-label={sound ? t.soundOff : t.soundOn}
       data-hint={hintsDone && !hintsDone.has("sound") ? "" : undefined}
       className={`sound-toggle flex h-6 items-center transition-colors duration-500 ease-[var(--ease-out-deep)] ${
-        sound ? "text-[var(--color-azure)]" : "text-[var(--sand-faint)] hover:text-[var(--color-sand)]"
+        sound ? "text-[var(--color-sand)]" : "text-[var(--sand-faint)] hover:text-[var(--color-sand)]"
       } ${className}`}
     >
       <svg
@@ -920,7 +927,8 @@ export function Home({
                       {contacts.note}
                     </p>
                   ) : null}
-                  <ul className="mt-[18px] flex flex-wrap justify-center gap-x-[clamp(40px,6vw,88px)] gap-y-5">
+                  {/* На телефоне — столбиком: строкой ссылки расходились к краям (Илья, 2026-11-10). */}
+                  <ul className="mt-[18px] flex flex-wrap justify-center gap-x-[clamp(40px,6vw,88px)] gap-y-5 max-md:flex-col max-md:items-center max-md:gap-y-6">
                     {contacts.links.map((l) => (
                       <li key={l.url}>
                         {/* pointer-events включает сама ссылка: слой сквозной всегда. */}
@@ -976,7 +984,8 @@ export function Home({
                     id={k === FIRST_PROJECT ? "projects" : undefined}
                     className="instrument max-w-[calc(100vw-2*var(--gutter)-16px)] text-[var(--color-sand)] md:max-w-none md:whitespace-nowrap"
                   >
-                    <Flip text={`${t.stopProject} ${pad(k - FIRST_PROJECT + 1)} / ${pad(projects.length)} · ${s.project.title}`} />
+                    {/* Без слова «проект»: и так ясно, что это работы (Илья, 2026-11-10). */}
+                    <Flip text={`${pad(k - FIRST_PROJECT + 1)} / ${pad(projects.length)} · ${s.project.title}`} />
                   </h2>
                   <span className="flex items-center gap-2.5 whitespace-nowrap">
                     <span className={`h-[5px] w-[5px] shrink-0 rounded-full ${st.dot}`} aria-hidden />
@@ -1050,7 +1059,7 @@ export function Home({
                   <Flip text={site.status} />
                 </p>
                 <h2 className="font-display mt-[clamp(18px,3vh,30px)] max-w-[22ch] text-[clamp(28px,2.4vw,40px)] font-light leading-[1.18]">
-                  <WaveText text={site.thesis} />
+                  <WaveText text={site.thesis} still />
                 </h2>
                 <p className="mt-[clamp(18px,3vh,26px)] max-w-[54ch] text-[16px] font-extralight leading-[1.75] text-[var(--sand-dim)]">
                   <WaveText text={site.intro} />
@@ -1157,10 +1166,18 @@ export function Home({
       {/* ── приборы: на всём круге ─────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[var(--gutter)] top-[var(--gutter)] flex flex-col gap-0.5">
-          {/* Имя — не слово: переводчик браузера его не трогает (Илья, 2026-11-05). */}
-          <span translate="no" className="notranslate instrument text-[var(--color-sand)]">
+          {/* Имя — не слово: переводчик браузера его не трогает (Илья, 2026-11-05).
+              Нажатие везёт на главную, к имени, одним шагом (Илья, 2026-11-10). */}
+          <button
+            type="button"
+            translate="no"
+            aria-label={`${site.alias} · ${t.home}`}
+            onClick={(e) => jump(0, e, true)}
+            onPointerEnter={flipHover}
+            className="notranslate instrument pointer-events-auto self-start text-left text-[var(--color-sand)]"
+          >
             <Flip text={site.alias} />
-          </span>
+          </button>
           {/* Только псевдоним: статус есть в «обо мне», проект — в выноске над
               сферой (Илья, 2026-11-05: «лишний текст», сперва на телефоне, потом
               и на десктопе). Номер точки остаётся скринридеру. Под псевдонимом —
@@ -1185,7 +1202,7 @@ export function Home({
             {projects.length > 0 ? (
               <a
                 href="#projects"
-                onClick={(e) => jump(FIRST_PROJECT, e)}
+                onClick={(e) => jump(FIRST_PROJECT, e, true)}
                 onPointerEnter={flipHover}
                 className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
               >
@@ -1199,15 +1216,15 @@ export function Home({
             ) : null}
             <a
               href="#contacts"
-              onClick={(e) => jump(CONTACTS, e)}
+              onClick={(e) => jump(CONTACTS, e, true)}
               onPointerEnter={flipHover}
               className="instrument text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
             >
               <Flip text={t.contact} />
             </a>
           </span>
-          {/* Язык: английский по умолчанию, русский — по выбору. Мир при смене
-              не перезагружается, меняются только надписи. */}
+          {/* Язык: английский по умолчанию, русский и украинский — по выбору.
+              Мир при смене не перезагружается, меняются только надписи. */}
           <span role="group" aria-label={t.language} className="flex items-center gap-1.5">
             {LANGS.map((l, i) => (
               <span key={l} className="flex items-center gap-1.5">

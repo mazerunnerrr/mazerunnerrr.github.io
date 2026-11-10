@@ -12,5 +12,12 @@
     "origin": "No secret. I like making interesting things, for myself and for other people. I write the code together with AI.",
     "process": "I take the client's input, work through it and hand back the result: fast, painless, no loose ends. Whatever the task needs, I do.",
     "status": "Remote · CET · open to projects"
+  },
+  "uk": {
+    "thesis": "Беру завдання і доводжу до робочого продукту",
+    "intro": "Розбираюся в бізнесі замовника, проєктую систему і збираю її сам, з AI-інструментами. Тому швидше й дешевше за студію, а рішення ухвалюю без ланцюжка менеджерів.",
+    "origin": "Секрету немає. Мені справді цікаво робити цікаві речі, для себе й для інших. Код пишу разом із ШІ.",
+    "process": "Беру в замовника вхідні дані, розбираюся з ними й віддаю результат: швидко, без болю і без швів. Роблю все, що потрібно завданню.",
+    "status": "Віддалено · CET · відкритий до проєктів"
   }
 }

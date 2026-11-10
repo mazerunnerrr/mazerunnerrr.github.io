@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
-import type { Lang } from "@/lib/i18n";
+import { LANGS, type Lang } from "@/lib/i18n";
 
 /* Выбор языка помнит браузер. Статическая страница всегда собирается
    английской: сервер не знает, что выбрал посетитель, и гидратация обязана
-   совпасть. Русский включается сразу после загрузки. */
+   совпасть. Русский и украинский включаются сразу после загрузки. */
 const KEY = "lang";
 /** Выбор в памяти страницы — на случай, если хранилище браузера закрыто. */
 let chosen: Lang | null = null;
@@ -12,7 +12,8 @@ const listeners = new Set<() => void>();
 const current = (): Lang => {
   if (chosen) return chosen;
   try {
-    return localStorage.getItem(KEY) === "ru" ? "ru" : "en";
+    const saved = localStorage.getItem(KEY);
+    return LANGS.find((l) => l === saved) ?? "en";
   } catch {
     return "en";
   }

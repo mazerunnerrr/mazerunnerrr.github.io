@@ -1,19 +1,21 @@
 import type { ProjectStatus } from "@/content";
 
 /**
- * Два языка: английский по умолчанию — сайт работает на весь мир, а не только
- * на СНГ, — и русский по переключателю (Илья, 2026-10-19).
+ * Три языка: английский по умолчанию — сайт работает на весь мир, а не только
+ * на СНГ, — русский (Илья, 2026-10-19) и украинский (2026-11-10, на переключателе
+ * «UK») по выбору.
  *
  * Здесь — мелкие надписи интерфейса: приборы, кнопки, подсказки. Большие
  * тексты (обо мне, проекты, контакты) живут в JSON и правятся в админке:
- * русский — в корне файла, английский — в ключе `en`. Пустое английское
- * поле показывает русское, поэтому сайт не пустеет, пока перевода нет.
+ * русский — в корне файла, английский — в ключе `en`, украинский — в `uk`.
+ * Пустое английское поле показывает русское, пустое украинское — английское,
+ * поэтому сайт не пустеет, пока перевода нет.
  *
  * Выбор посетителя хранит `useLang.ts` — отдельно, потому что словарь читают
  * и серверные страницы, а хук там недоступен.
  */
-export type Lang = "en" | "ru";
-export const LANGS: Lang[] = ["en", "ru"];
+export type Lang = "en" | "ru" | "uk";
+export const LANGS: Lang[] = ["en", "ru", "uk"];
 
 export const UI = {
   en: {
@@ -35,7 +37,8 @@ export const UI = {
     hintGripTouch: "drag the name",
     hintSpin: "drag to spin",
     hintSpinTouch: "swipe sideways to spin",
-    openProject: "open project ↵",
+    /** Вход в комнату сферы — без слова «проект» (Илья, 2026-11-10). */
+    openProject: "open ↵",
     aboutEnter: "about me ↵",
     about: "About me",
     experience: "Other experiences",
@@ -58,6 +61,8 @@ export const UI = {
     soundOn: "Turn sound on",
     soundOff: "Turn sound off",
     language: "Language",
+    /** Псевдоним в углу — путь на главную, к имени. */
+    home: "home",
     backToRoute: "back to the route",
     formName: "Name",
     formReach: "How to reach you",
@@ -85,7 +90,7 @@ export const UI = {
     hintGripTouch: "веди пальцем по имени",
     hintSpin: "зажми и крути",
     hintSpinTouch: "смахни вбок — закрутится",
-    openProject: "открыть проект ↵",
+    openProject: "открыть ↵",
     aboutEnter: "обо мне ↵",
     about: "Обо мне",
     experience: "Другой опыт",
@@ -108,6 +113,7 @@ export const UI = {
     soundOn: "Включить звук",
     soundOff: "Выключить звук",
     language: "Язык",
+    home: "главная",
     backToRoute: "к маршруту",
     formName: "Имя",
     formReach: "Как ответить",
@@ -118,6 +124,57 @@ export const UI = {
     formSent: "Отправлено. Отвечу тем же способом, что вы оставили.",
     formFailed: "Не отправилось",
     formFallback: "Можно написать в Telegram или на почту.",
+  },
+  uk: {
+    stopName: "ім'я",
+    stopProject: "проєкт",
+    stopContacts: "контакти",
+    stopExperience: "інший досвід",
+    inside: "всередині",
+    scrollBack: "↑ прокрути вгору — назад",
+    scrollClose: "прокрути — закрити",
+    close: "закрити · esc",
+    closeTouch: "закрити",
+    hintEnjoy: "гортай і кайфуй",
+    hintEnjoyTouch: "гортай і кайфуй",
+    hintGrip: "затисни і веди ім'я",
+    hintGripTouch: "веди пальцем по імені",
+    hintSpin: "затисни і крути",
+    hintSpinTouch: "змахни вбік — закрутиться",
+    openProject: "відкрити ↵",
+    aboutEnter: "про мене ↵",
+    about: "Про мене",
+    experience: "Інший досвід",
+    whatIDo: "Що роблю",
+    originLabel: "Звідки я це вмію",
+    processLabel: "Як працюю",
+    whatIDid: "Що зробив",
+    screen: "екран",
+    chTask: "Завдання",
+    chSolution: "Рішення",
+    chResult: "Підсумок",
+    chBuild: "Як влаштовано",
+    chScreens: "Екрани",
+    fullCase: "повний кейс",
+    projects: "проєкти",
+    work: "роботи",
+    contact: "контакт",
+    contacts: "Контакти",
+    nav: "Переходи і звук",
+    soundOn: "Увімкнути звук",
+    soundOff: "Вимкнути звук",
+    language: "Мова",
+    home: "головна",
+    backToRoute: "до маршруту",
+    formName: "Ім'я",
+    formReach: "Як відповісти",
+    formReachHint: "@нік або пошта",
+    formTask: "Що треба зробити",
+    formSend: "Надіслати",
+    formSending: "Надсилаю",
+    formSent: "Надіслано. Відповім тим самим способом, який ви залишили.",
+    formFailed: "Не надіслалося",
+    formFallback: "Можна написати в Telegram або на пошту.",
   },
 } satisfies Record<Lang, Record<string, string>>;
 
@@ -140,5 +197,14 @@ export const STATUS_LABEL: Record<Lang, Record<ProjectStatus, string>> = {
     "ищем инвестиции": "ищем инвестиции",
     заморожен: "заморожен",
     запущен: "запущен",
+  },
+  uk: {
+    "в работе": "в роботі",
+    "личный проект": "особистий проєкт",
+    "разбор и архитектура": "аналіз і архітектура",
+    концепт: "концепт",
+    "ищем инвестиции": "шукаємо інвестиції",
+    заморожен: "заморожений",
+    запущен: "запущений",
   },
 };

@@ -107,7 +107,7 @@ export function ProjectRoom({
       <div className="room-tint absolute inset-0" aria-hidden />
 
       {/* На компьютере комнату закрывает колесо — подсказка об этом; на телефоне
-          прокрутка не закрывает, там своя кнопка внизу. */}
+          прокрутка не закрывает, там только кнопка «закрыть» справа сверху. */}
       <span className="instrument pointer-events-none absolute left-1/2 top-[calc(var(--gutter)+40px)] -translate-x-1/2 whitespace-nowrap text-[var(--sand-faint)] max-md:hidden">
         <Flip text={t.scrollClose} />
       </span>
@@ -156,8 +156,7 @@ export function ProjectRoom({
               <Flip text={p.summary} />
             </p>
           ) : null}
-          {/* На телефоне справа в этой строке — «закрыть»: ссылки до него не доходят. */}
-          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 max-md:pr-16 md:mt-3.5">
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 md:mt-3.5">
             <a href={`/work/${p.slug}/`} className={link}>
               <Flip text={`${t.fullCase} ↗`} />
             </a>

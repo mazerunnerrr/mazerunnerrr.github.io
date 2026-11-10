@@ -1,11 +1,12 @@
 import { split } from "@/lib/scramble";
+import { createField } from "@/lib/waveField";
 
 /**
  * Волна по буквам комнаты — как в комнатах igloo.inc (Илья, 2026-11-06;
  * их код разобран в тот же день, `App3D`, классы карты и буквы).
  *
- * Мышь рисует мазок в грубой карте экрана (клетка — 5 px). Карта каждый шаг
- * расползается на клетку во все стороны (~300 px/с) и гаснет. Буква берёт
+ * Мышь рисует мазок в грубой карте экрана (клетка — 5 px). Волна от мазка
+ * расходится кругом (~300 px/с) и гаснет (`waveField.ts`). Буква берёт
  * из карты одно значение в своём центре: сама величина её подсвечивает,
  * а её рост — проходящий фронт — на 3–5 шагов подменяет букву соседними
  * знаками её строки «атласа». Поэтому свет держится пятном вокруг следа
@@ -23,11 +24,6 @@ import { split } from "@/lib/scramble";
 const TEXEL = 5;
 /** Шаг карты, с: как у igloo, не чаще 60 раз в секунду. */
 const STEP = 1 / 60;
-/** Затухание карты за шаг. */
-const DECAY = 0.985;
-/** Ослабление фронта на клетку: у igloo его даёт шум сноса, без него кольцо
-    перебора уходило бы через весь экран. Подобрано под их замер: ~400 px. */
-const SPREAD = 0.976;
 /** Мышь стояла дольше — первое её движение не рисуется, с. */
 const IDLE = 0.15;
 /** Скачок больше этой доли окна за шаг — не мазок. */
@@ -42,7 +38,7 @@ const RIM = 0.045;
 const SCRAMBLE_STEPS = 4;
 
 /* Строки «атласа» igloo — знак мотается по своей строке. Кириллицы у них нет,
-   её строки сложены так же, по восемь. */
+   её строки сложены так же, по восемь; украинские буквы — своей строкой. */
 const ROWS = [
   "!\"#$%&'(",
   ")*+,-./0",
@@ -66,6 +62,7 @@ const ROWS = [
   "опрстуфх",
   "цчшщъыьэ",
   "юя",
+  "ҐЄІЇґєії",
 ];
 const PLACE = new Map<string, [number, number]>();
 ROWS.forEach((row, r) => Array.from(row).forEach((c, i) => PLACE.set(c, [r, i])));
@@ -78,7 +75,9 @@ const shifted = (ch: string, k: number) => {
   return row[(at[1] + k) % row.length];
 };
 
-type Letter = { el: HTMLElement; x: number; y: number; last: number; w: number; scr: number; g: string; seed: number };
+/** `still` — крупный текст: только светлеет, знаки не перебирает (Илья, 2026-11-10:
+    подмена в больших буквах, особенно русских, «выглядит липово»). */
+type Letter = { el: HTMLElement; x: number; y: number; last: number; w: number; scr: number; g: string; seed: number; still: boolean };
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const smooth = (a: number, b: number, x: number) => {
@@ -98,11 +97,7 @@ export function attachWave() {
 
   let vw = 0;
   let vh = 0;
-  let gw = 0;
-  let gh = 0;
-  let cur = new Float32Array(0);
-  let nxt = new Float32Array(0);
-  let active = false;
+  const field = createField(TEXEL);
 
   let mx = -1;
   let my = -1;
@@ -120,10 +115,7 @@ export function attachWave() {
   const size = () => {
     vw = window.innerWidth;
     vh = window.innerHeight;
-    gw = Math.ceil(vw / TEXEL) + 1;
-    gh = Math.ceil(vh / TEXEL) + 1;
-    cur = new Float32Array(gw * gh);
-    nxt = new Float32Array(gw * gh);
+    field.resize(vw, vh);
     measured = false;
   };
 
@@ -143,7 +135,17 @@ export function attachWave() {
       box.querySelectorAll<HTMLElement>("[data-c], [data-split] > span").forEach((el) => {
         const r = el.getBoundingClientRect();
         if (!r.width) return;
-        letters.push({ el, x: r.left + r.width / 2, y: r.top + r.height / 2, last: 0, w: 0, scr: 0, g: "", seed: seed++ * 5 });
+        letters.push({
+          el,
+          x: r.left + r.width / 2,
+          y: r.top + r.height / 2,
+          last: 0,
+          w: 0,
+          scr: 0,
+          g: "",
+          seed: seed++ * 5,
+          still: el.dataset.c === "still",
+        });
       });
     }
   };
@@ -170,58 +172,15 @@ export function attachWave() {
     sv += (1 - Math.pow(1 - tv, 4) - sv) * 0.1;
     const R = RADIUS * smooth(0.1, 1, sv) * vh;
 
-    // Карта расползается на клетку и чуть слабеет на фронте.
-    for (let y = 0; y < gh; y++) {
-      const row = y * gw;
-      for (let x = 0; x < gw; x++) {
-        const i = row + x;
-        let n = x > 0 ? cur[i - 1] : 0;
-        if (x < gw - 1 && cur[i + 1] > n) n = cur[i + 1];
-        if (y > 0 && cur[i - gw] > n) n = cur[i - gw];
-        if (y < gh - 1 && cur[i + gw] > n) n = cur[i + gw];
-        n *= SPREAD;
-        nxt[i] = cur[i] > n ? cur[i] : n;
-      }
-    }
     // Мазок — отрезок от прошлого места мыши к нынешнему.
-    if (present && R > 0.5) {
-      const ax = lx;
-      const ay = ly;
-      const sx = mx - ax;
-      const sy = my - ay;
-      const l2 = sx * sx + sy * sy;
-      const x0 = Math.max(0, Math.floor((Math.min(ax, mx) - R) / TEXEL));
-      const x1 = Math.min(gw - 1, Math.ceil((Math.max(ax, mx) + R) / TEXEL));
-      const y0 = Math.max(0, Math.floor((Math.min(ay, my) - R) / TEXEL));
-      const y1 = Math.min(gh - 1, Math.ceil((Math.max(ay, my) + R) / TEXEL));
-      for (let y = y0; y <= y1; y++) {
-        for (let x = x0; x <= x1; x++) {
-          const px = (x + 0.5) * TEXEL - ax;
-          const py = (y + 0.5) * TEXEL - ay;
-          const t = l2 > 0 ? clamp01((px * sx + py * sy) / l2) : 0;
-          const d = Math.hypot(px - sx * t, py - sy * t);
-          const s = 1 - d / R;
-          if (s > 0) nxt[y * gw + x] += s * s * s;
-        }
-      }
-    }
-    let max = 0;
-    for (let i = 0; i < nxt.length; i++) {
-      const v = Math.min(1, nxt[i] * DECAY);
-      nxt[i] = v < 1e-4 ? 0 : v;
-      if (v > max) max = v;
-    }
-    [cur, nxt] = [nxt, cur];
+    field.step(lx, ly, mx, my, present ? R : 0);
     lx = mx;
     ly = my;
-    active = max > 0.003;
 
     // Буквы читают карту в своём центре.
     const dy = scroller ? scroll0 - scroller.scrollTop : 0;
     for (const l of letters) {
-      const cx = Math.floor(l.x / TEXEL);
-      const cy = Math.floor((l.y + dy) / TEXEL);
-      const v = cx >= 0 && cy >= 0 && cx < gw && cy < gh ? cur[cy * gw + cx] : 0;
+      const v = field.at(l.x, l.y + dy);
       const rim = v - l.last;
       l.last = v;
       const w = Math.round(clamp01((v - LIT_FROM) / (LIT_TO - LIT_FROM)) * 50) / 50;
@@ -230,7 +189,7 @@ export function attachWave() {
         else l.el.style.removeProperty("--w");
         l.w = w;
       }
-      if (rim > RIM) l.scr = SCRAMBLE_STEPS;
+      if (rim > RIM && !l.still) l.scr = SCRAMBLE_STEPS;
       let g = "";
       if (l.scr > 0) {
         l.scr--;
@@ -257,7 +216,7 @@ export function attachWave() {
       n++;
     }
     if (n === 4) acc = 0;
-    if (active || performance.now() / 1000 - moveT < IDLE * 2) raf = requestAnimationFrame(frame);
+    if (field.active || performance.now() / 1000 - moveT < IDLE * 2) raf = requestAnimationFrame(frame);
     else {
       // Волна улеглась — буквы на месте; при следующем движении перемеряем.
       for (const l of letters) l.last = 0;
@@ -295,8 +254,7 @@ export function attachWave() {
     /** Комната открылась (или сменился язык) — волна читает её буквы; null — комнаты нет. */
     setRoot(el: HTMLElement | null) {
       clearLetters();
-      cur.fill(0);
-      active = false;
+      field.reset();
       root = el;
       measured = false;
     },
