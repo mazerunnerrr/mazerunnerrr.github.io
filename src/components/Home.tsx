@@ -367,12 +367,21 @@ export function Home({
       if (localStorage.getItem(SOUND_KEY) === "off") setSound(false);
     } catch {}
     const onGesture = (e: Event) => {
+      /* Касание пальцем звук не разрешает — только отпущенный палец (pointerup,
+         touchend). На телефоне звук пробовал заиграть на касании, браузер не
+         пускал, и второй попытки не было: после «старт» музыка молчала
+         (Илья, 2026-11-10). */
+      if (e.type === "pointerdown" && (e as PointerEvent).pointerType !== "mouse") return;
       // Нажатие по самому прибору решает toggleSound: первое — «заиграй».
       if ((e.target as Element | null)?.closest?.(".sound-toggle")) return;
-      if (soundRef.current) startSound();
-      stop();
+      if (!soundRef.current) return stop();
+      const a = ambienceRef.current;
+      if (!a) startSound();
+      else if (a.running) stop();
+      // Браузер мог не пустить и этот раз — пробуем на следующем жесте.
+      else a.wake();
     };
-    const kinds = ["pointerdown", "keydown", "touchend"] as const;
+    const kinds = ["pointerdown", "pointerup", "keydown", "touchend"] as const;
     const stop = () => kinds.forEach((k) => window.removeEventListener(k, onGesture, true));
     kinds.forEach((k) => window.addEventListener(k, onGesture, true));
     return stop;
@@ -402,8 +411,9 @@ export function Home({
   const toggleSound = () => {
     hintDone("sound");
     // Прибор горит, но ещё молчал: первое нажатие — «заиграй», а не «выключи».
-    if (sound && !ambienceRef.current) {
-      startSound();
+    if (sound && !ambienceRef.current?.running) {
+      if (ambienceRef.current) ambienceRef.current.wake();
+      else startSound();
       return;
     }
     const next = !sound;

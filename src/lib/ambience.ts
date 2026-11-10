@@ -251,6 +251,18 @@ export class Ambience {
     droneFilter.connect(droneGain).connect(this.master);
   }
 
+  /** Браузер звук пустил и он идёт. */
+  get running() {
+    return this.ctx.state === "running";
+  }
+
+  /** Ещё попытка заиграть — из жеста: прошлую браузер мог не пустить. */
+  wake() {
+    if (!this.on || this.away) return;
+    void this.ctx.resume();
+    void this.track?.play().catch(() => {});
+  }
+
   /** Включение и выключение плавные: без щелчка в колонках. */
   set(on: boolean) {
     this.on = on;

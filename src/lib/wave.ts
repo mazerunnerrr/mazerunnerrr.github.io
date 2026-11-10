@@ -107,6 +107,8 @@ export function attachWave() {
   /** Скорость мыши: копилка и её сглаженное значение, как у igloo. */
   let tv = 0;
   let sv = 0;
+  /** Ведёт палец: мазок набирает ширину быстрее — свайп короче движения мыши. */
+  let touch = false;
 
   let raf = 0;
   let last = 0;
@@ -124,7 +126,9 @@ export function attachWave() {
     letters = [];
     measured = true;
     if (!root) return;
-    scroller = root.closest<HTMLElement>("[data-room-scroll]");
+    // Колонка прокрутки — внутри комнаты (раньше искалась снаружи и не находилась:
+    // прокрутил посреди волны — буквы читали карту со старых мест).
+    scroller = root.querySelector<HTMLElement>("[data-room-scroll]") ?? root.closest<HTMLElement>("[data-room-scroll]");
     scroll0 = scroller?.scrollTop ?? 0;
     const boxes = root.matches("[data-wave]") ? [root] : Array.from(root.querySelectorAll<HTMLElement>("[data-wave]"));
     let seed = 0;
@@ -169,7 +173,7 @@ export function attachWave() {
       ly = my;
     }
     tv = clamp01((tv + e * 6) * 0.88);
-    sv += (1 - Math.pow(1 - tv, 4) - sv) * 0.1;
+    sv += (1 - Math.pow(1 - tv, 4) - sv) * (touch ? 0.3 : 0.1);
     const R = RADIUS * smooth(0.1, 1, sv) * vh;
 
     // Мазок — отрезок от прошлого места мыши к нынешнему.
@@ -232,13 +236,35 @@ export function attachWave() {
   };
 
   const onMove = (e: PointerEvent) => {
+    touch = e.pointerType !== "mouse";
     mx = e.clientX;
     my = e.clientY;
     moveT = performance.now() / 1000;
     wake();
   };
   const onOut = (e: PointerEvent) => {
-    if (!e.relatedTarget) mx = my = -1;
+    // Палец снимает touchend: pointerout у него приходит, как только пошла прокрутка.
+    if (e.pointerType === "mouse" && !e.relatedTarget) mx = my = -1;
+  };
+  /* Палец — по событиям касания: как только колонка пошла прокручиваться,
+     браузер перестаёт слать pointermove, и буквы под пальцем замирали
+     (Илья, 2026-11-10: «вожу пальцем — разводов нет»). touchmove идёт и во
+     время прокрутки. Касание — новый мазок с места, без отрезка от прошлого. */
+  const onTouch = (e: TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    touch = true;
+    mx = t.clientX;
+    my = t.clientY;
+    if (e.type === "touchstart") {
+      lx = mx;
+      ly = my;
+    }
+    moveT = performance.now() / 1000;
+    wake();
+  };
+  const onTouchEnd = (e: TouchEvent) => {
+    if (!e.touches.length) mx = my = -1;
   };
   const onResize = () => {
     size();
@@ -248,6 +274,10 @@ export function attachWave() {
   size();
   window.addEventListener("pointermove", onMove, { passive: true });
   window.addEventListener("pointerout", onOut, { passive: true });
+  window.addEventListener("touchstart", onTouch, { passive: true });
+  window.addEventListener("touchmove", onTouch, { passive: true });
+  window.addEventListener("touchend", onTouchEnd, { passive: true });
+  window.addEventListener("touchcancel", onTouchEnd, { passive: true });
   window.addEventListener("resize", onResize);
 
   return {
@@ -263,6 +293,10 @@ export function attachWave() {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerout", onOut);
+      window.removeEventListener("touchstart", onTouch);
+      window.removeEventListener("touchmove", onTouch);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("resize", onResize);
     },
   };

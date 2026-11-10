@@ -6,18 +6,48 @@ import { Clicks, ENTER_KEY } from "@/lib/ambience";
 /** Сколько точек в кольце и его радиус. */
 const DOTS = 64;
 const R = 62;
-/** За сколько кольцо проходит круг, мс (Илья, 2026-11-10: было ~2,5 с, «чтобы не ждать»;
-    1,5 с оказалось резко — «чуть длиннее и плавнее»). */
-const DUR = 2200;
+/* Скорость кольца (Илья, 2026-11-10): было ~2,5 с — «чтобы не ждать», 1,5 с по
+   кубической кривой — резко: первые щелчки за 0,15 с сливались в дробь (83 → 50 →
+   39 → 31 мс). Разгон — четверть синуса за RISE: 91 → 63 → 52 → 45 мс между
+   щелчками. Торможение — cos³ за FALL, длиннее разгона: «в конце плавнее» —
+   … 42 → 46 → 51 → 59 → 72 → 95 → 161 мс, кольцо садится мягко. */
+const RISE = 1100;
+const FALL = 1650;
+const DUR = RISE + FALL;
 /** Пока сцена не готова, кольцо не заходит дальше этой доли. */
 const HOLD = 0.86;
-/* Разгон к середине и торможение к концу — по синусу. Кубическая кривая
-   трогалась позже и тут же срывалась: первые щелчки за 0,15 с сливались
-   в дробь (83 → 50 → 39 → 31 мс между ними); у синуса на 2,2 с — 91 → 63 →
-   52 → 45 мс, разгон слышно (Илья, 2026-11-10). */
-const inOut = (u: number) => (1 - Math.cos(Math.PI * u)) / 2;
-/** Доля времени, на которой кривая доходит до HOLD. */
-const U_HOLD = Math.acos(1 - 2 * HOLD) / Math.PI;
+/** Доля кольца по доле времени — таблицей: у такой кривой нет формулы. */
+const STEPS = 1024;
+const CURVE = (() => {
+  const v = (u: number) => {
+    const t = u * DUR;
+    return t < RISE ? Math.sin((Math.PI / 2) * (t / RISE)) : Math.cos((Math.PI / 2) * ((t - RISE) / FALL)) ** 3;
+  };
+  const p = new Float64Array(STEPS + 1);
+  for (let i = 1; i <= STEPS; i++) p[i] = p[i - 1] + (v((i - 1) / STEPS) + v(i / STEPS)) / 2;
+  for (let i = 0; i <= STEPS; i++) p[i] /= p[STEPS];
+  return p;
+})();
+const inOut = (u: number) => {
+  const x = Math.min(1, Math.max(0, u)) * STEPS;
+  const i = Math.min(STEPS - 1, Math.floor(x));
+  return CURVE[i] + (CURVE[i + 1] - CURVE[i]) * (x - i);
+};
+/** Доля времени, когда кольцо доходит до доли `p`. */
+const timeOf = (p: number) => {
+  let lo = 0;
+  let hi = STEPS;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (CURVE[m] < p) lo = m;
+    else hi = m;
+  }
+  return (lo + (p - CURVE[lo]) / (CURVE[hi] - CURVE[lo] || 1)) / STEPS;
+};
+const U_HOLD = timeOf(HOLD);
+/** Последняя точка загорелась — столько кольцо стоит полным, мс, и уходит:
+    хвост кривой после неё почти недвижим, ждать его до конца незачем. */
+const LAST_PAUSE = 150;
 
 /**
  * Заставка на первые секунды (Илья, 2026-10-20, по образцу Active Theory).
@@ -68,6 +98,8 @@ export function Loader({
     /** Доля пройденного времени круга: стоит, пока сцена не готова. */
     let u = 0;
     let lit = 0;
+    /** Когда загорелась последняя точка. */
+    let litAt = 0;
     let shown = -1;
     let raf = 0;
     let timer = 0;
@@ -103,15 +135,16 @@ export function Loader({
       for (; lit < on; lit++) {
         dots.current[lit]?.setAttribute("data-on", "");
         // Когда точка загорелась на самом деле — внутри прошедшего кадра.
-        const at = Math.acos(1 - (2 * (lit + 0.5)) / DOTS) / Math.PI;
+        const at = timeOf((lit + 0.5) / DOTS);
         clicks?.tick(0.8, Math.max(0, ((u - at) * DUR) / 1000));
       }
-      const pct = Math.min(100, Math.round(p * 100));
+      if (lit >= DOTS && !litAt) litAt = now;
+      const pct = lit >= DOTS ? 100 : Math.min(99, Math.round(p * 100));
       if (pct !== shown && count.current) {
         shown = pct;
         count.current.textContent = String(pct).padStart(3, "0");
       }
-      if (readyRef.current && u >= 1) {
+      if (readyRef.current && (u >= 1 || (litAt && now - litAt >= LAST_PAUSE))) {
         clicks?.close();
         window.removeEventListener("keydown", onKey);
         box.current?.setAttribute("data-done", "");
