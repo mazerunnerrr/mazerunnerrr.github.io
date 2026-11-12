@@ -1,24 +1,24 @@
 {
   "alias": "Helias",
-  "thesis": "Беру задачу и довожу до работающего продукта",
-  "intro": "Разбираюсь в бизнесе, проектирую систему и собираю её сам, с AI-инструментами. Поэтому быстрее и дешевле студии, а решения принимаю без цепочки менеджеров.",
-  "origin": "Секрета нет. Мне правда интересно делать интересные вещи, для себя и для других. Код пишу вместе с ИИ.",
-  "process": "Беру вводные, разбираюсь с ними и отдаю результат: быстро, без боли и без швов. Делаю всё, что нужно задаче.",
+  "thesis": "Я создаю",
+  "intro": "Делаю сайты, приложения и ботов на заказ, а параллельно занимаюсь своими проектами. Работаю быстро: сайт, на который у опытного разработчика уходит три недели, собираю за одну.",
+  "origin": "Два года учился на архитектора, потом всё бросил и переехал в другую страну. С головой ушёл в ИИ: на чистом азарте и желании создавать своё.",
+  "process": "Берусь за любую задачу и сразу присылаю план действий. Темп задаёте вы: чем быстрее отвечаете, тем раньше готово.",
   "status": "Удалённо · CET · открыт к проектам",
   "music": "/media/fly-up-high.m4a",
   "photos": [],
   "en": {
-    "thesis": "I take a task and see it through to a working product",
-    "intro": "I learn how the business works, design the system and build it myself, with AI tools. That makes me faster and cheaper than a studio, and decisions don't wait on a chain of managers.",
-    "origin": "No secret. I like making interesting things, for myself and for other people. I write the code together with AI.",
-    "process": "I take the input, work through it and hand back the result: fast, painless, no loose ends. Whatever the task needs, I do.",
+    "thesis": "I create things",
+    "intro": "I build websites, apps and bots for clients and work on my own projects on the side. I work fast: a website that takes an experienced developer three weeks, I build in one.",
+    "origin": "Two years into architecture school I dropped everything and moved to another country. Then I threw myself into AI, on pure drive and the urge to build my own things.",
+    "process": "I take on any task and send an action plan right away. You set the pace: the faster you reply, the sooner it's done.",
     "status": "Remote · CET · open to projects"
   },
   "uk": {
-    "thesis": "Беру завдання і доводжу до робочого продукту",
-    "intro": "Розбираюся в бізнесі, проєктую систему і збираю її сам, з AI-інструментами. Тому швидше й дешевше за студію, а рішення ухвалюю без ланцюжка менеджерів.",
-    "origin": "Секрету немає. Мені справді цікаво робити цікаві речі, для себе й для інших. Код пишу разом із ШІ.",
-    "process": "Беру вхідні дані, розбираюся з ними й віддаю результат: швидко, без болю і без швів. Роблю все, що потрібно завданню.",
+    "thesis": "Я створюю",
+    "intro": "Роблю сайти, застосунки й ботів на замовлення, а паралельно займаюся власними проєктами. Працюю швидко: сайт, на який у досвідченого розробника йде три тижні, збираю за один.",
+    "origin": "Два роки вчився на архітектора, потім усе кинув і переїхав в іншу країну. З головою пішов у ШІ: на чистому азарті й бажанні створювати своє.",
+    "process": "Беруся за будь-яку задачу й одразу надсилаю план дій. Темп задаєте ви: що швидше відповідаєте, то раніше готово.",
     "status": "Віддалено · CET · відкритий до проєктів"
   }
 }
