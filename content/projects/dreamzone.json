@@ -4,10 +4,11 @@
   "year": "2026",
   "role": "приложение",
   "status": "в работе",
-  "summary": "Веб-приложение для мечт: кладёшь в мечту фото и строки, и она становится живой сценой — цвет берётся из твоего снимка, поверх лежит жидкое стекло, которое отвечает на руку. Смысл не «создать», а возвращаться к своему «зачем».",
-  "task": "Доски желаний и заметки про цели выглядят как списки: открыл, пролистал, закрыл. Хотелось места, куда хочется возвращаться, — где мечта ощущается, а не читается.",
-  "solution": "Вся сетка мечт и раскрытая сцена — один WebGL-холст: карточка не сменяется страницей, а растягивается в сцену тем же материалом. Палитра каждой мечты считается из её фотографии, своей палитры у интерфейса нет. Плавность проверял замерами на живом GPU, а не на глаз.",
-  "result": "Основа готова и работает в браузере: создание и правка мечт, хранение снимков, установка как приложение. Дальше — выкладка на сервер и вход с телефона.",
+  "summary": "Мечта в той форме, в которой она в голове: твой снимок становится живой сценой. Смысл — не записать, а возвращаться к своему «зачем».",
+  "idea": "Залог того, что человек доходит до своего, — он помнит, зачем это делает. И ровно это ломается первым. В погоне за желаемым люди забывают «зачем», скатываются в бытовуху, и жизнь становится рутиной, из которой сложно выбраться — потому что своё «зачем» они подавили и забыли.\n\nМечт, целей, желаний у человека в голове много, и живут они там ярко: картинками, звуками, вайбом, ощущением. Но перенести их в реальность почти невозможно. В голове — есть, снаружи — нет. И это «в голове» смешивается с обычным мыслепотоком — бытовым, рабочим — и забывается.\n\nDreamzone — место, где мечта хранится в той форме, в которой она у тебя в голове: фото, видео, голос, музыка, строки. Не заметка о мечте, а сама мечта — чтобы ты всегда видел, ради чего всё это. Пока в мечту кладутся снимки и строки; видео, голос и музыка — дальше.",
+  "task": "",
+  "solution": "Центр тяжести продукта — не «создать», а «вернуться». Доски желаний не работают не потому, что туда нельзя положить картинку, а потому что их собирают один раз на волне вдохновения и больше не открывают. Мечта не забывается — она выцветает. То, что в январе жгло, к июню превращается в стопку JPEG'ов. Если сделать идеальное создание и провалить возвращение — получится просто красивый Pinterest.\n\nНесколько решений, из которых всё складывается:\n— Снимок — основание, а не источник цвета. Фотография и есть мечта; поверх лежит поле-линза: дышит, гнёт, отвечает на руку. Своей палитры у интерфейса нет — цвет приносит мечта.\n— Сцена, а не слайдшоу. У слайдшоу есть таймлайн и конец, его смотрят — это про прошлое. В сцене нет автоплея, стрелок и счётчика «3 из 12»: в ней находишься и из неё выходишь.\n— Карточка не открывает страницу, а становится сценой. Сетка и раскрытая мечта — один WebGL-холст, рамка растягивается тем же материалом, без склейки.\n— Композицию не верстают — она вырастает из содержимого. Ни шаблонов, ни свободного холста: кладёшь фрагменты, вид складывается сам.\n— Мечта не заполняется как анкета. Жмёшь плюс — и сразу оказываешься внутри пустой сцены; снимок, который туда положишь, задаёт всё пространство.\n— Только «зачем». Никаких задач, галочек и стриков: как только они появляются, это ещё один таск-менеджер.\n— Это работает и для мечты не про вещи. Одна из тестовых мечт — «Чтобы отец увидел меня таким». Если интерфейс перестанет её вмещать, значит продукт свернул в каталог хотелок.\n— Плавность и отклик проверял замерами, а не на глаз: скриншот бывает красивым при полностью мёртвом интерактиве.",
+  "result": "Основа готова и работает в браузере: создание и правка мечт, хранение снимков, установка как приложение. Дальше — синхронизация между устройствами и то, ради чего всё затевалось: возвращение.\n\nНапоминание «не забывай о мечте» по ощущению ничем не отличается от уведомления из рабочего чата — тот же баннер, тот же звук. Его отключат через неделю. Поэтому мечта должна возвращаться не прерыванием, а средой: обоями, новой вкладкой, экраном блокировки — там, куда ты и так смотришь сто раз в день. Тебя не дёргают — ты просто оказываешься внутри. И без вины: «не открывал два месяца» — факт, а не упрёк.",
   "did": [
     {
       "title": "Один холст на всё",
@@ -19,7 +20,7 @@
     },
     {
       "title": "Палитра из фото",
-      "detail": "Пять тонов из снимка (k-means), разнесённых по оттенку."
+      "detail": "Снимок сжимается до 64 px, k-means на пять кластеров, из них — тёмная база и три источника света, разнесённые по оттенку."
     },
     {
       "title": "Мечта из фрагментов",
@@ -27,7 +28,7 @@
     },
     {
       "title": "Замеры вместо «на глаз»",
-      "detail": "24 скрипта Playwright: кадры на живом GPU, задержка отклика, сценарии правки."
+      "detail": "20 скриптов Playwright: кадры на живом GPU, задержка отклика, сценарии правки."
     }
   ],
   "stack": [
@@ -42,8 +43,8 @@
   ],
   "facts": [
     {
-      "value": "120 к/с",
-      "label": "в сцене на MacBook M3"
+      "value": "104 к/с",
+      "label": "в сцене с рукой на MacBook M3"
     },
     {
       "value": "211 мс",
@@ -77,12 +78,14 @@
   ],
   "links": [],
   "accent": "azure",
+  "order": 2,
   "en": {
     "role": "app",
-    "summary": "A web app for dreams: put photos and lines into a dream and it becomes a living scene — its colour taken from your photo, with liquid glass on top that answers your hand. The point isn't to create, it's to come back to your why.",
-    "task": "Vision boards and goal notes look like lists: open, scroll, close. I wanted a place you want to come back to — where a dream is felt rather than read.",
-    "solution": "The whole grid of dreams and the open scene are one WebGL canvas: a card doesn't switch to a page, it stretches into the scene in the same material. Each dream's palette is computed from its photo; the interface has no palette of its own. Smoothness was checked with measurements on a real GPU, not by eye.",
-    "result": "The core is done and runs in the browser: creating and editing dreams, storing photos, installing as an app. Next: putting it on a server and signing in from a phone.",
+    "summary": "A dream kept in the form it has in your head: your photo becomes a living scene. The point isn't to write it down but to keep coming back to your “why”.",
+    "idea": "What gets a person to the thing they want is remembering why they're doing it. And that's exactly what breaks first. Chasing what they want, people forget the “why”, slide into everyday routine, and life turns into a rut that's hard to climb out of, because they've buried their “why” and forgotten it.\n\nPeople carry plenty of dreams, goals and wishes in their heads, and they live there vividly: as pictures, sounds, a vibe, a feeling. But bringing them out into the real world is almost impossible. In your head they exist; outside, they don't. And that “in your head” gets mixed into the ordinary stream of thought, about home and work, and slips away.\n\nDreamzone is a place where a dream is kept in the form it has in your head: photos, video, voice, music, lines of text. Not a note about the dream but the dream itself, so you always see what it's all for. For now a dream holds photos and lines; video, voice and music come next.",
+    "task": "",
+    "solution": "The product's centre of gravity isn't “create” but “come back”. Vision boards don't fail because you can't put a picture on them. They fail because people make them once, on a wave of inspiration, and never open them again. A dream isn't forgotten; it fades. What burned in January is a pile of JPEGs by June. Make creating perfect and fail at coming back, and all you get is a pretty Pinterest.\n\nA few decisions everything rests on:\n— The photo is the foundation, not a colour source. The photo is the dream; on top lies a lens field that breathes, bends and answers your hand. The interface has no palette of its own: the dream brings the colour.\n— A scene, not a slideshow. A slideshow has a timeline and an end; you watch it, and it's about the past. The scene has no autoplay, no arrows, no “3 of 12” counter: you're in it, and then you step out.\n— A card doesn't open a page, it becomes the scene. The grid and the open dream are one WebGL canvas; the frame stretches in the same material, with no seam.\n— The layout isn't designed, it grows out of the content. No templates and no free canvas: you add fragments and the view arranges itself.\n— A dream isn't filled in like a form. Press plus and you're straight inside an empty scene; the photo you put there sets the whole space.\n— Only the “why”. No tasks, checkboxes or streaks: the moment they appear, it's one more task manager.\n— It works for dreams that aren't about things, too. One of the test dreams is “For my father to see me like this”. If the interface ever stops holding it, the product has turned into a wish-list catalogue.\n— Smoothness and response were checked with measurements, not by eye: a screenshot can look beautiful while the interaction is completely dead.",
+    "result": "The core is done and runs in the browser: creating and editing dreams, storing photos, installing as an app. Next comes sync across devices, and the thing it was all for in the first place: coming back.\n\nA “don't forget your dream” reminder feels no different from a notification from a work chat: same banner, same sound. People switch it off within a week. So a dream should come back not as an interruption but as surroundings: wallpaper, a new tab, the lock screen, the places you look a hundred times a day anyway. Nobody nudges you; you simply find yourself inside. And without guilt: “not opened for two months” is a fact, not a reproach.",
     "did": [
       {
         "title": "One canvas for everything",
@@ -94,7 +97,7 @@
       },
       {
         "title": "Palette from the photo",
-        "detail": "Five tones from the photo (k-means), spread apart by hue."
+        "detail": "The photo is scaled down to 64 px and split into five clusters with k-means; from them come a dark base and three light sources spread apart by hue."
       },
       {
         "title": "A dream made of fragments",
@@ -102,13 +105,13 @@
       },
       {
         "title": "Measured, not eyeballed",
-        "detail": "24 Playwright scripts: frames on a real GPU, response latency, editing scenarios."
+        "detail": "20 Playwright scripts: frames on a real GPU, response latency, editing scenarios."
       }
     ],
     "facts": [
       {
-        "value": "120 fps",
-        "label": "in the scene on a MacBook M3"
+        "value": "104 fps",
+        "label": "in the scene with the hand moving, MacBook M3"
       },
       {
         "value": "211 ms",
@@ -140,10 +143,11 @@
   },
   "uk": {
     "role": "застосунок",
-    "summary": "Вебзастосунок для мрій: кладеш у мрію фото й рядки, і вона стає живою сценою — колір береться з твого знімка, зверху лежить рідке скло, яке відповідає на руку. Сенс не в тому, щоб «створити», а щоб повертатися до свого «навіщо».",
-    "task": "Дошки бажань і нотатки про цілі виглядають як списки: відкрив, прогорнув, закрив. Хотілося місця, куди хочеться повертатися, — де мрію відчуваєш, а не читаєш.",
-    "solution": "Уся сітка мрій і розгорнута сцена — одне WebGL-полотно: картку не змінює сторінка, вона розтягується в сцену тим самим матеріалом. Палітра кожної мрії обчислюється з її фотографії, власної палітри інтерфейс не має. Плавність перевіряв вимірюваннями на живому GPU, а не на око.",
-    "result": "Основа готова й працює в браузері: створення та редагування мрій, зберігання знімків, встановлення як застосунку. Далі — розгортання на сервері та вхід із телефона.",
+    "summary": "Мрія в тій формі, у якій вона в голові: твій знімок стає живою сценою. Сенс — не записати, а повертатися до свого «навіщо».",
+    "idea": "Запорука того, що людина доходить до свого, — вона пам'ятає, навіщо це робить. І саме це ламається першим. У гонитві за бажаним люди забувають «навіщо», скочуються в побут, і життя стає рутиною, з якої складно вибратися, — бо своє «навіщо» вони придушили й забули.\n\nМрій, цілей, бажань у людини в голові багато, і живуть вони там яскраво: картинками, звуками, вайбом, відчуттям. Але перенести їх у реальність майже неможливо. У голові — є, назовні — немає. І це «в голові» змішується зі звичайним потоком думок — побутових, робочих — і забувається.\n\nDreamzone — місце, де мрія зберігається в тій формі, у якій вона в тебе в голові: фото, відео, голос, музика, рядки. Не нотатка про мрію, а сама мрія — щоб ти завжди бачив, заради чого все це. Поки що в мрію кладуться знімки й рядки; відео, голос і музика — далі.",
+    "task": "",
+    "solution": "Центр ваги продукту — не «створити», а «повернутися». Дошки бажань не працюють не тому, що туди не можна покласти картинку, а тому, що їх збирають один раз на хвилі натхнення й більше не відкривають. Мрія не забувається — вона вицвітає. Те, що в січні пекло, до червня перетворюється на купу JPEG'ів. Якщо зробити ідеальне створення й провалити повернення — вийде просто гарний Pinterest.\n\nКілька рішень, з яких усе складається:\n— Знімок — основа, а не джерело кольору. Фотографія і є мрія; зверху лежить поле-лінза: дихає, гне, відповідає на руку. Власної палітри інтерфейс не має — колір приносить мрія.\n— Сцена, а не слайдшоу. У слайдшоу є таймлайн і кінець, його дивляться — це про минуле. У сцені немає автоплею, стрілок і лічильника «3 з 12»: у ній перебуваєш і з неї виходиш.\n— Картка не відкриває сторінку, а стає сценою. Сітка й розгорнута мрія — одне WebGL-полотно, рамка розтягується тим самим матеріалом, без склейки.\n— Композицію не верстають — вона виростає зі вмісту. Ні шаблонів, ні вільного полотна: кладеш фрагменти, вигляд складається сам.\n— Мрія не заповнюється як анкета. Тиснеш плюс — і одразу опиняєшся всередині порожньої сцени; знімок, який туди покладеш, задає весь простір.\n— Тільки «навіщо». Жодних задач, галочок і стриків: щойно вони з'являються, це ще один таск-менеджер.\n— Це працює і для мрії не про речі. Одна з тестових мрій — «Щоб батько побачив мене таким». Якщо інтерфейс перестане її вміщати, значить продукт звернув у каталог забаганок.\n— Плавність і відгук перевіряв вимірюваннями, а не на око: скриншот буває гарним за повністю мертвої інтерактивності.",
+    "result": "Основа готова й працює в браузері: створення та редагування мрій, зберігання знімків, встановлення як застосунку. Далі — синхронізація між пристроями і те, заради чого все затівалося: повернення.\n\nНагадування «не забувай про мрію» на відчуття нічим не відрізняється від сповіщення з робочого чату — той самий банер, той самий звук. Його вимкнуть за тиждень. Тому мрія має повертатися не перериванням, а середовищем: шпалерами, новою вкладкою, екраном блокування — там, куди ти й так дивишся сто разів на день. Тебе не смикають — ти просто опиняєшся всередині. І без провини: «не відкривав два місяці» — факт, а не докір.",
     "did": [
       {
         "title": "Одне полотно на все",
@@ -155,7 +159,7 @@
       },
       {
         "title": "Палітра з фото",
-        "detail": "П'ять тонів зі знімка (k-means), рознесених за відтінком."
+        "detail": "Знімок стискається до 64 px, k-means на п'ять кластерів, з них — темна основа й три джерела світла, рознесені за відтінком."
       },
       {
         "title": "Мрія з фрагментів",
@@ -163,13 +167,13 @@
       },
       {
         "title": "Виміри замість «на око»",
-        "detail": "24 скрипти Playwright: кадри на живому GPU, затримка відгуку, сценарії редагування."
+        "detail": "20 скриптів Playwright: кадри на живому GPU, затримка відгуку, сценарії редагування."
       }
     ],
     "facts": [
       {
-        "value": "120 к/с",
-        "label": "у сцені на MacBook M3"
+        "value": "104 к/с",
+        "label": "у сцені з рукою на MacBook M3"
       },
       {
         "value": "211 мс",
@@ -198,6 +202,5 @@
         "caption": "Інша мрія — інше світло: палітру дає її фотографія"
       }
     ]
-  },
-  "order": 2
+  }
 }

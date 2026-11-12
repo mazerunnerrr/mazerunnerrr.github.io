@@ -75,18 +75,24 @@ collections:
         i18n: true
         required: false
         hint: "Комната и страница проекта: 2–3 строки, до ~30 слов — что это и зачем"
+      - name: idea
+        label: Откуда идея
+        widget: text
+        i18n: true
+        required: false
+        hint: "Страница проекта, первый раздел — раньше цифр: мысль, из которой проект вырос. Пустая строка — новый абзац, строки «— …» — список"
       - name: task
         label: Задача
         widget: text
         i18n: true
-        required: [ru]
-        hint: "Страница проекта, раздел «Задача»: что болело и почему понадобилось решение"
+        required: false
+        hint: "Страница проекта, раздел «Задача»: что болело и почему понадобилось решение. Можно оставить пустым, если его заменяет «Откуда идея»"
       - name: solution
         label: Решение
         widget: text
         i18n: true
         required: false
-        hint: "Страница проекта, раздел «Решение»: как решил и почему именно так"
+        hint: "Страница проекта, раздел «Решение»: как решил и почему именно так. Пустая строка — новый абзац, строки «— …» — список"
       - name: result
         label: Итог
         widget: text
@@ -154,6 +160,12 @@ collections:
         fields:
           - { name: label, label: Подпись, widget: string, i18n: true }
           - { name: url, label: Адрес, widget: string, i18n: duplicate }
+      - name: caseUrl
+        label: Полный кейс на другом сайте
+        widget: string
+        i18n: duplicate
+        required: false
+        hint: "Адрес с https://. Заполнено — «полный кейс» в комнате открывает его в новой вкладке. Пусто — своя страница проекта"
       - name: accent
         label: Цвет комнаты
         widget: select
@@ -222,6 +234,13 @@ collections:
             i18n: duplicate
             required: false
             hint: "mp3, играет по кругу по переключателю звука. Пусто — звучит процедурный ветер мира. Ставить только трек, на который есть права"
+          - name: photos
+            label: Фото фоном
+            widget: list
+            i18n: duplicate
+            required: false
+            hint: "«Обо мне», фоном под текстом, притушены. Несколько — сменяются наплывом. Горизонтальные, от 1600 px по ширине"
+            field: { name: photo, label: Фото, widget: image }
 
       - name: skills
         label: Что делаю

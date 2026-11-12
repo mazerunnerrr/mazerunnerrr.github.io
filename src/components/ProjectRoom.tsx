@@ -157,7 +157,11 @@ export function ProjectRoom({
             </p>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 md:mt-3.5">
-            <a href={`/work/${p.slug}/`} className={link}>
+            <a
+              href={p.caseUrl ?? `/work/${p.slug}/`}
+              {...(p.caseUrl ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+              className={link}
+            >
               <Flip text={`${t.fullCase} ↗`} />
             </a>
             {p.links.map((l, i) => (

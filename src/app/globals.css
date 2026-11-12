@@ -255,6 +255,16 @@ body {
 .room-veil {
   background: rgba(11, 22, 51, 0.34);
 }
+/* Полоса под «к маршруту» на странице кейса (ProjectPage.tsx): фон страницы,
+   гаснущий вниз, — прокрученный текст уходит под надпись и тает. */
+.case-back {
+  background: linear-gradient(to bottom, var(--color-void) calc(100% - 28px), transparent);
+}
+/* Фото «обо мне» (AboutPhotos.tsx): свет кадра, а не картинка — притушено,
+   чтобы текст колонки поверх держал контраст. */
+.about-photos {
+  opacity: 0.32;
+}
 
 /* Комната проекта (ProjectRoom.tsx). Цвет — акцент проекта: им тонируется
    свечение из глубины, контур кадра и подписи, как у Active Theory. */

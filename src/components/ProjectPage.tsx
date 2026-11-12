@@ -19,13 +19,19 @@ export function ProjectPage({ project: both }: { project: Record<Lang, Project> 
       data-accent={accentOf(project)}
       className="mx-auto w-full max-w-[1100px] px-[clamp(18px,5vw,64px)] pb-[clamp(60px,12vh,140px)] pt-[clamp(22px,4vh,48px)]"
     >
-      {/* Назад — к точке этого проекта на маршруте, а не к первой. */}
-      <Link
-        href={`/#${project.slug}`}
-        className="eyebrow text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
-      >
-        {t.backToRoute}
-      </Link>
+      {/* Назад — к точке этого проекта на маршруте, а не к первой. Стоит в левом
+          верхнем углу при любой прокрутке (Илья, 2026-11-12): полоса под ним гаснет
+          вниз, текст уходит под неё, а не наползает на надпись. Поле сверху — то же,
+          что у страницы, поэтому прилипшая надпись не сдвигается; хвост полосы снизу
+          (`pb` с равным `-mb`) лежит на отступе заголовка и вёрстку не двигает. */}
+      <div className="case-back sticky top-0 z-20 -mb-10 -mt-[clamp(22px,4vh,48px)] pb-10 pt-[clamp(22px,4vh,48px)]">
+        <Link
+          href={`/#${project.slug}`}
+          className="eyebrow text-[var(--sand-dim)] transition-colors duration-500 ease-[var(--ease-out-deep)] hover:text-[var(--color-sand)]"
+        >
+          {t.backToRoute}
+        </Link>
+      </div>
 
       <ProjectBody project={project} lang={lang} />
 

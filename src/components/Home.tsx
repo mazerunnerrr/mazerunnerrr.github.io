@@ -6,12 +6,14 @@ import type { RoomLayout } from "@/lib/roomSurface";
 import type { ChapterLight, Landmark } from "@/lib/environment";
 import type { Contacts, Experience, Project, Site, Skill } from "@/content";
 import { starSpots } from "@/lib/shapes";
+import { AboutPhotos } from "@/components/AboutPhotos";
 import { ContactForm } from "@/components/ContactForm";
 import { Loader } from "@/components/Loader";
 import { Ambience, SOUND_KEY } from "@/lib/ambience";
 import { attachFlipHand, Flip, flipIn } from "@/components/Flip";
 import { WaveText } from "@/components/WaveText";
 import { attachWave } from "@/lib/wave";
+import { BackTrail } from "@/lib/backTrail";
 import { clamp01, ease, fade, lightUp } from "@/lib/layer";
 import { ProjectRoom, type RoomUpdate } from "@/components/ProjectRoom";
 import { ACCENT_HEX, STATUS, accentOf } from "@/lib/status";
@@ -442,8 +444,9 @@ export function Home({
   const onReady = useCallback(
     (api: SceneApi) => {
       apiRef.current = api;
-      const stop = hashStops[window.location.hash];
-      if (stop !== undefined) api.jumpTo(stop);
+      // Вернулись «назад» со страницы кейса или перезагрузили — на ту же точку (`backTrail.ts`).
+      const stop = BackTrail.startPoint(hashStops[window.location.hash] ?? 0);
+      if (stop !== 0) api.jumpTo(stop);
     },
     [hashStops]
   );
@@ -463,7 +466,17 @@ export function Home({
     if (kind === "experience") setStar(job);
     setRoom(k);
     apiRef.current?.setRoom(k, kind === "experience" ? job : -1);
+    roomLive.current = k;
+    trail.current?.openRoom(k);
   };
+
+  /* «Назад» телефона и браузера — по пройденному пути (`backTrail.ts`). Комната
+     здесь — сразу, без ожидания рендера: popstate может прийти раньше него.
+     `settled` — точка, где камера встала последней. */
+  const trail = useRef<BackTrail | null>(null);
+  const roomLive = useRef<number | null>(null);
+  const settled = useRef(0);
+  const closingBack = useRef(false);
 
   /** Куда вернуть фокус после выхода из комнаты. */
   const returnTo = useRef<number | null>(null);
@@ -472,7 +485,51 @@ export function Home({
     returnTo.current = room;
     setRoom(null);
     apiRef.current?.setRoom(null);
+    roomLive.current = null;
+    // Закрыли не «назад», а кнопкой, Esc или колесом — шаг комнаты становится точкой.
+    if (!closingBack.current) trail.current?.closeRoom();
   }, [room]);
+  const closeRoomRef = useRef(closeRoom);
+  useEffect(() => {
+    closeRoomRef.current = closeRoom;
+  }, [closeRoom]);
+
+  useEffect(() => {
+    const t = new BackTrail();
+    t.start(hashStops[window.location.hash] ?? 0);
+    trail.current = t;
+    settled.current = BackTrail.startPoint(0);
+    const arm = () => t.arm();
+    const gestures = ["touchstart", "touchend", "pointerdown", "pointerup", "keydown"] as const;
+    gestures.forEach((k) => window.addEventListener(k, arm, true));
+    const onPop = (e: PopStateEvent) => {
+      const s = t.pop(e.state);
+      if (s === null) return;
+      // Адрес тот же, восстанавливать роутеру Next нечего — событие только наше.
+      e.stopImmediatePropagation();
+      if (s === "self") return;
+      const open = roomLive.current;
+      if (open !== null) {
+        // Та же комната — перемены нет, шаг дальше назад.
+        if (s.room && s.p === open) return history.back();
+        closingBack.current = true;
+        closeRoomRef.current();
+        closingBack.current = false;
+        if (s.p !== open) apiRef.current?.goTo(s.p, true);
+        return;
+      }
+      // Камера уже здесь — перемены нет, шаг дальше назад (с имени — с сайта).
+      if (s.p === settled.current) return history.back();
+      apiRef.current?.goTo(s.p, true);
+    };
+    // Захватом: раньше обработчика Next на том же window.
+    window.addEventListener("popstate", onPop, true);
+    return () => {
+      gestures.forEach((k) => window.removeEventListener(k, arm, true));
+      window.removeEventListener("popstate", onPop, true);
+      trail.current = null;
+    };
+  }, [hashStops]);
 
   /* В комнате фокус встаёт на «закрыть», Esc выводит обратно на аллею.
 
@@ -532,6 +589,17 @@ export function Home({
     const corridor = 1 - amount;
     const free = room === null;
     roomOpen.current = amount;
+    // Камера встала на новую точку — шаг пути для «назад» (`backTrail.ts`).
+    // До onReady сцена ещё не встала на стартовую точку — не считается.
+    if (
+      free &&
+      apiRef.current &&
+      near !== settled.current &&
+      Math.abs(velocity) < 0.02 &&
+      Math.abs(progress - Math.round(progress)) < 0.01 &&
+      trail.current?.arrive(near)
+    )
+      settled.current = near;
 
     for (let k = 0; k < N; k++) {
       const el = layers.current[k];
@@ -859,7 +927,7 @@ export function Home({
       содержимое прокручивается целиком, без видимой полосы: в комнате
       колесо отдано ему. Комната проекта (`fixed`) не прокручивается: она
       ровно в экран, и подсказка выхода у неё своя, сверху. */
-  const roomShell = (k: number, label: string, children: React.ReactNode, accent?: string, fixed = false) => (
+  const roomShell = (k: number, label: string, children: React.ReactNode, accent?: string, fixed = false, backdrop?: React.ReactNode) => (
     <div
       key={`room-${k}`}
       ref={roomRef(k)}
@@ -870,6 +938,8 @@ export function Home({
       data-accent={accent}
       className="pointer-events-none absolute inset-0 opacity-0"
     >
+      {/* Фон под вуалью, не прокручивается с текстом (фото «обо мне»). */}
+      {backdrop}
       {/* Ровная синева под текстом: материя вокруг видна, но не спорит с буквами. */}
       <div className="room-veil absolute inset-0" aria-hidden />
       {closeButton(k, !fixed)}
@@ -1113,7 +1183,10 @@ export function Home({
                   </li>
                 ))}
               </ul>
-            </div>
+            </div>,
+            undefined,
+            false,
+            <AboutPhotos photos={site.photos} open={room === k} />
           );
         }
         if (s.kind === "experience") {

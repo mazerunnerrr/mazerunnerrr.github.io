@@ -65,6 +65,8 @@ export type Site = {
   status: string;
   /** Трек сайта, путь от корня. Пусто — играет процедурный звук мира. */
   music?: string;
+  /** Фото фоном «обо мне», пути от корня. Несколько — сменяются наплывом. */
+  photos: string[];
 };
 
 export type Contacts = {
@@ -118,6 +120,9 @@ export type Project = {
   status: ProjectStatus;
   /** Суть в 2–3 строки — в подписи комнаты проекта и на его странице. */
   summary?: string;
+  /** Откуда идея — мысль, из которой проект вырос; на странице первой главой,
+      раньше цифр (Илья, 2026-11-12). Пусто — главы нет. */
+  idea?: string;
   /* Кейс главами: задача → решение → итог. Каждая — глава комнаты проекта,
      пустая пропускается (Илья, 2026-10-19). */
   task?: string;
@@ -136,6 +141,9 @@ export type Project = {
   poster?: string;
   shots: Shot[];
   links: Link[];
+  /** «Полный кейс» живёт на другом сайте — туда и ведёт ссылка из комнаты
+      (Snake Battle — документация проекта). Пусто — своя страница `/work/<адрес>/`. */
+  caseUrl?: string;
   accent?: Accent;
   /** Место на аллее: меньше — раньше. Пусто — после пронумерованных, по статусу и году. */
   order?: number;
@@ -198,7 +206,7 @@ const lastYear = (year: string) => Math.max(0, ...(year.match(/\d{4}/g) ?? []).m
 
 export const getSite = (lang: Lang = "en"): Site => {
   const s = readIn<Site>("site.json", lang);
-  return { ...s, music: opt(s.music) };
+  return { ...s, music: opt(s.music), photos: (s.photos ?? []).filter((x) => x?.trim()) };
 };
 
 export const getContacts = (lang: Lang = "en"): Contacts => {
@@ -230,10 +238,12 @@ export const getProjects = (lang: Lang = "en"): Project[] =>
         ...p,
         slug: name.slice(0, -".json".length),
         summary: opt(p.summary),
+        idea: opt(p.idea),
         task: opt(p.task),
         solution: opt(p.solution),
         result: opt(p.result),
         scheme: opt(p.scheme),
+        caseUrl: opt(p.caseUrl),
         video: opt(p.video),
         poster: opt(p.poster),
         accent: opt(p.accent) as Accent | undefined,

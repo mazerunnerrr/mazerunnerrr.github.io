@@ -38,9 +38,38 @@ export function ProjectBody({ project, lang }: { project: Project; lang: Lang })
   const heading = (text: string) => (
     <h2 className="font-display mt-[clamp(36px,6vh,72px)] text-[clamp(22px,2.6vw,32px)] font-light leading-tight">{text}</h2>
   );
-  const paragraph = (text: string) => (
-    <p className="mt-4 max-w-[62ch] text-[clamp(14px,1.6vw,17px)] font-extralight leading-[1.8] text-[var(--sand-dim)]">{text}</p>
-  );
+  /** Текст главы из админки: пустая строка — новый абзац, строки «— …» подряд —
+      список с той же чертой, что у «Что сделал» (Илья, 2026-11-12: кейс Dreamzone). */
+  const paragraph = (text: string) => {
+    const blocks: { list: boolean; lines: string[] }[] = [];
+    let open: (typeof blocks)[number] | null = null;
+    for (const raw of text.split("\n")) {
+      const line = raw.trim();
+      if (!line) {
+        open = null;
+        continue;
+      }
+      const item = /^[—–-]\s+/.test(line);
+      if (!open || open.list !== item) blocks.push((open = { list: item, lines: [] }));
+      open.lines.push(item ? line.replace(/^[—–-]\s+/, "") : line);
+    }
+    return blocks.map((b, i) =>
+      b.list ? (
+        <ul key={i} className="mt-4 max-w-[62ch] space-y-3">
+          {b.lines.map((l, j) => (
+            <li key={j} className="relative pl-5 text-[clamp(14px,1.6vw,17px)] font-extralight leading-[1.8] text-[var(--sand-dim)]">
+              <span className="absolute left-0 top-[0.9em] h-px w-[9px] bg-[var(--accent)] opacity-70" aria-hidden />
+              {l}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p key={i} className="mt-4 max-w-[62ch] text-[clamp(14px,1.6vw,17px)] font-extralight leading-[1.8] text-[var(--sand-dim)]">
+          {b.lines.join(" ")}
+        </p>
+      )
+    );
+  };
 
   // Видео — обложка, и тогда все скриншоты идут ниже; иначе обложка — первый скриншот.
   const [hero, ...rest] = project.video ? [undefined, ...project.shots] : project.shots;
@@ -78,6 +107,15 @@ export function ProjectBody({ project, lang }: { project: Project; lang: Lang })
         />
       ) : hero ? (
         <div className="mt-[clamp(26px,5vh,54px)]">{figure(hero, 0, true)}</div>
+      ) : null}
+
+      {/* Откуда идея — первым после обложки, раньше цифр: кейс начинается с «зачем»,
+          а не с технологий (Илья, 2026-11-12). */}
+      {project.idea ? (
+        <>
+          {heading(t.chIdea)}
+          {paragraph(project.idea)}
+        </>
       ) : null}
 
       {project.facts.length > 0 ? (
