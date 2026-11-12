@@ -796,8 +796,8 @@ export function Home({
       v > 0.02
         ? `${-v * 7}px 0 rgba(143,179,204,.55), ${v * 7}px 0 rgba(232,223,205,.35)`
         : "none";
+    // Заголовок контактов — без каймы (Илья, 2026-11-12: «барахлит», в отличие от ссылок под ним).
     for (const el of glitch.current) if (el) el.style.textShadow = shadow;
-    if (contactsTitleRef.current) contactsTitleRef.current.style.textShadow = shadow;
   };
 
   /** Выход из комнаты: кнопка вверху справа и подсказка внизу по центру —
