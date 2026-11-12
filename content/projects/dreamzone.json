@@ -43,8 +43,8 @@
   ],
   "facts": [
     {
-      "value": "104 к/с",
-      "label": "в сцене с рукой на MacBook M3"
+      "value": "120 к/с",
+      "label": "в сцене на MacBook M3"
     },
     {
       "value": "211 мс",
@@ -110,8 +110,8 @@
     ],
     "facts": [
       {
-        "value": "104 fps",
-        "label": "in the scene with the hand moving, MacBook M3"
+        "value": "120 fps",
+        "label": "in the scene on a MacBook M3"
       },
       {
         "value": "211 ms",
@@ -172,8 +172,8 @@
     ],
     "facts": [
       {
-        "value": "104 к/с",
-        "label": "у сцені з рукою на MacBook M3"
+        "value": "120 к/с",
+        "label": "у сцені на MacBook M3"
       },
       {
         "value": "211 мс",
